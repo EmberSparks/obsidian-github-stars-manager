@@ -1,0 +1,544 @@
+/*
+ * GitHub Stars Manager
+ * 自定义样式
+ */
+
+/* 主容器 */
+.github-stars-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 0 10px;
+}
+
+/* 标题 */
+.github-stars-header {
+  margin: 10px 0;
+  border-bottom: 1px solid var(--background-modifier-border);
+  padding-bottom: 10px;
+}
+
+.github-stars-header h2 {
+  margin: 0;
+  font-size: 1.5em;
+  color: var(--text-normal);
+}
+
+/* 工具栏 */
+.github-stars-toolbar {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+  padding: 5px;
+  border-radius: 5px;
+  background-color: var(--background-secondary);
+}
+
+.github-stars-sync-button {
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border: none;
+  border-radius: 3px;
+  padding: 5px 10px;
+  margin-right: 10px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.github-stars-sync-button:hover {
+  background-color: var(--interactive-accent-hover);
+}
+
+.github-stars-sync-button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.github-stars-search {
+  /* flex-grow: 1; */ /* Removed to prevent taking all space */
+  width: 250px; /* Give it a fixed width, adjust as needed */
+  max-width: 50%; /* Or a max width relative to the toolbar */
+  margin-right: 10px; /* Add some space between search and sort button */
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 3px;
+  padding: 5px 10px;
+  background-color: var(--background-primary);
+  color: var(--text-normal);
+}
+
+/* 新增：排序按钮样式 */
+.github-stars-sort-button {
+  background-color: transparent;
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+  border-radius: 3px;
+  padding: 5px 8px; /* Adjust padding */
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.github-stars-sort-button:hover {
+  background-color: var(--background-modifier-hover);
+  border-color: var(--interactive-accent);
+  color: var(--interactive-accent);
+}
+
+.github-stars-sort-button.active {
+  background-color: var(--interactive-accent);
+  border-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.github-stars-sort-button.active:hover {
+  background-color: var(--interactive-accent-hover);
+}
+
+/* 标签筛选区 - 应用商店风格 */
+.github-stars-tags {
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.github-stars-tags-title {
+  font-weight: 500;
+  color: var(--text-normal);
+  font-size: 0.9em;
+  margin-right: 4px;
+}
+
+.github-stars-tags-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.github-stars-tag {
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.85em;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background-color: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+  font-weight: 600; /* Make tags bold */
+}
+
+.github-stars-tag:hover {
+  border-color: var(--interactive-accent);
+  background-color: var(--background-modifier-hover);
+}
+
+.github-stars-tag.active {
+  background-color: #22c55e;
+  color: white;
+  border-color: #22c55e;
+}
+
+.github-stars-tag-more {
+  color: var(--interactive-accent);
+  cursor: pointer;
+  font-size: 0.85em;
+  padding: 6px 12px;
+  border-radius: 20px;
+  background-color: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  transition: all 0.2s ease;
+}
+
+.github-stars-tag-more:hover {
+  background-color: var(--background-modifier-hover);
+  border-color: var(--interactive-accent);
+}
+
+
+/* 仓库容器 - 应用商店网格布局 */
+.github-stars-repos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+  gap: 16px;
+  flex-grow: 1;
+  overflow-y: auto;
+  padding: 0;
+  align-items: start; /* Align cards to start to prevent stretching */
+}
+
+/* 空状态 */
+.github-stars-empty {
+  padding: 20px;
+  text-align: center;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* 仓库卡片 - 应用商店风格 */
+.github-stars-repo {
+    padding: 16px;
+    border-radius: 12px;
+    background-color: var(--background-primary);
+    position: relative;
+    transition: all 0.2s ease;
+    border: 1px solid var(--background-modifier-border);
+    display: flex;
+    flex-direction: column;
+    height: fit-content;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.github-stars-repo:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.github-stars-repo-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+
+.github-stars-repo-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    object-fit: cover;
+    border: 1px solid var(--background-modifier-border);
+    flex-shrink: 0;
+}
+
+.github-stars-repo-title-group {
+    flex: 1;
+    min-width: 0;
+}
+
+.github-stars-repo-title {
+    font-weight: 700; /* Make project titles bold */
+    font-size: 1.1em;
+    line-height: 1.3;
+    margin-bottom: 4px;
+}
+
+.github-stars-repo-link {
+    color: var(--text-normal);
+    text-decoration: none;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.github-stars-repo-link:hover {
+    color: var(--interactive-accent);
+}
+
+.github-stars-repo-desc {
+    color: var(--text-muted);
+    font-size: 0.9em;
+    line-height: 1.5;
+    margin-bottom: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+.github-stars-repo-desc-tooltip {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background-color: var(--background-secondary);
+    color: var(--text-normal);
+    padding: 12px;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    z-index: 1000;
+    font-size: 0.9em;
+    line-height: 1.4;
+    border: 1px solid var(--background-modifier-border);
+    display: none;
+    margin-top: 8px;
+}
+
+.github-stars-repo-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+
+.github-stars-repo-tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.75em;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+    background-color: var(--background-modifier-border);
+    color: var(--text-muted);
+}
+
+.github-stars-repo-tag:hover {
+    transform: translateY(-1px);
+    background-color: var(--background-modifier-hover);
+}
+
+.github-stars-repo-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: auto;
+    padding-top: 6px;
+    border-top: 1px solid var(--background-modifier-border);
+}
+
+.github-stars-repo-info {
+    display: flex;
+    align-items: center;
+    font-size: 0.8em;
+    color: var(--text-muted);
+    gap: 12px;
+}
+
+.github-stars-repo-edit {
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent);
+    border: none;
+    border-radius: 8px;
+    padding: 6px 14px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-weight: 600;
+    font-size: 0.8em;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.github-stars-repo-edit:hover {
+    background-color: var(--interactive-accent-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* 仓库标签的颜色系统 (纯色版本) */
+.github-stars-repo-tag[data-tag-color="1"] {
+  background: #6366f1;
+  color: white;
+}
+
+.github-stars-repo-tag[data-tag-color="2"] {
+  background: #ec4899;
+  color: white;
+}
+
+.github-stars-repo-tag[data-tag-color="3"] {
+  background: #06b6d4;
+  color: white;
+}
+
+.github-stars-repo-tag[data-tag-color="4"] {
+  background: #10b981;
+  color: white;
+}
+
+.github-stars-repo-tag[data-tag-color="5"] {
+  background: #f59e0b;
+  color: white;
+}
+
+.github-stars-repo-tag[data-tag-color="6"] {
+  background: #8b5cf6;
+  color: white;
+}
+
+.github-stars-repo-tag[data-tag-color="7"] {
+  background: #ef4444;
+  color: white;
+}
+
+.github-stars-repo-tag[data-tag-color="8"] {
+  background: #f97316;
+  color: white;
+}
+
+.github-stars-repo-tag[data-tag-color="9"] {
+  background: #84cc16;
+  color: white;
+}
+
+.github-stars-repo-tag[data-tag-color="10"] {
+  background: #06b6d4;
+  color: white;
+}
+
+.github-stars-repo-tag[data-tag-color="11"] {
+  background: #8b5cf6;
+  color: white;
+}
+
+.github-stars-repo-tag[data-tag-color="12"] {
+  background: #be185d;
+  color: white;
+}
+
+.github-stars-repo-notes {
+    margin-top: 8px;
+    padding: 8px;
+    border-radius: 6px;
+    background-color: var(--background-secondary);
+    font-size: 0.85em;
+    color: var(--text-muted);
+    font-style: italic;
+    border-left: 3px solid var(--interactive-accent);
+}
+
+.github-stars-repo-linked-note {
+    margin-top: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.85em;
+}
+
+.github-stars-repo-linked-note a {
+    color: var(--interactive-accent);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.github-stars-repo-linked-note a:hover {
+    text-decoration: underline;
+}
+
+
+/* 编辑模态框 */
+.edit-repo-info {
+  margin-bottom: 20px;
+  padding: 10px;
+  background-color: var(--background-secondary);
+  border-radius: 5px;
+}
+
+.edit-repo-fullname {
+  font-weight: bold;
+  margin: 0 0 5px 0;
+  color: var(--text-accent);
+}
+
+.edit-repo-description {
+  margin: 0;
+  font-size: 0.9em;
+  color: var(--text-muted);
+}
+
+.edit-repo-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+/* 笔记选择器模态框 */
+.note-selector-search {
+  margin-bottom: 15px;
+}
+
+.note-selector-search input {
+  width: 100%;
+  padding: 8px;
+  border-radius: 5px;
+  border: 1px solid var(--background-modifier-border);
+}
+
+.note-selector-files {
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 5px;
+}
+
+.note-selector-file {
+  padding: 8px 10px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.note-selector-file:hover {
+  background-color: var(--background-secondary-alt);
+}
+
+.note-selector-file:not(:last-child) {
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.note-selector-empty {
+  padding: 15px;
+  text-align: center;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* Styles for Existing Tags in Edit Modal */
+.existing-tags-container {
+  margin-top: 5px; /* Add some space above the container */
+  margin-bottom: 15px; /* Add space below before the next setting */
+  padding-left: 10px; /* Align roughly with setting controls */
+}
+
+.existing-tags-label {
+  display: block; /* Make label appear on its own line */
+  margin-bottom: 5px;
+  font-size: var(--font-ui-small);
+  color: var(--text-muted);
+}
+
+.existing-tag-button {
+  background-color: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-normal);
+  padding: 3px 8px;
+  margin-right: 5px;
+  margin-bottom: 5px; /* Allow wrapping */
+  border-radius: var(--radius-s);
+  cursor: pointer;
+  font-size: var(--font-ui-small);
+  transition: background-color 0.1s ease-in-out, border-color 0.1s ease-in-out;
+}
+
+.existing-tag-button:hover {
+  background-color: var(--background-modifier-hover);
+  border-color: var(--interactive-accent);
+}
+
+/* Style for active existing tag button in modal */
+.existing-tag-button.active {
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: var(--interactive-accent-hover);
+}
+
+.existing-tag-button.active:hover {
+  background-color: var(--interactive-accent-hover);
+}
+
+/* Style for Notes Textarea in Edit Modal */
+.edit-repo-notes-textarea {
+  resize: none; /* Disable resizing completely */
+  height: 11.5em; /* Set a fixed height (5em * 2.3) */
+  width: 100%; /* Ensure it takes full available width */
+  box-sizing: border-box; /* Include padding and border in the element's total width and height */
+  /* Width is typically handled by the parent Setting component, but we explicitly set it */
+}
+
+
+/* --- Edit Repo Modal Width Adjustment (Attempt 2) --- */
+.github-stars-edit-modal {
+  width: 75vw; /* Set width relative to viewport width */
+  max-width: 900px; /* Adjust max-width accordingly */
+}
