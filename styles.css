@@ -139,6 +139,13 @@
   border-color: #22c55e;
 }
 
+.github-stars-tag.highlighted {
+  background-color: #fbbf24;
+  color: white;
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.3);
+}
+
 .github-stars-tag-more {
   color: var(--interactive-accent);
   cursor: pointer;
@@ -305,6 +312,39 @@
     font-size: 0.8em;
     color: var(--text-muted);
     gap: 12px;
+    flex-wrap: wrap;
+}
+
+.github-stars-repo-stars,
+.github-stars-repo-forks,
+.github-stars-repo-updated {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.github-stars-icon {
+    font-size: 0.9em;
+}
+
+.star-icon svg,
+.fork-icon svg,
+.calendar-icon svg {
+    display: inline-block;
+    vertical-align: middle;
+    color: var(--text-muted);
+}
+
+.star-icon svg {
+    color: #eab308; /* Yellow color for star icon */
+}
+
+.github-stars-repo-language {
+    background-color: var(--background-modifier-border);
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-size: 0.75em;
+    font-weight: 500;
 }
 
 .github-stars-repo-edit {
