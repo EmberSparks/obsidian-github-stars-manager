@@ -7,6 +7,7 @@ export interface GithubStarsSettings {
     githubToken: string;
     autoSync: boolean;
     syncInterval: number; // 单位：分钟
+    theme: 'default' | 'ios-glass'; // 新增主题设置
 }
 
 // GitHub仓库接口（来自GitHub API, 包含 starred_at）

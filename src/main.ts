@@ -53,6 +53,9 @@ export default class GithubStarsPlugin extends Plugin {
         // 注册自动同步 (不变)
         this.setupAutoSync();
 
+        // 应用主题
+        this.applyTheme(this.settings.theme);
+
         new Notice('GitHub Stars Manager 已加载');
     }
 
@@ -234,5 +237,20 @@ export default class GithubStarsPlugin extends Plugin {
             });
         }
         this.data.allTags = Array.from(allTags).sort();
+    }
+
+    // --- 主题管理 ---
+    applyTheme(theme: 'default' | 'ios-glass') {
+        const body = document.body;
+        
+        // 移除所有主题类
+        body.removeClass('github-stars-theme-default');
+        body.removeClass('github-stars-theme-ios-glass');
+        
+        // 应用新主题类
+        body.addClass(`github-stars-theme-${theme}`);
+        
+        // 更新视图以应用主题
+        this.updateViews();
     }
 }
