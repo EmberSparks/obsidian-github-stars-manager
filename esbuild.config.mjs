@@ -13,7 +13,7 @@ if you want to view the source, please visit the github repository of this plugi
 
 const prod = (process.argv[2] === "production");
 
-// esbuild plugin to handle copying files after build
+// esbuild plugin to handle copying files after build with backup
 const copyPlugin = {
     name: 'copy-to-obsidian',
     setup: (build) => {
@@ -31,38 +31,50 @@ const copyPlugin = {
 
             const pluginId = "obsidian-github-stars-manager"; // Must match the 'id' in manifest.json
             const targetDir = path.join(obsidianPluginDir, pluginId);
+            const backupDir = path.join(targetDir, "backup");
 
             // Ensure target directory exists
             if (!fs.existsSync(targetDir)) {
                 fs.mkdirSync(targetDir, { recursive: true });
             }
 
-            // Copy main.js
-            try {
-                fs.copyFileSync("main.js", path.join(targetDir, "main.js"));
-                console.log(`Copied main.js to ${targetDir}`);
-            } catch (err) {
-                console.error('Error copying main.js:', err);
+            // Ensure backup directory exists
+            if (!fs.existsSync(backupDir)) {
+                fs.mkdirSync(backupDir, { recursive: true });
             }
 
-
-            // Copy styles.css if it exists
-            if (fs.existsSync("styles.css")) {
+            // Function to backup and copy file
+            const backupAndCopy = (sourceFile, targetFile, fileName) => {
                 try {
-                    fs.copyFileSync("styles.css", path.join(targetDir, "styles.css"));
-                    console.log(`Copied styles.css to ${targetDir}`);
+                    // Create backup if target file exists
+                    if (fs.existsSync(targetFile)) {
+                        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                        const backupFile = path.join(backupDir, `${fileName}.${timestamp}.backup`);
+                        fs.copyFileSync(targetFile, backupFile);
+                        console.log(`Backed up ${fileName} to ${backupFile}`);
+                    }
+
+                    // Copy new file
+                    fs.copyFileSync(sourceFile, targetFile);
+                    console.log(`Copied ${fileName} to ${targetDir}`);
                 } catch (err) {
-                    console.error('Error copying styles.css:', err);
+                    console.error(`Error copying ${fileName}:`, err);
                 }
+            };
+
+            // Copy main.js with backup
+            backupAndCopy("main.js", path.join(targetDir, "main.js"), "main.js");
+
+            // Copy styles.css with backup if it exists
+            if (fs.existsSync("styles.css")) {
+                backupAndCopy("styles.css", path.join(targetDir, "styles.css"), "styles.css");
             }
 
-            // Copy manifest.json
-            try {
-                fs.copyFileSync("manifest.json", path.join(targetDir, "manifest.json"));
-                console.log(`Copied manifest.json to ${targetDir}`);
-            } catch (err) {
-                console.error('Error copying manifest.json:', err);
-            }
+            // Copy manifest.json with backup
+            backupAndCopy("manifest.json", path.join(targetDir, "manifest.json"), "manifest.json");
+
+            console.log(`\n✅ Plugin files deployed to: ${targetDir}`);
+            console.log(`📦 Backups stored in: ${backupDir}`);
         });
     },
 };

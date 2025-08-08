@@ -191,15 +191,15 @@
 }
 
 
-/* 仓库容器 - 应用商店网格布局 */
+/* 仓库容器 - 小红书风格瀑布流布局 */
 .github-stars-repos {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
-  gap: 16px;
+  column-count: auto;
+  column-width: 280px;
+  column-gap: 16px;
   flex-grow: 1;
   overflow-y: auto;
-  padding: 0;
-  align-items: start; /* Align cards to start to prevent stretching */
+  padding: 16px;
+  column-fill: balance;
 }
 
 /* 空状态 */
@@ -212,37 +212,50 @@
 
 /* 仓库卡片 - 应用商店风格 */
 .github-stars-repo {
-    padding: 16px;
-    border-radius: 12px;
+    padding: 12px;
+    border-radius: 20px; /* 小红书风格的大圆角 */
     background-color: var(--background-primary);
     position: relative;
-    transition: all 0.2s ease;
-    border: 1px solid var(--background-modifier-border);
+    transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    border: 1px solid var(--background-modifier-border-hover);
     display: flex;
     flex-direction: column;
     height: fit-content;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    min-height: auto; /* 移除最小高度限制 */
+    max-height: none; /* 移除最大高度限制，让内容自适应 */
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08); /* 小红书风格的柔和阴影 */
+    overflow: hidden;
+    margin-bottom: 16px; /* 瀑布流间距 */
+    break-inside: avoid; /* 防止卡片被分割到不同列 */
+    page-break-inside: avoid; /* 兼容性 */
+    /* 小红书风格的背景 */
+    background: var(--background-primary);
 }
 
 .github-stars-repo:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    transform: translateY(-2px) scale(1.02); /* 小红书风格的悬停效果 */
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+    border-color: var(--interactive-accent);
 }
 
 .github-stars-repo-header {
     display: flex;
     align-items: flex-start;
-    gap: 12px;
-    margin-bottom: 10px;
+    gap: 10px;
+    margin-bottom: 8px; /* 减少间距 */
+    min-height: 40px; /* 减少高度 */
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--background-modifier-border-hover);
 }
 
 .github-stars-repo-avatar {
-    width: 48px;
-    height: 48px;
-    border-radius: 10px;
+    width: 36px; /* 小红书风格的小头像 */
+    height: 36px;
+    border-radius: 50%; /* 圆形头像 */
     object-fit: cover;
-    border: 1px solid var(--background-modifier-border);
+    border: 2px solid var(--background-modifier-border);
     flex-shrink: 0;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .github-stars-repo-title-group {
@@ -250,14 +263,15 @@
     min-width: 0;
     display: flex;
     flex-direction: column;
-    justify-content: center; /* Center content vertically to align with avatar */
+    justify-content: flex-start; /* 改为顶部对齐，确保内容可见 */
+    gap: 4px; /* 添加间距 */
 }
 
 .github-stars-repo-title {
-    font-weight: 700; /* Make project titles bold */
-    font-size: 1.0em;
-    line-height: 1.2;
-    margin-bottom: 2px;
+    font-weight: 600; /* 稍微减轻字重 */
+    font-size: 0.9em; /* 小红书风格的紧凑字体 */
+    line-height: 1.3;
+    margin-bottom: 4px;
 }
 
 .github-stars-repo-link {
@@ -275,14 +289,16 @@
 
 .github-stars-repo-desc {
     color: var(--text-muted);
-    font-size: 0.9em;
-    line-height: 1.5;
-    margin-bottom: 12px;
+    font-size: 0.85em; /* 小红书风格的小字体 */
+    line-height: 1.4;
+    margin-bottom: 10px; /* 减少间距 */
     overflow: hidden;
     text-overflow: ellipsis;
     display: -webkit-box;
-    -webkit-line-clamp: 2;
+    -webkit-line-clamp: 4; /* 允许更多行显示 */
     -webkit-box-orient: vertical;
+    word-wrap: break-word;
+    padding: 4px 0; /* 减少内边距 */
 }
 
 .github-stars-repo-desc-tooltip {
@@ -314,27 +330,32 @@
 .github-stars-repo-title-tags {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px;
-    margin-top: 2px; /* Reduce space between title and tags */
+    gap: 4px; /* 小红书风格的紧凑间距 */
+    margin-top: 4px;
+    margin-bottom: 6px;
+    min-height: 16px;
 }
 
 .github-stars-repo-title-tags .github-stars-repo-tag {
-    padding: 1px 6px; /* Smaller padding for tags in title area */
-    font-size: 0.7em; /* Smaller font size */
-    border-radius: 10px; /* Smaller border radius */
+    padding: 2px 6px; /* 小红书风格的小标签 */
+    font-size: 0.7em;
+    border-radius: 8px; /* 小圆角 */
+    white-space: nowrap;
 }
 
 .github-stars-repo-tag {
     display: inline-block;
-    padding: 2px 8px;
-    border-radius: 12px;
+    padding: 3px 10px;
+    border-radius: 14px;
     font-size: 0.75em;
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s ease;
-    border: 1px solid transparent;
-    background-color: var(--background-modifier-border);
-    color: var(--text-muted);
+    border: 1px solid var(--background-modifier-border);
+    background-color: var(--background-secondary);
+    color: var(--text-normal);
+    white-space: nowrap; /* 防止标签文字换行 */
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .github-stars-repo-tag:hover {
@@ -347,17 +368,22 @@
     justify-content: space-between;
     align-items: center;
     margin-top: auto;
-    padding-top: 6px;
+    padding-top: 8px; /* 减少内边距 */
     border-top: 1px solid var(--background-modifier-border);
+    min-height: 32px; /* 减少高度 */
+    flex-shrink: 0;
+    gap: 8px; /* 减少间距 */
 }
 
 .github-stars-repo-info {
     display: flex;
     align-items: center;
-    font-size: 0.8em;
+    font-size: 0.75em; /* 小红书风格的小字体 */
     color: var(--text-muted);
-    gap: 12px;
+    gap: 8px; /* 减少间距 */
     flex-wrap: wrap;
+    flex: 1;
+    min-height: 16px;
 }
 
 .github-stars-repo-stars,
@@ -396,13 +422,13 @@
     background-color: var(--interactive-accent);
     color: var(--text-on-accent);
     border: none;
-    border-radius: 8px;
-    padding: 6px 14px;
+    border-radius: 12px; /* 小红书风格的圆角按钮 */
+    padding: 4px 10px; /* 更紧凑的按钮 */
     cursor: pointer;
     transition: all 0.2s ease;
-    font-weight: 600;
-    font-size: 0.8em;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    font-weight: 500;
+    font-size: 0.75em; /* 更小的字体 */
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .github-stars-repo-edit:hover {

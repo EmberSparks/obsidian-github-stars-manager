@@ -397,7 +397,7 @@ export class GithubStarsView extends ItemView {
                 
                 // Create tooltip for long descriptions
                 if (repo.description.length > 100) {
-                    const tooltip = repoEl.createEl('div', { 
+                    const tooltip = repoEl.createEl('div', {
                         cls: 'github-stars-repo-desc-tooltip',
                         text: repo.description
                     });
