@@ -95,6 +95,20 @@ export class GithubStarsView extends ItemView {
             this.renderRepositories();
         });
 
+        // Theme Toggle Button
+        const themeButton = toolbarDiv.createEl('button', { cls: 'github-stars-theme-button' });
+        this.updateThemeButton(themeButton);
+        themeButton.setAttribute('aria-label', '切换主题');
+        themeButton.addEventListener('click', () => {
+            const currentTheme = this.plugin.settings.theme;
+            const newTheme = currentTheme === 'default' ? 'ios-glass' : 'default';
+            this.plugin.settings.theme = newTheme;
+            this.plugin.saveSettings();
+            this.plugin.applyTheme(newTheme);
+            this.updateThemeButton(themeButton);
+            new Notice(`已切换到${newTheme === 'ios-glass' ? 'iOS液态玻璃' : '默认'}主题`);
+        });
+
         // Tags Filter Area
         const tagsDiv = container.createDiv('github-stars-tags');
         this.tagsContainer = tagsDiv.createDiv('github-stars-tags-container');
@@ -345,34 +359,13 @@ export class GithubStarsView extends ItemView {
                 attr: { href: repo.html_url || '#', target: '_blank' }
             });
 
-            // Description (from githubRepo)
-            if (repo.description) {
-                const descEl = repoEl.createEl('div', { cls: 'github-stars-repo-desc', text: repo.description });
-                
-                // Create tooltip for long descriptions
-                if (repo.description.length > 100) {
-                    const tooltip = repoEl.createEl('div', { 
-                        cls: 'github-stars-repo-desc-tooltip',
-                        text: repo.description
-                    });
-                    
-                    descEl.addEventListener('mouseenter', () => {
-                        tooltip.style.display = 'block';
-                    });
-                    
-                    descEl.addEventListener('mouseleave', () => {
-                        tooltip.style.display = 'none';
-                    });
-                }
-            }
-
-            // Tags (from enhancement)
+            // Tags in title group (moved from below description)
             if (Array.isArray(repo.tags) && repo.tags.length > 0) {
-                const tagsEl = repoEl.createEl('div', { cls: 'github-stars-repo-tags' });
+                const titleTagsEl = titleGroupEl.createEl('div', { cls: 'github-stars-repo-title-tags' });
                 repo.tags.forEach(tag => {
                     const colorIndex = this.getTagColorIndex(tag);
-                    const tagEl = tagsEl.createEl('span', { 
-                        cls: 'github-stars-repo-tag', 
+                    const tagEl = titleTagsEl.createEl('span', {
+                        cls: 'github-stars-repo-tag',
                         text: tag,
                         attr: { 'data-tag-color': String(colorIndex) }
                     });
@@ -397,6 +390,29 @@ export class GithubStarsView extends ItemView {
                     });
                 });
             }
+
+            // Description (from githubRepo)
+            if (repo.description) {
+                const descEl = repoEl.createEl('div', { cls: 'github-stars-repo-desc', text: repo.description });
+                
+                // Create tooltip for long descriptions
+                if (repo.description.length > 100) {
+                    const tooltip = repoEl.createEl('div', { 
+                        cls: 'github-stars-repo-desc-tooltip',
+                        text: repo.description
+                    });
+                    
+                    descEl.addEventListener('mouseenter', () => {
+                        tooltip.style.display = 'block';
+                    });
+                    
+                    descEl.addEventListener('mouseleave', () => {
+                        tooltip.style.display = 'none';
+                    });
+                }
+            }
+
+            // Tags moved to title group - this section is now empty
 
             // Footer with info and edit button
             const footerEl = repoEl.createEl('div', { cls: 'github-stars-repo-footer' });
@@ -494,5 +510,25 @@ export class GithubStarsView extends ItemView {
             console.warn('repoContainer not initialized when updateData called');
         }
         console.log('GithubStarsView: Data updated and view re-rendered.');
+    }
+
+    /**
+     * 更新主题按钮的图标和样式
+     */
+    updateThemeButton(button: HTMLElement) {
+        const currentTheme = this.plugin.settings.theme;
+        button.empty();
+        
+        if (currentTheme === 'ios-glass') {
+            // iOS液态玻璃主题图标
+            setIcon(button, 'sparkles');
+            button.setAttribute('aria-label', '切换到默认主题');
+            button.addClass('active');
+        } else {
+            // 默认主题图标
+            setIcon(button, 'palette');
+            button.setAttribute('aria-label', '切换到iOS液态玻璃主题');
+            button.removeClass('active');
+        }
     }
 } // End of GithubStarsView class
