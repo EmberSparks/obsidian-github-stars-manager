@@ -12,7 +12,10 @@ This plugin allows you to manage and view your starred GitHub repositories direc
 - 🔄 Automatic or manual synchronization of starred repositories
 - 🔍 Search and filter by name, language, tags
 - 📊 Sort by starred time, name, language, and more
-- 🎨 Clean UI that integrates seamlessly with Obsidian themes
+- 🎨 Multiple theme support: Default theme and iOS Glass theme
+- 🌊 **iOS Glass Theme**: iOS-style frosted glass effect with dynamic backgrounds and shimmer animations
+- 📱 Waterfall layout: Xiaohongshu-style card display
+- ✨ Responsive design that integrates seamlessly with Obsidian themes
 
 ## Configuration
 
@@ -39,6 +42,21 @@ To use this plugin, you need to provide a GitHub Personal Access Token (PAT) wit
 3. Configure your GitHub PAT in the plugin settings on first use
 4. Click the "Sync" button to fetch your starred repositories
 5. You can add personal notes, tags, or link repositories to existing Obsidian notes
+
+### Theme Switching
+
+The plugin provides two visual themes:
+
+- **Default Theme**: Clean card layout that maintains consistency with Obsidian's native themes
+- **iOS Glass Theme**: iOS-style frosted glass effect with the following features:
+  - 🌈 Colorful gradient backgrounds for better visual contrast
+  - ✨ Dynamic floating animation background effects
+  - 🔍 Enhanced frosted glass blur effects
+  - 💫 Shimmer sweep animation on card hover
+  - 📱 Waterfall layout similar to Xiaohongshu's card display
+  - 🎯 Optimized font rendering to avoid blur issues on hover
+
+You can quickly switch themes using the theme button at the top of the plugin interface.
 
 ## Installation
 
