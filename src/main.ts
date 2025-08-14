@@ -12,7 +12,8 @@ const DEFAULT_PLUGIN_DATA: PluginData = {
     githubRepositories: [], // 重命名
     userEnhancements: {},   // 新增
     allTags: [],            // 新增 (替代旧的 tags)
-    lastSyncTime: ''
+    lastSyncTime: '',
+    accountSyncTimes: {}    // 新增：每个账号的同步时间
 };
 
 // 默认合并数据 (不变，因为内部引用已更新)
@@ -33,8 +34,8 @@ export default class GithubStarsPlugin extends Plugin {
         // 加载合并后的数据
         await this.loadCombinedData();
 
-        // 初始化GitHub服务 (不变)
-        this.githubService = new GithubService(this.settings.githubToken);
+        // 初始化GitHub服务 (支持多账号)
+        this.githubService = new GithubService(this.settings.accounts || []);
         // 添加设置标签 (不变)
         this.addSettingTab(new GithubStarsSettingTab(this.app, this));
 
@@ -89,6 +90,9 @@ export default class GithubStarsPlugin extends Plugin {
         if (!Array.isArray(this.data.allTags)) {
             this.data.allTags = [];
         }
+        if (typeof this.data.accountSyncTimes !== 'object' || this.data.accountSyncTimes === null || Array.isArray(this.data.accountSyncTimes)) {
+            this.data.accountSyncTimes = {};
+        }
     }
 
     async saveCombinedData() {
@@ -105,7 +109,8 @@ export default class GithubStarsPlugin extends Plugin {
     // --- 设置相关 (不变) ---
     async saveSettings() {
         await this.saveCombinedData();
-        this.githubService.setToken(this.settings.githubToken);
+        // 更新GitHub服务的账号列表
+        this.githubService.updateAccounts(this.settings.accounts || []);
         this.setupAutoSync();
     }
 
@@ -156,34 +161,54 @@ export default class GithubStarsPlugin extends Plugin {
 
     // --- 核心逻辑 (重构) ---
     async syncStars(): Promise<void> {
-        if (!this.settings.githubToken) {
-            new Notice('请先在设置中配置GitHub个人访问令牌');
-            return;
+        // 检查是否有启用的账号
+        const enabledAccounts = (this.settings.accounts || []).filter(acc => acc.enabled);
+        
+        if (enabledAccounts.length === 0) {
+            // 向后兼容：如果没有多账号配置，使用单一令牌
+            if (!this.settings.githubToken) {
+                new Notice('请先在设置中配置GitHub账号或个人访问令牌');
+                return;
+            }
+            // 创建临时账号进行同步
+            const tempAccount = {
+                id: 'legacy',
+                name: '默认账号',
+                username: 'unknown',
+                token: this.settings.githubToken,
+                enabled: true
+            };
+            this.settings.accounts = [tempAccount];
+            this.githubService.updateAccounts([tempAccount]);
         }
+
         new Notice('正在同步GitHub星标...');
         try {
-            // 1. 获取最新的 GitHub 仓库列表
-            const fetchedRepositories = await this.githubService.fetchStarredRepositories();
-            console.log('Fetched repositories from GitHub:', fetchedRepositories);
-            if (!fetchedRepositories) {
-                 new Notice('获取星标仓库失败，请检查令牌权限或网络');
-                 console.error('fetchStarredRepositories returned null or undefined');
-                 return;
-            }
+            // 1. 获取所有启用账号的星标仓库
+            const syncResult = await this.githubService.fetchAllStarredRepositories();
+            console.log('Sync result:', syncResult);
 
-            // 2. 直接替换旧的 GitHub 数据
-            this.data.githubRepositories = fetchedRepositories;
+            // 2. 更新仓库数据
+            this.data.githubRepositories = syncResult.repositories;
 
             // 3. 更新同步时间
             this.data.lastSyncTime = new Date().toISOString();
+            this.data.accountSyncTimes = {
+                ...this.data.accountSyncTimes,
+                ...syncResult.accountSyncTimes
+            };
 
-            // 4. 保存数据 (注意：用户增强数据 userEnhancements 不在此处修改)
-            // savePluginData 内部会调用 saveCombinedData, 进而调用 updateAllTags
+            // 4. 保存数据
             await this.savePluginData();
             console.log('Plugin data saved after sync. GitHub Repos count:', this.data.githubRepositories.length);
 
-            new Notice(`成功同步 ${fetchedRepositories.length} 个星标仓库`);
-            // 5. 更新视图
+            // 5. 显示同步结果
+            const errorCount = Object.keys(syncResult.errors).length;
+            if (errorCount > 0) {
+                console.error('同步错误:', syncResult.errors);
+            }
+
+            // 6. 更新视图
             this.updateViews();
         } catch (error) {
             console.error('同步GitHub星标失败:', error);

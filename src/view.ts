@@ -109,6 +109,9 @@ export class GithubStarsView extends ItemView {
             new Notice(`已切换到${newTheme === 'ios-glass' ? 'iOS液态玻璃' : '默认'}主题`);
         });
 
+        // 在工具栏中添加账户选择器
+        this.addAccountSelector(toolbarDiv);
+
         // Tags Filter Area
         const tagsDiv = container.createDiv('github-stars-tags');
         this.tagsContainer = tagsDiv.createDiv('github-stars-tags-container');
@@ -280,6 +283,20 @@ export class GithubStarsView extends ItemView {
 
         // 2. Filter combined data
         const filteredRepos = combinedRepos.filter(repo => {
+            // Account filter - only show repos from enabled accounts
+            const enabledAccounts = this.plugin.settings.accounts?.filter(account => account.enabled) || [];
+            const enabledAccountIds = enabledAccounts.map(account => account.id);
+            
+            // If no accounts are enabled, show nothing
+            if (enabledAccountIds.length === 0) {
+                return false;
+            }
+            
+            // If repo has account_id, check if it's from an enabled account
+            if (repo.account_id && !enabledAccountIds.includes(repo.account_id)) {
+                return false;
+            }
+            
             const name = repo.name || '';
             const description = repo.description || '';
             const ownerLogin = repo.owner?.login || '';
@@ -530,5 +547,121 @@ export class GithubStarsView extends ItemView {
             button.setAttribute('aria-label', '切换到iOS液态玻璃主题');
             button.removeClass('active');
         }
+    }
+
+    /**
+     * 在工具栏中添加账户选择器
+     */
+    private addAccountSelector(toolbarDiv: HTMLElement): void {
+        const accounts = this.plugin.settings.accounts || [];
+        
+        // 创建账户选择器容器
+        const accountSelectorContainer = toolbarDiv.createDiv('github-account-selector');
+        
+        if (accounts.length === 0) {
+            // 没有配置账号时显示添加按钮
+            const addAccountBtn = accountSelectorContainer.createEl('button', {
+                cls: 'github-account-add-btn',
+                text: '+ 添加账号'
+            });
+            
+            addAccountBtn.addEventListener('click', () => {
+                // 打开插件设置页面
+                // @ts-ignore - Obsidian API
+                this.app.setting.open();
+                // @ts-ignore - Obsidian API
+                this.app.setting.openTabById(this.plugin.manifest.id);
+            });
+            
+            return;
+        }
+
+        // 创建折叠按钮
+        const toggleBtn = accountSelectorContainer.createEl('button', {
+            cls: 'github-account-toggle-btn',
+            text: `账号 (${accounts.filter((a: any) => a.enabled).length})`
+        });
+        
+        // 创建折叠内容容器
+        const collapsibleContent = accountSelectorContainer.createDiv('github-account-collapsible');
+        collapsibleContent.style.display = 'none'; // 初始状态为折叠
+        
+        let isExpanded = false;
+        
+        toggleBtn.addEventListener('click', () => {
+            isExpanded = !isExpanded;
+            collapsibleContent.style.display = isExpanded ? 'block' : 'none';
+            toggleBtn.toggleClass('expanded', isExpanded);
+        });
+
+        // 添加账号列表
+        accounts.forEach((account: any) => {
+            const accountEl = collapsibleContent.createDiv('github-account-item-compact');
+            
+            // 头像
+            if (account.avatar_url) {
+                const avatarEl = accountEl.createEl('img', {
+                    cls: 'account-avatar-small',
+                    attr: {
+                        src: account.avatar_url,
+                        alt: `${account.username} avatar`,
+                        loading: 'lazy'
+                    }
+                });
+                avatarEl.addEventListener('error', () => {
+                    avatarEl.style.display = 'none';
+                });
+            }
+            
+            // 账号信息
+            const infoEl = accountEl.createDiv('account-info-compact');
+            infoEl.createEl('span', {
+                cls: 'account-name-compact',
+                text: account.name || account.username
+            });
+            infoEl.createEl('span', {
+                cls: 'account-username-compact',
+                text: `@${account.username}`
+            });
+            
+            // 同步时间
+            const syncTime = this.plugin.data.accountSyncTimes?.[account.id];
+            if (syncTime) {
+                infoEl.createEl('span', {
+                    cls: 'account-sync-time-compact',
+                    text: this.formatRelativeTime(syncTime)
+                });
+            }
+            
+            // 启用状态切换
+            const toggleEl = accountEl.createDiv('account-toggle-compact');
+            const toggleInput = toggleEl.createEl('input', {
+                type: 'checkbox',
+                cls: 'account-toggle-input-compact'
+            });
+            toggleInput.checked = account.enabled;
+            
+            toggleInput.addEventListener('change', async () => {
+                account.enabled = toggleInput.checked;
+                await this.plugin.saveSettings();
+                
+                // 更新视觉状态
+                accountEl.toggleClass('disabled', !account.enabled);
+                
+                // 更新按钮文本
+                toggleBtn.textContent = `账号 (${accounts.filter((a: any) => a.enabled).length})`;
+                
+                // 显示通知
+                new Notice(`账号 ${account.username} ${account.enabled ? '已启用' : '已禁用'}`);
+                
+                // 重新渲染仓库列表以应用账户过滤
+                this.renderRepositories();
+            });
+            
+            // 设置初始状态
+            if (!account.enabled) {
+                accountEl.addClass('disabled');
+            }
+        });
     }
 } // End of GithubStarsView class
