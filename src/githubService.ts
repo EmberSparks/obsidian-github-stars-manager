@@ -1,24 +1,19 @@
 import { Octokit } from '@octokit/rest';
 import { Notice } from 'obsidian';
-import { GithubRepository } from './types'; // Removed LocalRepository import
+import { GithubRepository, GithubAccount } from './types';
 
 /**
- * GitHub服务类：负责与GitHub API交互
+ * 单个账号的GitHub服务实例
  */
-export class GithubService {
+class SingleAccountGithubService {
     private octokit: Octokit | null = null;
     
-    /**
-     * 初始化GitHub服务
-     * @param token GitHub个人访问令牌
-     */
-    constructor(private token: string) {
-        this.setToken(token);
+    constructor(private account: GithubAccount) {
+        this.setToken(account.token);
     }
     
     /**
      * 设置GitHub令牌
-     * @param token GitHub个人访问令牌
      */
     public setToken(token: string): void {
         if (!token) {
@@ -31,8 +26,7 @@ export class GithubService {
                 auth: token
             });
         } catch (error) {
-            console.error('初始化Octokit失败:', error);
-            new Notice('GitHub Stars Manager: 初始化Octokit失败，请检查令牌');
+            console.error(`初始化Octokit失败 (${this.account.username}):`, error);
             this.octokit = null;
         }
     }
@@ -41,16 +35,11 @@ export class GithubService {
      * 检查服务是否已经初始化
      */
     private checkInitialized(): boolean {
-        if (!this.octokit) {
-            new Notice('GitHub Stars Manager: 请先设置有效的GitHub令牌');
-            return false;
-        }
-        return true;
+        return this.octokit !== null;
     }
     
     /**
-     * 获取用户星标的所有仓库 (包含 starred_at)
-     * @returns 星标仓库列表 (GithubRepository[])
+     * 获取用户星标的所有仓库
      */
     public async fetchStarredRepositories(): Promise<GithubRepository[]> {
         if (!this.checkInitialized()) {
@@ -58,19 +47,16 @@ export class GithubService {
         }
         
         try {
-            // 获取所有星标仓库（处理分页）
             const repositories: GithubRepository[] = [];
             let page = 1;
-            const per_page = 100; // GitHub API允许的最大每页数量
+            const per_page = 100;
             
             while (true) {
-                // 使用非空断言，因为之前已经通过checkInitialized()检查
-                // Add the 'star' media type header to get starred_at field
                 const response = await this.octokit!.activity.listReposStarredByAuthenticatedUser({
                     per_page,
                     page,
                     headers: {
-                        Accept: 'application/vnd.github.star+json' // This header is crucial
+                        Accept: 'application/vnd.github.star+json'
                     }
                 });
                 
@@ -78,19 +64,17 @@ export class GithubService {
                     break;
                 }
                 
-                // The response.data here should be an array of objects like:
-                // { starred_at: "...", repo: { ... actual repo data ... } }
-                // We need to extract the 'repo' and add 'starred_at' to it.
                 const starredReposData = response.data.map((item: any) => {
                     if (item && item.repo && item.starred_at) {
                         return {
-                            ...item.repo, // Spread the actual repository data
-                            starred_at: item.starred_at // Add the starred_at field
+                            ...item.repo,
+                            starred_at: item.starred_at,
+                            account_id: this.account.id // 标记来源账号
                         };
                     }
-                    console.warn("Skipping malformed starred repo item:", item);
-                    return null; // Skip malformed items
-                }).filter(repo => repo !== null); // Filter out nulls
+                    console.warn(`Skipping malformed starred repo item (${this.account.username}):`, item);
+                    return null;
+                }).filter(repo => repo !== null);
 
                 repositories.push(...starredReposData as GithubRepository[]);
                 
@@ -103,36 +87,203 @@ export class GithubService {
             
             return repositories;
         } catch (error) {
-            console.error('获取星标仓库失败:', error);
-            new Notice('GitHub Stars Manager: 获取星标仓库失败');
+            console.error(`获取星标仓库失败 (${this.account.username}):`, error);
             return [];
         }
     }
     
     /**
      * 获取用户信息
-     * @returns 用户信息或null
      */
-    public async getCurrentUser(): Promise<{login: string, name: string} | null> {
+    public async getCurrentUser(): Promise<{login: string, name: string, avatar_url: string} | null> {
         if (!this.checkInitialized()) {
             return null;
         }
         
         try {
-            // 使用非空断言，因为之前已经通过checkInitialized()检查
             const { data } = await this.octokit!.users.getAuthenticated();
             return {
                 login: data.login,
-                name: data.name || data.login
+                name: data.name || data.login,
+                avatar_url: data.avatar_url
             };
         } catch (error) {
-            console.error('获取用户信息失败:', error);
-            new Notice('GitHub Stars Manager: 获取用户信息失败，请检查令牌');
+            console.error(`获取用户信息失败 (${this.account.username}):`, error);
             return null;
         }
     }
+}
 
-    // Removed the convertToLocalRepositories method as it's no longer needed
-    // The fetchStarredRepositories method now directly returns GithubRepository[]
-    // including the starred_at field. User enhancements are handled separately.
+/**
+ * 多账号GitHub服务类：负责管理多个GitHub账号的API交互
+ */
+export class GithubService {
+    private services: Map<string, SingleAccountGithubService> = new Map();
+    
+    /**
+     * 初始化多账号GitHub服务
+     */
+    constructor(private accounts: GithubAccount[] = []) {
+        this.updateAccounts(accounts);
+    }
+    
+    /**
+     * 更新账号列表
+     */
+    public updateAccounts(accounts: GithubAccount[]): void {
+        this.accounts = accounts;
+        this.services.clear();
+        
+        // 为每个启用的账号创建服务实例
+        accounts.filter(account => account.enabled).forEach(account => {
+            this.services.set(account.id, new SingleAccountGithubService(account));
+        });
+    }
+    
+    /**
+     * 获取所有启用账号的星标仓库
+     */
+    public async fetchAllStarredRepositories(): Promise<{
+        repositories: GithubRepository[];
+        accountSyncTimes: { [accountId: string]: string };
+        errors: { [accountId: string]: string };
+    }> {
+        const allRepositories: GithubRepository[] = [];
+        const accountSyncTimes: { [accountId: string]: string } = {};
+        const errors: { [accountId: string]: string } = {};
+        
+        if (this.services.size === 0) {
+            new Notice('GitHub Stars Manager: 没有启用的GitHub账号');
+            return { repositories: [], accountSyncTimes, errors };
+        }
+        
+        // 并行获取所有账号的星标仓库
+        const promises = Array.from(this.services.entries()).map(async ([accountId, service]) => {
+            const account = this.accounts.find(acc => acc.id === accountId);
+            if (!account) return;
+            
+            try {
+                const repos = await service.fetchStarredRepositories();
+                allRepositories.push(...repos);
+                accountSyncTimes[accountId] = new Date().toISOString();
+                
+                console.log(`成功同步账号 ${account.username}: ${repos.length} 个仓库`);
+            } catch (error) {
+                const errorMsg = `同步失败: ${error instanceof Error ? error.message : '未知错误'}`;
+                errors[accountId] = errorMsg;
+                console.error(`账号 ${account.username} 同步失败:`, error);
+            }
+        });
+        
+        await Promise.all(promises);
+        
+        // 去重处理（基于仓库ID，保留最新的starred_at时间）
+        const uniqueRepos = this.deduplicateRepositories(allRepositories);
+        
+        // 显示同步结果通知
+        const successCount = Object.keys(accountSyncTimes).length;
+        const errorCount = Object.keys(errors).length;
+        const totalRepos = uniqueRepos.length;
+        
+        if (errorCount === 0) {
+            new Notice(`GitHub Stars Manager: 成功同步 ${successCount} 个账号，共 ${totalRepos} 个仓库`);
+        } else {
+            new Notice(`GitHub Stars Manager: 同步完成，${successCount} 个成功，${errorCount} 个失败，共 ${totalRepos} 个仓库`);
+        }
+        
+        return {
+            repositories: uniqueRepos,
+            accountSyncTimes,
+            errors
+        };
+    }
+    
+    /**
+     * 去重仓库（基于仓库ID）
+     */
+    private deduplicateRepositories(repositories: GithubRepository[]): GithubRepository[] {
+        const repoMap = new Map<number, GithubRepository>();
+        
+        repositories.forEach(repo => {
+            const existing = repoMap.get(repo.id);
+            if (!existing) {
+                repoMap.set(repo.id, repo);
+            } else {
+                // 如果仓库已存在，保留最新的starred_at时间
+                const existingTime = existing.starred_at ? new Date(existing.starred_at).getTime() : 0;
+                const currentTime = repo.starred_at ? new Date(repo.starred_at).getTime() : 0;
+                
+                if (currentTime > existingTime) {
+                    repoMap.set(repo.id, repo);
+                }
+            }
+        });
+        
+        return Array.from(repoMap.values());
+    }
+    
+    /**
+     * 验证单个账号的令牌
+     */
+    public async validateAccount(account: GithubAccount): Promise<{
+        valid: boolean;
+        userInfo?: { login: string; name: string; avatar_url: string };
+        error?: string;
+    }> {
+        const service = new SingleAccountGithubService(account);
+        
+        try {
+            const userInfo = await service.getCurrentUser();
+            if (userInfo) {
+                return { valid: true, userInfo };
+            } else {
+                return { valid: false, error: '无法获取用户信息' };
+            }
+        } catch (error) {
+            return { 
+                valid: false, 
+                error: error instanceof Error ? error.message : '验证失败' 
+            };
+        }
+    }
+    
+    /**
+     * 获取指定账号的用户信息
+     */
+    public async getAccountUserInfo(accountId: string): Promise<{
+        login: string; 
+        name: string; 
+        avatar_url: string;
+    } | null> {
+        const service = this.services.get(accountId);
+        if (!service) {
+            return null;
+        }
+        
+        return await service.getCurrentUser();
+    }
+
+    // 向后兼容的方法
+    /**
+     * @deprecated 使用 fetchAllStarredRepositories 替代
+     */
+    public async fetchStarredRepositories(): Promise<GithubRepository[]> {
+        const result = await this.fetchAllStarredRepositories();
+        return result.repositories;
+    }
+    
+    /**
+     * @deprecated 多账号模式下不再使用单一令牌
+     */
+    public setToken(token: string): void {
+        console.warn('setToken is deprecated in multi-account mode');
+    }
+    
+    /**
+     * @deprecated 多账号模式下使用 getAccountUserInfo
+     */
+    public async getCurrentUser(): Promise<{login: string, name: string} | null> {
+        console.warn('getCurrentUser is deprecated in multi-account mode');
+        return null;
+    }
 }

@@ -1154,3 +1154,572 @@
 .github-stars-theme-ios-glass ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.3);
 }
+
+
+/* 多账号管理样式 */
+.github-accounts-container {
+    margin-top: 10px;
+}
+
+.github-accounts-empty {
+    color: var(--text-muted);
+    font-style: italic;
+    text-align: center;
+    padding: 20px;
+}
+
+.github-account-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px;
+    margin: 8px 0;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 8px;
+    background: var(--background-secondary);
+}
+
+.github-account-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+}
+
+.github-account-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.github-account-details {
+    flex: 1;
+}
+
+.github-account-name {
+    font-weight: 500;
+    color: var(--text-normal);
+}
+
+.github-account-username {
+    font-size: 0.9em;
+    color: var(--text-muted);
+}
+
+.github-account-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-right: 12px;
+}
+
+.github-account-toggle {
+    margin: 0;
+}
+
+.github-account-status label {
+    font-size: 0.9em;
+    margin: 0;
+}
+
+.github-account-status label.enabled {
+    color: var(--text-success);
+}
+
+.github-account-status label.disabled {
+    color: var(--text-muted);
+}
+
+.github-account-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.github-account-btn {
+    padding: 4px 12px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    background: var(--background-primary);
+    color: var(--text-normal);
+    cursor: pointer;
+    font-size: 0.9em;
+}
+
+.github-account-btn:hover {
+    background: var(--background-modifier-hover);
+}
+
+.github-account-btn.edit {
+    color: var(--text-accent);
+}
+
+.github-account-btn.delete {
+    color: var(--text-error);
+}
+
+.github-account-btn.delete:hover {
+    background: var(--background-modifier-error);
+}
+
+/* 账号信息显示区域样式 */
+.github-account-info-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: var(--background-secondary);
+    border-radius: 6px;
+    margin-bottom: 10px;
+    border: 1px solid var(--background-modifier-border);
+}
+
+.github-account-info-bar .account-avatar {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.github-account-info-bar .account-name {
+    font-size: 0.9em;
+    color: var(--text-normal);
+    font-weight: 500;
+}
+
+.github-account-info-bar .account-toggle {
+    margin-left: auto;
+}
+
+.github-account-info-bar .account-toggle input {
+    margin: 0;
+}
+
+
+/* 多账号信息显示区域样式 */
+.github-accounts-info {
+    margin-bottom: 15px;
+    padding: 10px;
+    background: var(--background-secondary);
+    border-radius: 8px;
+    border: 1px solid var(--background-modifier-border);
+}
+
+.github-accounts-info-title {
+    margin: 0 0 10px 0;
+    font-size: 1.1em;
+    font-weight: 600;
+    color: var(--text-normal);
+}
+
+.github-accounts-info-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.github-account-info-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: var(--background-primary);
+    border-radius: 6px;
+    border: 1px solid var(--background-modifier-border);
+    transition: all 0.2s ease;
+}
+
+.github-account-info-bar.disabled {
+    opacity: 0.6;
+    background: var(--background-modifier-form-field-highlighted);
+}
+
+.github-account-info-bar .account-avatar {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.github-account-info-bar .account-name {
+    font-weight: 500;
+    color: var(--text-normal);
+    font-size: 0.95em;
+}
+
+.github-account-info-bar .account-username {
+    font-size: 0.85em;
+    color: var(--text-muted);
+    margin-left: -5px;
+}
+
+.github-account-info-bar .account-status {
+    flex: 1;
+    text-align: right;
+    margin-right: 10px;
+}
+
+.github-account-info-bar .account-sync-time {
+    font-size: 0.8em;
+    color: var(--text-muted);
+}
+
+.github-account-info-bar .account-toggle {
+    flex-shrink: 0;
+}
+
+.github-account-info-bar .account-toggle-input {
+    margin: 0;
+    cursor: pointer;
+}
+
+.github-account-info-bar:hover {
+    background: var(--background-modifier-hover);
+}
+
+.github-account-info-bar.disabled:hover {
+    background: var(--background-modifier-form-field-highlighted);
+}
+
+
+/* 账号模态框样式 */
+.account-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin: 20px 0;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.form-field label {
+  font-weight: 600;
+  color: var(--text-normal);
+  font-size: 14px;
+}
+
+.form-field-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 5px;
+}
+
+.form-field input {
+  padding: 8px 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  background-color: var(--background-primary);
+  color: var(--text-normal);
+  font-size: 14px;
+  transition: border-color 0.2s ease;
+}
+
+.form-field input:focus {
+  outline: none !important;
+  border-color: var(--interactive-accent) !important;
+  box-shadow: 0 0 0 2px var(--interactive-accent-hover) !important;
+}
+
+.form-field input:disabled,
+.form-field input[readonly] {
+  background-color: var(--background-modifier-border);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.modal-button-container {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.modal-button-container button {
+  padding: 8px 16px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  background-color: var(--background-primary);
+  color: var(--text-normal);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.modal-button-container button:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.modal-button-container button.mod-cta {
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: var(--interactive-accent);
+}
+
+.modal-button-container button.mod-cta:hover {
+  background-color: var(--interactive-accent-hover);
+}
+
+.modal-button-container button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+
+/* 账户空状态样式 */
+.github-accounts-empty-state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background-color: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  margin-bottom: 15px;
+}
+
+.github-accounts-empty-icon {
+  font-size: 16px;
+  opacity: 0.7;
+}
+
+.github-accounts-empty-message {
+  color: var(--text-muted);
+  font-size: 13px;
+  flex: 1;
+}
+
+.github-accounts-empty-link {
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border: none;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.github-accounts-empty-link:hover {
+  background-color: var(--interactive-accent-hover);
+}
+
+
+/* ===== 账户选择器样式 ===== */
+
+/* 账户选择器容器 */
+.github-account-selector {
+  position: relative;
+  margin-left: 8px;
+}
+
+/* 添加账号按钮 */
+.github-account-add-btn {
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border: none;
+  border-radius: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 0.85em;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.github-account-add-btn:hover {
+  background-color: var(--interactive-accent-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+/* 折叠按钮 */
+.github-account-toggle-btn {
+  background-color: transparent;
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+  border-radius: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 0.85em;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.github-account-toggle-btn:hover {
+  background-color: var(--background-modifier-hover);
+  border-color: var(--interactive-accent);
+  color: var(--interactive-accent);
+}
+
+.github-account-toggle-btn.expanded {
+  background-color: var(--interactive-accent);
+  border-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+/* 折叠内容容器 */
+.github-account-collapsible {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 8px;
+  background-color: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  min-width: 280px;
+  max-width: 320px;
+  overflow: hidden;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/* 紧凑账号项 */
+.github-account-item-compact {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  transition: all 0.2s ease;
+  gap: 12px;
+}
+
+.github-account-item-compact:last-child {
+  border-bottom: none;
+}
+
+.github-account-item-compact:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.github-account-item-compact.disabled {
+  opacity: 0.6;
+  background-color: var(--background-modifier-border);
+}
+
+/* 小头像 */
+.account-avatar-small {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--background-modifier-border);
+  flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* 紧凑账号信息 */
+.account-info-compact {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.account-name-compact {
+  font-weight: 600;
+  font-size: 0.9em;
+  color: var(--text-normal);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-username-compact {
+  font-size: 0.8em;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-sync-time-compact {
+  font-size: 0.75em;
+  color: var(--text-faint);
+  margin-top: 2px;
+}
+
+/* 紧凑切换开关 */
+.account-toggle-compact {
+  flex-shrink: 0;
+}
+
+.account-toggle-input-compact {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--interactive-accent);
+}
+
+/* iOS 液态玻璃主题下的账户选择器样式 */
+.github-stars-theme-ios-glass .github-account-add-btn {
+  background: linear-gradient(135deg, var(--ios-glass-accent) 0%, rgba(0, 122, 255, 0.8) 100%);
+  backdrop-filter: var(--ios-glass-blur);
+  -webkit-backdrop-filter: var(--ios-glass-blur);
+  border: 1px solid var(--ios-glass-border);
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.github-stars-theme-ios-glass .github-account-add-btn:hover {
+  background: linear-gradient(135deg, rgba(0, 122, 255, 0.9) 0%, rgba(0, 122, 255, 0.7) 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 122, 255, 0.3);
+}
+
+.github-stars-theme-ios-glass .github-account-toggle-btn {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: var(--ios-glass-blur);
+  -webkit-backdrop-filter: var(--ios-glass-blur);
+  border: 1px solid var(--ios-glass-border);
+  border-radius: 12px;
+}
+
+.github-stars-theme-ios-glass .github-account-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.github-stars-theme-ios-glass .github-account-toggle-btn.expanded {
+  background: linear-gradient(135deg, var(--ios-glass-accent) 0%, rgba(0, 122, 255, 0.7) 100%);
+  border-color: rgba(0, 122, 255, 0.3);
+  color: white;
+}
+
+.github-stars-theme-ios-glass .github-account-collapsible {
+  background: linear-gradient(135deg, 
+    rgba(255, 255, 255, 0.15) 0%, 
+    rgba(255, 255, 255, 0.08) 100%);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--ios-glass-border);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+}
+
+.github-stars-theme-ios-glass .github-account-item-compact {
+  border-bottom-color: var(--ios-glass-border);
+}
+
+.github-stars-theme-ios-glass .github-account-item-compact:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.github-stars-theme-ios-glass .github-account-item-compact.disabled {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.github-stars-theme-ios-glass .account-avatar-small {
+  border-color: var(--ios-glass-border);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
