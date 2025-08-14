@@ -672,9 +672,17 @@
 
 /* 主容器 - 液态玻璃效果 */
 .github-stars-theme-ios-glass .github-stars-container {
-  background: linear-gradient(135deg, 
-    rgba(255, 255, 255, 0.1) 0%, 
-    rgba(255, 255, 255, 0.05) 100%);
+  /* 添加彩色渐变背景提高对比度 */
+  background:
+    linear-gradient(135deg,
+      rgba(74, 144, 226, 0.12) 0%,
+      rgba(80, 200, 120, 0.08) 25%,
+      rgba(255, 107, 107, 0.06) 50%,
+      rgba(196, 181, 253, 0.08) 75%,
+      rgba(251, 191, 36, 0.1) 100%),
+    linear-gradient(135deg,
+      rgba(255, 255, 255, 0.15) 0%,
+      rgba(255, 255, 255, 0.08) 100%);
   backdrop-filter: var(--ios-glass-blur);
   -webkit-backdrop-filter: var(--ios-glass-blur);
   border-radius: 20px;
@@ -682,6 +690,29 @@
   box-shadow: var(--ios-glass-shadow);
   margin: 10px;
   overflow: hidden;
+  position: relative;
+}
+
+/* 添加动态背景效果 */
+.github-stars-theme-ios-glass .github-stars-container::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle,
+    rgba(74, 144, 226, 0.03) 0%,
+    transparent 50%);
+  animation: float 20s ease-in-out infinite;
+  pointer-events: none;
+  z-index: -1;
+}
+
+@keyframes float {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  33% { transform: translate(30px, -30px) rotate(120deg); }
+  66% { transform: translate(-20px, 20px) rotate(240deg); }
 }
 
 /* 标题区域 */
@@ -857,39 +888,54 @@
 }
 
 .github-stars-theme-ios-glass .github-stars-repo {
-  background: linear-gradient(135deg, 
-    rgba(255, 255, 255, 0.15) 0%, 
-    rgba(255, 255, 255, 0.08) 100%);
-  backdrop-filter: var(--ios-glass-blur);
-  -webkit-backdrop-filter: var(--ios-glass-blur);
-  border: 1px solid var(--ios-glass-border);
+  /* 增强卡片背景对比度 */
+  background: linear-gradient(135deg,
+    rgba(255, 255, 255, 0.25) 0%,
+    rgba(255, 255, 255, 0.15) 50%,
+    rgba(255, 255, 255, 0.12) 100%);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
   border-radius: 20px;
   padding: 20px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+  /* 添加微妙的内阴影增强玻璃效果 */
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    0 8px 32px rgba(0, 0, 0, 0.12);
   transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   overflow: hidden;
   position: relative;
 }
 
+/* 卡片光泽效果 */
 .github-stars-theme-ios-glass .github-stars-repo::before {
   content: '';
   position: absolute;
   top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, 
-    transparent 0%, 
-    rgba(255, 255, 255, 0.3) 50%, 
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.15) 50%,
     transparent 100%);
+  transition: left 0.6s ease;
+  pointer-events: none;
+}
+
+.github-stars-theme-ios-glass .github-stars-repo:hover::before {
+  left: 100%;
 }
 
 .github-stars-theme-ios-glass .github-stars-repo:hover {
-  transform: translateY(-4px) scale(1.02);
+  transform: translateY(-3px); /* 移除scale避免字体模糊 */
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.15);
-  background: linear-gradient(135deg, 
-    rgba(255, 255, 255, 0.2) 0%, 
-    rgba(255, 255, 255, 0.12) 100%);
+  background: linear-gradient(135deg,
+    rgba(255, 255, 255, 0.25) 0%,
+    rgba(255, 255, 255, 0.15) 100%);
+  /* 确保文字清晰 */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* 仓库头像 - 圆角优化 */
