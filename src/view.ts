@@ -15,7 +15,8 @@ export class GithubStarsView extends ItemView {
     filterByTags: Map<string, boolean> = new Map();
     tagsContainer: HTMLElement;
     currentFilter: string = '';
-    sortBy: 'default' | 'starred_at_desc' = 'default';
+    sortBy: 'starred_at' | 'stars' | 'forks' | 'updated' = 'starred_at';
+    sortOrder: 'asc' | 'desc' = 'desc'; // 新增排序方向状态
     showAllTags: boolean = false; // Add state for showing all tags
 
     constructor(leaf: WorkspaceLeaf, plugin: GithubStarsPlugin) {
@@ -83,16 +84,75 @@ export class GithubStarsView extends ItemView {
             this.renderRepositories();
         });
 
-        // Sort Button (logic unchanged)
-        const sortButton = toolbarDiv.createEl('button', { cls: 'github-stars-sort-button' });
-        setIcon(sortButton, 'arrow-down-up');
-        sortButton.setAttribute('aria-label', '按 Star 时间排序');
-        sortButton.addEventListener('click', () => {
-            this.sortBy = this.sortBy === 'starred_at_desc' ? 'default' : 'starred_at_desc';
-            setIcon(sortButton, this.sortBy === 'starred_at_desc' ? 'calendar-clock' : 'arrow-down-up');
-            sortButton.toggleClass('active', this.sortBy === 'starred_at_desc');
-            new Notice(this.sortBy === 'starred_at_desc' ? '按最近 Star 时间排序' : '按默认顺序排序');
-            this.renderRepositories();
+        // Sort Button Group - Four individual radio-style buttons
+        const sortButtonGroup = toolbarDiv.createDiv('github-stars-sort-group');
+        
+        const sortOptions = [
+            { key: 'starred_at', icon: 'calendar-clock', title: '最近添加' },
+            { key: 'stars', icon: 'star', title: 'Star数量' },
+            { key: 'forks', icon: 'git-fork', title: 'Fork数量' },
+            { key: 'updated', icon: 'clock', title: '最近更新' }
+        ] as const;
+        
+        sortOptions.forEach(option => {
+            const isActive = this.sortBy === option.key;
+            const sortButton = sortButtonGroup.createEl('button', {
+                cls: 'github-stars-sort-option' + (isActive ? ' active' : '')
+            });
+            
+            // 创建按钮内容容器
+            const buttonContent = sortButton.createDiv('sort-button-content');
+            const iconSpan = buttonContent.createSpan('sort-icon');
+            setIcon(iconSpan, option.icon);
+            
+            // 添加排序方向指示器
+            const directionSpan = buttonContent.createSpan('sort-direction');
+            if (isActive) {
+                setIcon(directionSpan, this.sortOrder === 'desc' ? 'chevron-down' : 'chevron-up');
+            }
+            
+            const orderText = this.sortOrder === 'desc' ? '降序' : '升序';
+            sortButton.setAttribute('aria-label', `按${option.title}${orderText}排序`);
+            sortButton.setAttribute('title', `按${option.title}${orderText}排序`);
+            
+            sortButton.addEventListener('click', () => {
+                if (this.sortBy === option.key) {
+                    // 如果点击的是当前激活的按钮，切换排序方向
+                    this.sortOrder = this.sortOrder === 'desc' ? 'asc' : 'desc';
+                } else {
+                    // 如果点击的是其他按钮，切换排序类型并设为降序
+                    this.sortBy = option.key;
+                    this.sortOrder = 'desc';
+                    
+                    // Remove active class from all buttons
+                    sortButtonGroup.querySelectorAll('.github-stars-sort-option').forEach(btn => {
+                        btn.removeClass('active');
+                    });
+                    
+                    // Add active class to clicked button
+                    sortButton.addClass('active');
+                }
+                
+                // 更新所有按钮的方向指示器
+                sortOptions.forEach((opt, index) => {
+                    const btn = sortButtonGroup.children[index] as HTMLElement;
+                    const dirSpan = btn.querySelector('.sort-direction') as HTMLElement;
+                    if (this.sortBy === opt.key) {
+                        dirSpan.empty();
+                        setIcon(dirSpan, this.sortOrder === 'desc' ? 'chevron-down' : 'chevron-up');
+                        btn.addClass('active');
+                        btn.setAttribute('title', `按${opt.title}${this.sortOrder === 'desc' ? '降序' : '升序'}排序`);
+                    } else {
+                        dirSpan.empty();
+                        btn.removeClass('active');
+                        btn.setAttribute('title', `按${opt.title}排序`);
+                    }
+                });
+                
+                const orderText = this.sortOrder === 'desc' ? '降序' : '升序';
+                new Notice(`按${option.title}${orderText}排序`);
+                this.renderRepositories();
+            });
         });
 
         // Theme Toggle Button
@@ -326,14 +386,38 @@ export class GithubStarsView extends ItemView {
 
         // 3. Sort filtered data
         let sortedRepos = [...filteredRepos]; // Mutable copy
-        if (this.sortBy === 'starred_at_desc') {
-            sortedRepos.sort((a, b) => {
-                const dateA = a.starred_at ? Date.parse(a.starred_at) : 0;
-                const dateB = b.starred_at ? Date.parse(b.starred_at) : 0;
-                return dateB - dateA; // Descending
-            });
+        const isDesc = this.sortOrder === 'desc';
+        
+        switch (this.sortBy) {
+            case 'starred_at':
+                sortedRepos.sort((a, b) => {
+                    const dateA = a.starred_at ? Date.parse(a.starred_at) : 0;
+                    const dateB = b.starred_at ? Date.parse(b.starred_at) : 0;
+                    return isDesc ? dateB - dateA : dateA - dateB;
+                });
+                break;
+            case 'stars':
+                sortedRepos.sort((a, b) => {
+                    const countA = a.stargazers_count || 0;
+                    const countB = b.stargazers_count || 0;
+                    return isDesc ? countB - countA : countA - countB;
+                });
+                break;
+            case 'forks':
+                sortedRepos.sort((a, b) => {
+                    const countA = a.forks_count || 0;
+                    const countB = b.forks_count || 0;
+                    return isDesc ? countB - countA : countA - countB;
+                });
+                break;
+            case 'updated':
+                sortedRepos.sort((a, b) => {
+                    const dateA = a.updated_at ? Date.parse(a.updated_at) : 0;
+                    const dateB = b.updated_at ? Date.parse(b.updated_at) : 0;
+                    return isDesc ? dateB - dateA : dateA - dateB;
+                });
+                break;
         }
-        // Add other sort criteria if needed
 
         // 4. Render the sorted and filtered repositories
         if (sortedRepos.length === 0) {
@@ -548,6 +632,7 @@ export class GithubStarsView extends ItemView {
             button.removeClass('active');
         }
     }
+
 
     /**
      * 在工具栏中添加账户选择器
