@@ -66,31 +66,81 @@
   color: var(--text-normal);
 }
 
-/* 新增：排序按钮样式 */
-.github-stars-sort-button {
-  background-color: transparent;
+/* 排序按钮组样式 */
+.github-stars-sort-group {
+  display: flex;
+  gap: 2px;
+  margin-right: 10px;
   border: 1px solid var(--background-modifier-border);
-  color: var(--text-muted);
-  border-radius: 3px;
-  padding: 5px 8px; /* Adjust padding */
+  border-radius: 6px;
+  overflow: hidden;
+  background-color: var(--background-secondary);
+}
+
+.github-stars-sort-option {
+  background-color: transparent;
+  border: none;
+  padding: 6px 8px;
   cursor: pointer;
-  transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+  transition: all 0.2s ease;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  position: relative;
 }
 
-.github-stars-sort-button:hover {
+.github-stars-sort-option:hover {
   background-color: var(--background-modifier-hover);
-  border-color: var(--interactive-accent);
-  color: var(--interactive-accent);
+  color: var(--text-normal);
 }
 
-.github-stars-sort-button.active {
+.github-stars-sort-option.active {
   background-color: var(--interactive-accent);
-  border-color: var(--interactive-accent);
   color: var(--text-on-accent);
 }
 
-.github-stars-sort-button.active:hover {
+.github-stars-sort-option.active:hover {
   background-color: var(--interactive-accent-hover);
+}
+
+.github-stars-sort-option:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 20%;
+  bottom: 20%;
+  width: 1px;
+  background-color: var(--background-modifier-border);
+}
+
+.github-stars-sort-option.active:not(:last-child)::after {
+  background-color: transparent;
+}
+
+/* 排序按钮内容布局 */
+.sort-button-content {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.sort-icon {
+  display: flex;
+  align-items: center;
+}
+
+.sort-direction {
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.sort-direction svg {
+  width: 12px;
+  height: 12px;
 }
 
 /* 主题切换按钮样式 */
@@ -784,27 +834,72 @@
   outline: none;
 }
 
-/* 排序按钮 - iOS风格 */
-.github-stars-theme-ios-glass .github-stars-sort-button {
-  background: rgba(255, 255, 255, 0.1);
+/* 排序按钮组 - iOS风格 */
+.github-stars-theme-ios-glass .github-stars-sort-group {
+  background: rgba(255, 255, 255, 0.15);
   backdrop-filter: var(--ios-glass-blur);
   -webkit-backdrop-filter: var(--ios-glass-blur);
-  border: 1px solid var(--ios-glass-border);
+  border: 2px solid rgba(255, 255, 255, 0.3);
   border-radius: 12px;
-  padding: 8px 12px;
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+.github-stars-theme-ios-glass .github-stars-sort-option {
+  color: rgba(255, 255, 255, 0.95);
+  background: transparent;
   transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  padding: 8px 10px;
+  font-weight: 500;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
-.github-stars-theme-ios-glass .github-stars-sort-button:hover {
-  background: rgba(255, 255, 255, 0.15);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-.github-stars-theme-ios-glass .github-stars-sort-button.active {
-  background: linear-gradient(135deg, var(--ios-glass-accent) 0%, rgba(0, 122, 255, 0.7) 100%);
-  border-color: rgba(0, 122, 255, 0.3);
+.github-stars-theme-ios-glass .github-stars-sort-option:hover {
+  background: rgba(255, 255, 255, 0.25);
   color: white;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(255, 255, 255, 0.2);
+}
+
+.github-stars-theme-ios-glass .github-stars-sort-option.active {
+  background: linear-gradient(135deg,
+    rgba(0, 122, 255, 0.9) 0%,
+    rgba(0, 100, 220, 0.8) 100%);
+  color: white;
+  box-shadow:
+    0 4px 12px rgba(0, 122, 255, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  border: 1px solid rgba(0, 122, 255, 0.6);
+  font-weight: 600;
+}
+
+.github-stars-theme-ios-glass .github-stars-sort-option.active:hover {
+  background: linear-gradient(135deg,
+    rgba(0, 122, 255, 1) 0%,
+    rgba(0, 100, 220, 0.9) 100%);
+  box-shadow:
+    0 6px 16px rgba(0, 122, 255, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+.github-stars-theme-ios-glass .github-stars-sort-option:not(:last-child)::after {
+  background-color: rgba(255, 255, 255, 0.3);
+}
+
+.github-stars-theme-ios-glass .github-stars-sort-option.active:not(:last-child)::after {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+/* iOS主题下的排序方向指示器 - 增强可见性 */
+.github-stars-theme-ios-glass .sort-direction {
+  color: inherit;
+  opacity: 1;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+}
+
+.github-stars-theme-ios-glass .sort-icon {
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
 }
 
 /* 主题按钮 - iOS风格 */
