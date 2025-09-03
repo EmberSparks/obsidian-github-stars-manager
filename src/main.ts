@@ -1,8 +1,9 @@
 import { Plugin, Notice, WorkspaceLeaf, addIcon } from 'obsidian';
-import { GithubStarsSettings, PluginData, CombinedPluginData, GithubRepository, UserRepoEnhancements } from './types'; // 移除 LocalRepository, 添加 GithubRepository, UserRepoEnhancements
+import { GithubStarsSettings, PluginData, CombinedPluginData, GithubRepository, UserRepoEnhancements, ExportOptions, DEFAULT_EXPORT_OPTIONS } from './types'; // 移除 LocalRepository, 添加 GithubRepository, UserRepoEnhancements, ExportOptions
 import { DEFAULT_SETTINGS, GithubStarsSettingTab } from './settings';
 import { GithubService } from './githubService';
 import { GithubStarsView, VIEW_TYPE_STARS } from './view';
+import { ExportService } from './exportService';
 
 // GitHub星标图标 (不变)
 const GITHUB_STAR_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-star"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>`;
@@ -13,7 +14,8 @@ const DEFAULT_PLUGIN_DATA: PluginData = {
     userEnhancements: {},   // 新增
     allTags: [],            // 新增 (替代旧的 tags)
     lastSyncTime: '',
-    accountSyncTimes: {}    // 新增：每个账号的同步时间
+    accountSyncTimes: {},   // 新增：每个账号的同步时间
+    exportOptions: undefined // 新增：导出选项（可选）
 };
 
 // 默认合并数据 (不变，因为内部引用已更新)
@@ -25,6 +27,7 @@ const DEFAULT_COMBINED_DATA: CombinedPluginData = {
 export default class GithubStarsPlugin extends Plugin {
     settings: GithubStarsSettings;
     githubService: GithubService;
+    exportService: ExportService;
     data: PluginData; // 引用 PluginData，其内部结构已改变
     syncIntervalId: number | null = null;
 
@@ -36,6 +39,9 @@ export default class GithubStarsPlugin extends Plugin {
 
         // 初始化GitHub服务 (支持多账号)
         this.githubService = new GithubService(this.settings.accounts || []);
+        
+        // 初始化导出服务
+        this.exportService = new ExportService(this.app);
         // 添加设置标签 (不变)
         this.addSettingTab(new GithubStarsSettingTab(this.app, this));
 
@@ -92,6 +98,20 @@ export default class GithubStarsPlugin extends Plugin {
         }
         if (typeof this.data.accountSyncTimes !== 'object' || this.data.accountSyncTimes === null || Array.isArray(this.data.accountSyncTimes)) {
             this.data.accountSyncTimes = {};
+        }
+        
+        // 确保导出选项使用最新的默认模板
+        if (!this.data.exportOptions) {
+            this.data.exportOptions = DEFAULT_EXPORT_OPTIONS;
+        } else {
+            // 检查是否需要更新属性模板（如果属性键名不是以GSM-开头，或者缺少enabled字段，则更新）
+            const hasOldTemplate = this.data.exportOptions.propertiesTemplate?.some(prop =>
+                !prop.key.startsWith('GSM-') || prop.enabled === undefined
+            );
+            if (hasOldTemplate) {
+                this.data.exportOptions.propertiesTemplate = DEFAULT_EXPORT_OPTIONS.propertiesTemplate;
+                console.log('已更新导出选项的属性模板为新的GSM-格式，并添加了enabled字段');
+            }
         }
     }
 
@@ -155,6 +175,14 @@ export default class GithubStarsPlugin extends Plugin {
             name: '打开 GitHub Stars 视图',
             callback: () => {
                 this.activateView();
+            }
+        });
+
+        this.addCommand({
+            id: 'export-all-stars',
+            name: '导出所有星标仓库',
+            callback: () => {
+                this.exportAllStars();
             }
         });
     }
@@ -277,5 +305,65 @@ export default class GithubStarsPlugin extends Plugin {
         
         // 更新视图以应用主题
         this.updateViews();
+    }
+
+    // --- 导出功能 ---
+    
+    /**
+     * 导出所有星标仓库
+     */
+    async exportAllStars(options?: Partial<ExportOptions>): Promise<void> {
+        if (this.data.githubRepositories.length === 0) {
+            new Notice('没有星标仓库可导出，请先同步数据');
+            return;
+        }
+
+        new Notice('开始导出星标仓库...');
+        
+        try {
+            // 使用插件数据中的导出选项，如果没有则使用默认选项
+            const exportOptions = options ? { ...this.data.exportOptions, ...options } : this.data.exportOptions;
+            const result = await this.exportService.exportAllRepositories(
+                this.data.githubRepositories,
+                this.data.userEnhancements,
+                exportOptions
+            );
+
+            if (result.success) {
+                new Notice(`导出完成！成功导出 ${result.exportedCount} 个仓库，跳过 ${result.skippedCount} 个`);
+            } else {
+                new Notice(`导出完成，但有错误。成功导出 ${result.exportedCount} 个仓库，失败 ${result.errors.length} 个`);
+                console.error('导出错误:', result.errors);
+            }
+        } catch (error) {
+            console.error('导出失败:', error);
+            new Notice('导出失败，请查看控制台了解详情');
+        }
+    }
+
+    /**
+     * 导出单个仓库
+     */
+    async exportSingleRepository(repository: GithubRepository, options?: Partial<ExportOptions>): Promise<void> {
+        new Notice(`正在导出 ${repository.full_name}...`);
+        
+        try {
+            // 使用插件数据中的导出选项，如果没有则使用默认选项
+            const exportOptions = options ? { ...this.data.exportOptions, ...options } : this.data.exportOptions;
+            const success = await this.exportService.exportSingleRepositoryById(
+                repository,
+                this.data.userEnhancements[repository.id],
+                exportOptions
+            );
+
+            if (success) {
+                new Notice(`${repository.full_name} 导出成功`);
+            } else {
+                new Notice(`${repository.full_name} 导出跳过（文件已存在）`);
+            }
+        } catch (error) {
+            console.error(`导出 ${repository.full_name} 失败:`, error);
+            new Notice(`导出 ${repository.full_name} 失败`);
+        }
     }
 }

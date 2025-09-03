@@ -32,3 +32,12 @@ package-lock.json
 
 # Memory bank files (Claude-specific)
 memory-bank/
+
+# Build artifacts
+versions.json
+
+# Local environment scripts
+setup-env.bat
+setup-env.ps1
+deploy.bat
+deploy-fixed.bat
