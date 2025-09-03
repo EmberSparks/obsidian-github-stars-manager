@@ -645,14 +645,16 @@ export class GithubStarsView extends ItemView {
                 this.updateSelectAllButton();
                 this.updateExportConfirmButton();
             } else {
-                // 正常模式下显示导出按钮
-                const exportButton = rightButtonsContainer.createEl('button', { cls: 'github-stars-export-button' });
-                setIcon(exportButton, 'share');
-                exportButton.setAttribute('aria-label', '批量导出');
-                exportButton.setAttribute('title', '批量导出仓库为Markdown文件');
-                exportButton.addEventListener('click', () => {
-                    this.enterExportMode();
-                });
+                // 正常模式下显示导出按钮 (如果启用)
+                if (this.plugin.settings.enableExport) {
+                    const exportButton = rightButtonsContainer.createEl('button', { cls: 'github-stars-export-button' });
+                    setIcon(exportButton, 'share');
+                    exportButton.setAttribute('aria-label', '批量导出');
+                    exportButton.setAttribute('title', '批量导出仓库为Markdown文件');
+                    exportButton.addEventListener('click', () => {
+                        this.enterExportMode();
+                    });
+                }
             }
         }
     }
@@ -749,11 +751,30 @@ export class GithubStarsView extends ItemView {
         collapsibleContent.style.display = 'none'; // 初始状态为折叠
         
         let isExpanded = false;
-        
-        toggleBtn.addEventListener('click', () => {
+
+        const closePopover = () => {
+            collapsibleContent.style.display = 'none';
+            toggleBtn.removeClass('expanded');
+            isExpanded = false;
+            document.removeEventListener('mousedown', handleOutsideClick);
+        };
+
+        const handleOutsideClick = (event: MouseEvent) => {
+            if (!collapsibleContent.contains(event.target as Node) && !toggleBtn.contains(event.target as Node)) {
+                closePopover();
+            }
+        };
+
+        toggleBtn.addEventListener('click', (event) => {
+            event.stopPropagation();
             isExpanded = !isExpanded;
-            collapsibleContent.style.display = isExpanded ? 'block' : 'none';
-            toggleBtn.toggleClass('expanded', isExpanded);
+            if (isExpanded) {
+                collapsibleContent.style.display = 'block';
+                toggleBtn.addClass('expanded');
+                document.addEventListener('mousedown', handleOutsideClick);
+            } else {
+                closePopover();
+            }
         });
 
         // 添加账号列表
