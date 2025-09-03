@@ -41,3 +41,6 @@ setup-env.bat
 setup-env.ps1
 deploy.bat
 deploy-fixed.bat
+
+# Environment variables
+.env

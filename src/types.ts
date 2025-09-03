@@ -200,21 +200,21 @@ export const DEFAULT_PROPERTIES_TEMPLATE: PropertyTemplate[] = [
         value: '{{watchers}}',
         type: 'number',
         description: 'Watcher数量',
-        enabled: true
+        enabled: false
     },
     {
         key: 'GSM-issues',
         value: '{{issues}}',
         type: 'number',
         description: '开放Issue数量',
-        enabled: true
+        enabled: false
     },
     {
         key: 'GSM-topics',
         value: '{{topics}}',
         type: 'tags',
         description: '主题标签',
-        enabled: true
+        enabled: false
     },
     {
         key: 'GSM-created-at',
@@ -228,14 +228,14 @@ export const DEFAULT_PROPERTIES_TEMPLATE: PropertyTemplate[] = [
         value: '{{updated_at}}',
         type: 'date',
         description: '最后更新时间',
-        enabled: true
+        enabled: false
     },
     {
         key: 'GSM-pushed-at',
         value: '{{pushed_at}}',
         type: 'date',
         description: '最后推送时间',
-        enabled: true
+        enabled: false
     },
     {
         key: 'GSM-starred-at',
@@ -249,21 +249,21 @@ export const DEFAULT_PROPERTIES_TEMPLATE: PropertyTemplate[] = [
         value: '{{is_private}}',
         type: 'checkbox',
         description: '是否为私有仓库',
-        enabled: true
+        enabled: false
     },
     {
         key: 'GSM-is-fork',
         value: '{{is_fork}}',
         type: 'checkbox',
         description: '是否为Fork仓库',
-        enabled: true
+        enabled: false
     },
     {
         key: 'GSM-repo-id',
         value: '{{id}}',
         type: 'number',
         description: '仓库ID',
-        enabled: true
+        enabled: false
     },
     {
         key: 'GSM-user-notes',
@@ -284,7 +284,7 @@ export const DEFAULT_PROPERTIES_TEMPLATE: PropertyTemplate[] = [
         value: '{{linked_note}}',
         type: 'text',
         description: '关联笔记',
-        enabled: true
+        enabled: false
     }
 ];
 

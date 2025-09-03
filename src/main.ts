@@ -132,6 +132,11 @@ export default class GithubStarsPlugin extends Plugin {
         // 更新GitHub服务的账号列表
         this.githubService.updateAccounts(this.settings.accounts || []);
         this.setupAutoSync();
+        // 同步 settings 中的模板到 data 中，以供导出时使用
+        if (this.data.exportOptions) {
+            this.data.exportOptions.propertiesTemplate = this.settings.propertiesTemplate;
+        }
+        this.updateViews(); // 确保每次保存设置都刷新视图
     }
 
     // --- 插件数据相关 (现在通过 saveCombinedData 保存) ---
@@ -268,7 +273,7 @@ export default class GithubStarsPlugin extends Plugin {
         this.app.workspace.getLeavesOfType(VIEW_TYPE_STARS).forEach(leaf => {
             if (leaf.view instanceof GithubStarsView) {
                 // 传递更新后的 GitHub 仓库列表和用户增强数据
-                leaf.view.updateData(this.data.githubRepositories, this.data.userEnhancements, this.data.allTags);
+                leaf.view.renderView();
             }
         });
     }

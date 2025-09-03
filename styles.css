@@ -43,15 +43,17 @@
   margin-left: auto;
 }
 
-.github-stars-sync-button {
-  background-color: var(--interactive-accent);
-  color: var(--text-on-accent);
-  border: none;
-  border-radius: 3px;
-  padding: 5px 10px;
-  margin-right: 10px;
+.github-stars-toolbar button {
+  background-color: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  padding: 6px 12px;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: all 0.2s ease;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .github-stars-sync-button:hover {
@@ -78,12 +80,20 @@
 /* 排序按钮组样式 */
 .github-stars-sort-group {
   display: flex;
-  gap: 2px;
-  margin-right: 10px;
-  border: 1px solid var(--background-modifier-border);
+  gap: 0;
   border-radius: 6px;
   overflow: hidden;
-  background-color: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+}
+
+.github-stars-sort-group button {
+  border-radius: 0;
+  border: none;
+  border-right: 1px solid var(--background-modifier-border);
+}
+
+.github-stars-sort-group button:last-child {
+  border-right: none;
 }
 
 .github-stars-sort-option {
@@ -1042,11 +1052,29 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+.github-account-selector {
+    position: relative;
+    z-index: 10;
+}
+
 /* 仓库头像 - 圆角优化 */
 .github-stars-theme-ios-glass .github-stars-repo-avatar {
   border-radius: 16px;
   border: 2px solid var(--ios-glass-border);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* 修复液态玻璃主题下账户选择器被覆盖的问题 */
+.github-stars-theme-ios-glass .github-account-selector {
+  z-index: 20;
+}
+
+.github-stars-theme-ios-glass .github-account-collapsible {
+  position: absolute;
+  z-index: 21;
+  right: 0;
+  top: 100%;
+  margin-top: 4px;
 }
 
 /* 仓库标题 */
@@ -1172,6 +1200,7 @@
   border: 1px solid var(--ios-glass-border);
   border-radius: 20px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  z-index: 100; /* 确保模态框在顶层 */
 }
 
 /* 模态框按钮 */

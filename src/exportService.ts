@@ -8,6 +8,7 @@ import { GithubRepository, UserRepoEnhancements, ExportOptions, ExportResult, Re
 export class ExportService {
     private vault: Vault;
     private app: App;
+    private overwriteAll: boolean | null = null; // 用于跟踪“覆盖全部”的状态
 
     constructor(app: App) {
         this.app = app;
@@ -23,6 +24,7 @@ export class ExportService {
         options: Partial<ExportOptions> = {}
     ): Promise<ExportResult> {
         const exportOptions = { ...DEFAULT_EXPORT_OPTIONS, ...options };
+        this.overwriteAll = null; // 重置覆盖状态
         const result: ExportResult = {
             success: true,
             exportedCount: 0,
@@ -125,11 +127,26 @@ export class ExportService {
             // 检查文件是否已存在
             const existingFile = this.vault.getAbstractFileByPath(filePath);
             if (existingFile && !options.overwriteExisting) {
-                // 询问用户是否覆盖
-                const shouldOverwrite = await this.confirmOverwrite(filePath);
-                if (!shouldOverwrite) {
-                    console.log(`用户选择跳过文件: ${filePath}`);
+                if (this.overwriteAll === true) {
+                    // 用户已选择“覆盖全部”
+                } else if (this.overwriteAll === false) {
+                    // 用户已选择“跳过全部”
+                    console.log(`根据用户选择，跳过文件: ${filePath}`);
                     return false;
+                } else {
+                    // 询问用户
+                    const userChoice = await this.confirmOverwrite(filePath);
+                    if (userChoice === 'overwriteAll') {
+                        this.overwriteAll = true;
+                    } else if (userChoice === 'skipAll') {
+                        this.overwriteAll = false;
+                        console.log(`用户选择“跳过全部”，跳过文件: ${filePath}`);
+                        return false;
+                    } else if (userChoice === 'skip') {
+                        console.log(`用户选择跳过文件: ${filePath}`);
+                        return false;
+                    }
+                    // 如果是 'overwrite'，则继续执行
                 }
             }
 
@@ -150,7 +167,7 @@ export class ExportService {
     /**
      * 确认是否覆盖现有文件
      */
-    private async confirmOverwrite(filePath: string): Promise<boolean> {
+    private async confirmOverwrite(filePath: string): Promise<'overwrite' | 'skip' | 'overwriteAll' | 'skipAll'> {
         return new Promise((resolve) => {
             const modal = new OverwriteConfirmModal(this.app, filePath, resolve);
             modal.open();
@@ -189,8 +206,11 @@ export class ExportService {
             for (const property of options.propertiesTemplate) {
                 // 只处理启用的属性
                 if (property.enabled) {
-                    const value = this.resolvePropertyValue(property.value, repository, enhancements);
-                    lines.push(`${property.key}: ${value}`);
+                    const value = this.resolvePropertyValue(property.value, repository, enhancements, options);
+                    // For checkbox type, the value can be 'true' or 'false', so we don't check trim()
+                    if (property.type === 'checkbox' || value.trim()) {
+                        lines.push(`${property.key}: ${value}`);
+                    }
                 }
             }
             lines.push('---');
@@ -223,61 +243,58 @@ export class ExportService {
     private resolvePropertyValue(
         template: string,
         repository: GithubRepository,
-        enhancements: UserRepoEnhancements | undefined
+        enhancements: UserRepoEnhancements | undefined,
+        options: ExportOptions
     ): string {
         let value = template;
 
-        // 仓库基本信息变量
-        value = value.replace(/\{\{name\}\}/g, repository.name || '');
-        value = value.replace(/\{\{full_name\}\}/g, repository.full_name || '');
-        value = value.replace(/\{\{owner\}\}/g, repository.owner?.login || '');
-        value = value.replace(/\{\{description\}\}/g, repository.description || '');
-        value = value.replace(/\{\{language\}\}/g, repository.language || '');
-        value = value.replace(/\{\{url\}\}/g, repository.html_url || '');
-        value = value.replace(/\{\{id\}\}/g, repository.id.toString());
-        
-        // 统计信息变量
-        value = value.replace(/\{\{stars\}\}/g, (repository.stargazers_count || 0).toString());
-        value = value.replace(/\{\{forks\}\}/g, (repository.forks_count || 0).toString());
-        value = value.replace(/\{\{watchers\}\}/g, (repository.watchers_count || 0).toString());
-        value = value.replace(/\{\{issues\}\}/g, (repository.open_issues_count || 0).toString());
-        
-        // 时间变量
-        value = value.replace(/\{\{created_at\}\}/g, repository.created_at ? this.formatDate(repository.created_at) : '');
-        value = value.replace(/\{\{updated_at\}\}/g, repository.updated_at ? this.formatDate(repository.updated_at) : '');
-        value = value.replace(/\{\{pushed_at\}\}/g, repository.pushed_at ? this.formatDate(repository.pushed_at) : '');
-        value = value.replace(/\{\{starred_at\}\}/g, repository.starred_at ? this.formatDate(repository.starred_at) : '');
-        
-        // 布尔值变量
-        value = value.replace(/\{\{is_private\}\}/g, repository.private ? 'true' : 'false');
-        value = value.replace(/\{\{is_fork\}\}/g, repository.fork ? 'true' : 'false');
-        
-        // 主题标签变量
-        if (repository.topics && repository.topics.length > 0) {
-            value = value.replace(/\{\{topics\}\}/g, `[${repository.topics.map(t => `"${t}"`).join(', ')}]`);
-        } else {
-            value = value.replace(/\{\{topics\}\}/g, '[]');
-        }
-        
-        // 用户增强信息变量
-        // 提前格式化，避免影响 user_tags
-        value = this.formatYamlValue(value);
+        const placeholderToKey = (placeholder: string): string => {
+            if (placeholder === 'full_name') return 'GSM-title';
+            if (placeholder === 'id') return 'GSM-repo-id';
+            if (placeholder === 'notes') return 'GSM-user-notes';
+            if (placeholder === 'user_tags') return 'GSM-user-tags';
+            if (placeholder === 'linked_note') return 'GSM-linked-note';
+            return `GSM-${placeholder.replace(/_/g, '-')}`;
+        };
 
-        if (enhancements) {
-            value = value.replace(/\{\{notes\}\}/g, enhancements.notes || '');
-            // 处理用户标签 - 遍历每个标签，生成YAML列表格式
-            if (enhancements.tags && enhancements.tags.length > 0) {
-                // 将用户标签数组转换为YAML列表格式，每个标签单独一行，不带引号
-                const userTagsYaml = enhancements.tags.map(tag => `  - ${tag}`).join('\n');
-                value = value.replace(/\{\{user_tags\}\}/g, `\n${userTagsYaml}`);
-            } else {
-                value = value.replace(/\{\{user_tags\}\}/g, '[]');
+        const isEnabled = (placeholder: string) => {
+            const key = placeholderToKey(placeholder);
+            const prop = options.propertiesTemplate.find(p => p.key === key);
+            return prop ? prop.enabled : false; // Default to false if not found
+        };
+
+        const replacements: { [key: string]: () => string } = {
+            'name': () => repository.name || '',
+            'full_name': () => repository.full_name || '',
+            'owner': () => repository.owner?.login || '',
+            'description': () => repository.description || '',
+            'language': () => repository.language || '',
+            'url': () => repository.html_url || '',
+            'id': () => repository.id.toString(),
+            'stars': () => (repository.stargazers_count || 0).toString(),
+            'forks': () => (repository.forks_count || 0).toString(),
+            'watchers': () => (repository.watchers_count || 0).toString(),
+            'issues': () => (repository.open_issues_count || 0).toString(),
+            'created_at': () => repository.created_at ? this.formatDate(repository.created_at) : '',
+            'updated_at': () => repository.updated_at ? this.formatDate(repository.updated_at) : '',
+            'pushed_at': () => repository.pushed_at ? this.formatDate(repository.pushed_at) : '',
+            'starred_at': () => repository.starred_at ? this.formatDate(repository.starred_at) : '',
+            'is_private': () => repository.private ? 'true' : 'false',
+            'is_fork': () => repository.fork ? 'true' : 'false',
+            'topics': () => (repository.topics && repository.topics.length > 0) ? `[${repository.topics.map(t => `"${t}"`).join(', ')}]` : '[]',
+            'notes': () => enhancements?.notes || '',
+            'user_tags': () => (enhancements?.tags && enhancements.tags.length > 0) ? `\n${enhancements.tags.map(tag => `  - ${tag}`).join('\n')}` : '[]',
+            'linked_note': () => enhancements?.linked_note || ''
+        };
+
+        for (const placeholder in replacements) {
+            if (value.includes(`{{${placeholder}}}`)) {
+                if (isEnabled(placeholder)) {
+                    value = value.replace(new RegExp(`\\{\\{${placeholder}\\}\\}`, 'g'), replacements[placeholder]());
+                } else {
+                    value = value.replace(new RegExp(`\\{\\{${placeholder}\\}\\}`, 'g'), '');
+                }
             }
-            value = value.replace(/\{\{linked_note\}\}/g, enhancements.linked_note || '');
-        } else {
-            value = value.replace(/\{\{notes\}\}/g, '');
-            value = value.replace(/\{\{user_tags\}\}/g, '[]');
-            value = value.replace(/\{\{linked_note\}\}/g, '');
         }
 
         return value;
@@ -317,9 +334,9 @@ export class ExportService {
  */
 class OverwriteConfirmModal extends Modal {
     private filePath: string;
-    private resolve: (value: boolean) => void;
+    private resolve: (value: 'overwrite' | 'skip' | 'overwriteAll' | 'skipAll') => void;
 
-    constructor(app: App, filePath: string, resolve: (value: boolean) => void) {
+    constructor(app: App, filePath: string, resolve: (value: 'overwrite' | 'skip' | 'overwriteAll' | 'skipAll') => void) {
         super(app);
         this.filePath = filePath;
         this.resolve = resolve;
@@ -345,26 +362,36 @@ class OverwriteConfirmModal extends Modal {
         buttonContainer.style.gap = '10px';
         buttonContainer.style.marginTop = '20px';
 
-        // 取消按钮
-        const cancelButton = buttonContainer.createEl('button', { text: '取消' });
-        cancelButton.style.padding = '8px 16px';
-        cancelButton.addEventListener('click', () => {
-            this.resolve(false);
+        // 跳过按钮
+        const skipButton = buttonContainer.createEl('button', { text: '跳过' });
+        skipButton.addEventListener('click', () => {
+            this.resolve('skip');
+            this.close();
+        });
+
+        // 跳过全部按钮
+        const skipAllButton = buttonContainer.createEl('button', { text: '跳过全部' });
+        skipAllButton.addEventListener('click', () => {
+            this.resolve('skipAll');
             this.close();
         });
 
         // 覆盖按钮
         const overwriteButton = buttonContainer.createEl('button', { text: '覆盖' });
-        overwriteButton.style.padding = '8px 16px';
-        overwriteButton.style.backgroundColor = 'var(--interactive-accent)';
-        overwriteButton.style.color = 'var(--text-on-accent)';
         overwriteButton.addEventListener('click', () => {
-            this.resolve(true);
+            this.resolve('overwrite');
             this.close();
         });
 
-        // 默认焦点在取消按钮上
-        cancelButton.focus();
+        // 覆盖全部按钮
+        const overwriteAllButton = buttonContainer.createEl('button', { text: '覆盖全部', cls: 'mod-cta' });
+        overwriteAllButton.addEventListener('click', () => {
+            this.resolve('overwriteAll');
+            this.close();
+        });
+
+        // 默认焦点在跳过按钮上
+        skipButton.focus();
     }
 
     onClose() {
