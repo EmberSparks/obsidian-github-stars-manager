@@ -19,6 +19,9 @@ export interface GithubStarsSettings {
     autoSync: boolean;
     syncInterval: number; // 单位：分钟
     theme: 'default' | 'ios-glass'; // 新增主题设置
+    enableExport: boolean; // 导出功能开关
+    includeProperties: boolean; // 是否包含Properties
+    propertiesTemplate: PropertyTemplate[]; // Properties模板配置
 }
 
 // GitHub仓库接口（来自GitHub API, 包含 starred_at）
@@ -74,6 +77,8 @@ export interface PluginData {
     accountSyncTimes: {
         [accountId: string]: string;
     };
+    // 导出选项
+    exportOptions?: ExportOptions;
 }
 
 // 合并设置和插件数据的接口 (修改后)
@@ -83,3 +88,215 @@ export interface CombinedPluginData {
 }
 
 // 移除 LocalRepository 接口，因为它被 githubRepositories 和 userEnhancements 替代了
+
+// Properties模板项接口
+export interface PropertyTemplate {
+    key: string; // 属性键名
+    value: string; // 属性值模板（支持变量）
+    type: 'text' | 'number' | 'date' | 'checkbox' | 'tags'; // 属性类型
+    description: string; // 中文描述
+    enabled: boolean; // 是否启用该属性
+}
+
+// 导出功能相关类型定义
+export interface ExportOptions {
+    // 导出格式
+    format: 'markdown';
+    // 导出目标目录（相对于vault根目录）
+    targetFolder: string;
+    // 是否包含用户增强信息（笔记、标签）
+    includeEnhancements: boolean;
+    // 是否包含仓库统计信息
+    includeStats: boolean;
+    // 是否包含仓库主题标签
+    includeTopics: boolean;
+    // 文件名模板
+    filenameTemplate: string;
+    // 是否覆盖已存在的文件
+    overwriteExisting: boolean;
+    // 是否包含Properties前置内容
+    includeProperties: boolean;
+    // Properties模板配置
+    propertiesTemplate: PropertyTemplate[];
+}
+
+// 导出结果接口
+export interface ExportResult {
+    success: boolean;
+    exportedCount: number;
+    skippedCount: number;
+    errors: string[];
+    exportedFiles: string[];
+}
+
+// 单个仓库导出数据接口
+export interface RepoExportData {
+    repository: GithubRepository;
+    enhancements?: UserRepoEnhancements;
+    filename: string;
+    content: string;
+}
+
+// 默认Properties模板
+export const DEFAULT_PROPERTIES_TEMPLATE: PropertyTemplate[] = [
+    {
+        key: 'GSM-title',
+        value: '{{full_name}}',
+        type: 'text',
+        description: '仓库标题（完整名称）',
+        enabled: true
+    },
+    {
+        key: 'GSM-name',
+        value: '{{name}}',
+        type: 'text',
+        description: '仓库名称',
+        enabled: true
+    },
+    {
+        key: 'GSM-owner',
+        value: '{{owner}}',
+        type: 'text',
+        description: '仓库所有者',
+        enabled: true
+    },
+    {
+        key: 'GSM-url',
+        value: '{{url}}',
+        type: 'text',
+        description: '仓库链接',
+        enabled: true
+    },
+    {
+        key: 'GSM-description',
+        value: '{{description}}',
+        type: 'text',
+        description: '仓库描述',
+        enabled: true
+    },
+    {
+        key: 'GSM-language',
+        value: '{{language}}',
+        type: 'text',
+        description: '主要编程语言',
+        enabled: true
+    },
+    {
+        key: 'GSM-stars',
+        value: '{{stars}}',
+        type: 'number',
+        description: 'Star数量',
+        enabled: true
+    },
+    {
+        key: 'GSM-forks',
+        value: '{{forks}}',
+        type: 'number',
+        description: 'Fork数量',
+        enabled: true
+    },
+    {
+        key: 'GSM-watchers',
+        value: '{{watchers}}',
+        type: 'number',
+        description: 'Watcher数量',
+        enabled: true
+    },
+    {
+        key: 'GSM-issues',
+        value: '{{issues}}',
+        type: 'number',
+        description: '开放Issue数量',
+        enabled: true
+    },
+    {
+        key: 'GSM-topics',
+        value: '{{topics}}',
+        type: 'tags',
+        description: '主题标签',
+        enabled: true
+    },
+    {
+        key: 'GSM-created-at',
+        value: '{{created_at}}',
+        type: 'date',
+        description: '仓库创建时间',
+        enabled: true
+    },
+    {
+        key: 'GSM-updated-at',
+        value: '{{updated_at}}',
+        type: 'date',
+        description: '最后更新时间',
+        enabled: true
+    },
+    {
+        key: 'GSM-pushed-at',
+        value: '{{pushed_at}}',
+        type: 'date',
+        description: '最后推送时间',
+        enabled: true
+    },
+    {
+        key: 'GSM-starred-at',
+        value: '{{starred_at}}',
+        type: 'date',
+        description: '加星时间',
+        enabled: true
+    },
+    {
+        key: 'GSM-is-private',
+        value: '{{is_private}}',
+        type: 'checkbox',
+        description: '是否为私有仓库',
+        enabled: true
+    },
+    {
+        key: 'GSM-is-fork',
+        value: '{{is_fork}}',
+        type: 'checkbox',
+        description: '是否为Fork仓库',
+        enabled: true
+    },
+    {
+        key: 'GSM-repo-id',
+        value: '{{id}}',
+        type: 'number',
+        description: '仓库ID',
+        enabled: true
+    },
+    {
+        key: 'GSM-user-notes',
+        value: '{{notes}}',
+        type: 'text',
+        description: '用户笔记',
+        enabled: true
+    },
+    {
+        key: 'GSM-user-tags',
+        value: '{{user_tags}}',
+        type: 'tags',
+        description: '用户标签',
+        enabled: true
+    },
+    {
+        key: 'GSM-linked-note',
+        value: '{{linked_note}}',
+        type: 'text',
+        description: '关联笔记',
+        enabled: true
+    }
+];
+
+// 默认导出选项
+export const DEFAULT_EXPORT_OPTIONS: ExportOptions = {
+    format: 'markdown',
+    targetFolder: 'GitHub Stars',
+    includeEnhancements: true,
+    includeStats: true,
+    includeTopics: true,
+    filenameTemplate: '{{owner}}-{{name}}',
+    overwriteExisting: false,
+    includeProperties: true,
+    propertiesTemplate: DEFAULT_PROPERTIES_TEMPLATE
+};
