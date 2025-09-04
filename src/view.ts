@@ -757,6 +757,13 @@ export class GithubStarsView extends ItemView {
 
         const closePopover = () => {
             collapsibleContent.style.display = 'none';
+            // 将元素移回原位置
+            accountSelectorContainer.appendChild(collapsibleContent);
+            // 重置样式
+            collapsibleContent.style.position = '';
+            collapsibleContent.style.zIndex = '';
+            collapsibleContent.style.top = '';
+            collapsibleContent.style.right = '';
             toggleBtn.removeClass('expanded');
             isExpanded = false;
             document.removeEventListener('mousedown', handleOutsideClick);
@@ -772,7 +779,17 @@ export class GithubStarsView extends ItemView {
             event.stopPropagation();
             isExpanded = !isExpanded;
             if (isExpanded) {
+                // 将弹出控件添加到 body，避免被父容器限制
+                document.body.appendChild(collapsibleContent);
                 collapsibleContent.style.display = 'block';
+                collapsibleContent.style.position = 'fixed';
+                collapsibleContent.style.zIndex = '9999';
+                
+                // 计算位置
+                const toggleRect = toggleBtn.getBoundingClientRect();
+                collapsibleContent.style.top = `${toggleRect.bottom + 4}px`;
+                collapsibleContent.style.right = `${window.innerWidth - toggleRect.right}px`;
+                
                 toggleBtn.addClass('expanded');
                 document.addEventListener('mousedown', handleOutsideClick);
             } else {
