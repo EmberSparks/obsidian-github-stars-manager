@@ -21,7 +21,7 @@ data.json
 # Exclude macOS Finder (System Explorer) View States
 .DS_Store
 
-package-lock.json
+# Note: package-lock.json should be committed for consistent builds
 .obsidian/
 
 # Claude-specific files
