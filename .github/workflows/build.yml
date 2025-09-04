@@ -178,14 +178,19 @@ jobs:
       
     - name: Check build script exists
       run: |
+        echo "🔍 Checking build configuration..."
         if [ ! -f "package.json" ]; then
-          echo "package.json not found"
+          echo "❌ package.json not found"
           exit 1
         fi
         
-        if ! npm run --silent | grep -q "build"; then
-          echo "Build script not found in package.json"
+        # Check if build script exists using node -p
+        BUILD_SCRIPT=$(node -p "const pkg = require('./package.json'); pkg.scripts && pkg.scripts.build ? pkg.scripts.build : ''")
+        
+        if [ -z "$BUILD_SCRIPT" ]; then
+          echo "❌ Build script not found in package.json"
           exit 1
         fi
         
+        echo "✅ Build script found: $BUILD_SCRIPT"
         echo "✅ Build configuration is valid"
