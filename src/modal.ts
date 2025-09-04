@@ -1,6 +1,7 @@
 import { App, Modal, Setting, Notice, TFile } from 'obsidian';
 import { GithubRepository, UserRepoEnhancements } from './types'; // Updated imports
 import GithubStarsPlugin from './main';
+import { EmojiUtils } from './emojiUtils';
 
 /**
  * 编辑仓库信息的模态框
@@ -41,10 +42,8 @@ this.modalEl.addClass('github-stars-edit-modal'); // Add specific class for styl
             cls: 'edit-repo-fullname'
         });
         if (this.githubRepo.description) {
-            infoDiv.createEl('p', {
-                text: this.githubRepo.description,
-                cls: 'edit-repo-description'
-            });
+            const descEl = infoDiv.createEl('p', { cls: 'edit-repo-description' });
+            EmojiUtils.setEmojiText(descEl, this.githubRepo.description);
         }
 
         // --- User Editable Fields ---

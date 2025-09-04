@@ -723,6 +723,16 @@
   max-width: 900px; /* Adjust max-width accordingly */
 }
 
+/* 确保所有弹出框在所有主题下都位于顶层 */
+.modal-container, .github-stars-edit-modal {
+  z-index: 9999 !important; /* 使用一个非常高的 z-index */
+}
+
+
+
+.github-account-selector {
+  margin-right: 8px;
+}
 
 /* ===== iOS 液态玻璃主题 ===== */
 .github-stars-theme-ios-glass {
@@ -1069,9 +1079,14 @@
   z-index: 20;
 }
 
+/* 确保在ios-glass主题下，Obsidian的弹出菜单显示在最顶层 */
+.github-stars-theme-ios-glass .menu {
+    z-index: 100;
+}
+
 .github-stars-theme-ios-glass .github-account-collapsible {
   position: absolute;
-  z-index: 21;
+  z-index: 9999 !important; /* 使用一个非常高的 z-index 确保在最顶层 */
   right: 0;
   top: 100%;
   margin-top: 4px;
@@ -2215,8 +2230,4 @@
 
 .github-stars-sort-button-group {
   gap: 6px;
-}
-
-.github-account-selector {
-  margin-right: 8px;
 }

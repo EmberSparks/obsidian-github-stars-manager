@@ -79,14 +79,18 @@ export default class GithubStarsPlugin extends Plugin {
         const combinedData = Object.assign({}, DEFAULT_COMBINED_DATA, loaded);
 
         // 分配到各自的属性
-        this.settings = combinedData.settings;
-        this.data = combinedData.pluginData;
+        this.settings = Object.assign({}, DEFAULT_SETTINGS, combinedData.settings);
+        this.data = Object.assign({}, DEFAULT_PLUGIN_DATA, combinedData.pluginData);
 
-        // 确保深层结构也正确合并
-        this.settings = Object.assign({}, DEFAULT_SETTINGS, this.settings);
-        this.data = Object.assign({}, DEFAULT_PLUGIN_DATA, this.data);
+        // 运行数据验证和迁移
+        this._ensureDataIntegrity();
+        this._migrateExportOptions();
+    }
 
-        // 确保新结构的类型正确
+    /**
+     * 确保加载的数据结构是正确的，防止因数据损坏或版本更新导致的问题。
+     */
+    private _ensureDataIntegrity() {
         if (!Array.isArray(this.data.githubRepositories)) {
             this.data.githubRepositories = [];
         }
@@ -99,8 +103,12 @@ export default class GithubStarsPlugin extends Plugin {
         if (typeof this.data.accountSyncTimes !== 'object' || this.data.accountSyncTimes === null || Array.isArray(this.data.accountSyncTimes)) {
             this.data.accountSyncTimes = {};
         }
-        
-        // 确保导出选项使用最新的默认模板
+    }
+
+    /**
+     * 检查并迁移旧的导出选项到新格式，以确保兼容性。
+     */
+    private _migrateExportOptions() {
         if (!this.data.exportOptions) {
             this.data.exportOptions = DEFAULT_EXPORT_OPTIONS;
         } else {
@@ -194,8 +202,12 @@ export default class GithubStarsPlugin extends Plugin {
 
     // --- 核心逻辑 (重构) ---
     async syncStars(): Promise<void> {
+        console.log('开始同步GitHub星标...');
+        console.log('当前设置的账号:', this.settings.accounts);
+        
         // 检查是否有启用的账号
         const enabledAccounts = (this.settings.accounts || []).filter(acc => acc.enabled);
+        console.log('启用的账号:', enabledAccounts);
         
         if (enabledAccounts.length === 0) {
             // 向后兼容：如果没有多账号配置，使用单一令牌
@@ -203,6 +215,7 @@ export default class GithubStarsPlugin extends Plugin {
                 new Notice('请先在设置中配置GitHub账号或个人访问令牌');
                 return;
             }
+            console.log('使用向后兼容模式，创建临时账号');
             // 创建临时账号进行同步
             const tempAccount = {
                 id: 'legacy',
@@ -213,40 +226,68 @@ export default class GithubStarsPlugin extends Plugin {
             };
             this.settings.accounts = [tempAccount];
             this.githubService.updateAccounts([tempAccount]);
+        } else {
+            // 确保GitHub服务使用最新的账号配置
+            console.log('更新GitHub服务账号配置');
+            this.githubService.updateAccounts(this.settings.accounts);
         }
 
         new Notice('正在同步GitHub星标...');
         try {
-            // 1. 获取所有启用账号的星标仓库
             const syncResult = await this.githubService.fetchAllStarredRepositories();
-            console.log('Sync result:', syncResult);
-
-            // 2. 更新仓库数据
-            this.data.githubRepositories = syncResult.repositories;
-
-            // 3. 更新同步时间
-            this.data.lastSyncTime = new Date().toISOString();
-            this.data.accountSyncTimes = {
-                ...this.data.accountSyncTimes,
-                ...syncResult.accountSyncTimes
-            };
-
-            // 4. 保存数据
-            await this.savePluginData();
-            console.log('Plugin data saved after sync. GitHub Repos count:', this.data.githubRepositories.length);
-
-            // 5. 显示同步结果
-            const errorCount = Object.keys(syncResult.errors).length;
-            if (errorCount > 0) {
-                console.error('同步错误:', syncResult.errors);
-            }
-
-            // 6. 更新视图
-            this.updateViews();
+            await this._handleSyncSuccess(syncResult);
         } catch (error) {
             console.error('同步GitHub星标失败:', error);
             new Notice('同步GitHub星标失败，请查看控制台了解详情');
         }
+    }
+
+    /**
+     * 处理同步成功后的数据更新。
+     * @param syncResult 同步结果
+     */
+    private async _handleSyncSuccess(syncResult: Awaited<ReturnType<typeof this.githubService.fetchAllStarredRepositories>>) {
+        console.log('Sync result:', syncResult);
+        console.log('Repositories received:', syncResult.repositories?.length || 0);
+        console.log('Account sync times:', syncResult.accountSyncTimes);
+        console.log('Errors:', syncResult.errors);
+
+        // 检查是否有有效的仓库数据
+        if (!syncResult.repositories || syncResult.repositories.length === 0) {
+            console.warn('同步结果中没有仓库数据');
+            const errorCount = Object.keys(syncResult.errors).length;
+            if (errorCount > 0) {
+                console.error('同步错误详情:', syncResult.errors);
+                new Notice(`同步失败：${Object.values(syncResult.errors).join(', ')}`);
+            } else {
+                new Notice('同步完成，但没有找到星标仓库');
+            }
+            return;
+        }
+
+        // 更新仓库数据
+        this.data.githubRepositories = syncResult.repositories;
+        console.log('Updated githubRepositories count:', this.data.githubRepositories.length);
+
+        // 更新同步时间
+        this.data.lastSyncTime = new Date().toISOString();
+        this.data.accountSyncTimes = {
+            ...this.data.accountSyncTimes,
+            ...syncResult.accountSyncTimes
+        };
+
+        // 保存数据
+        await this.savePluginData();
+        console.log('Plugin data saved after sync. Final GitHub Repos count:', this.data.githubRepositories.length);
+
+        // 显示同步结果
+        const errorCount = Object.keys(syncResult.errors).length;
+        if (errorCount > 0) {
+            console.error('同步错误:', syncResult.errors);
+        }
+
+        // 更新视图
+        this.updateViews();
     }
 
     // --- 视图管理 (activateView 不变, updateViews 更新) ---
@@ -273,7 +314,11 @@ export default class GithubStarsPlugin extends Plugin {
         this.app.workspace.getLeavesOfType(VIEW_TYPE_STARS).forEach(leaf => {
             if (leaf.view instanceof GithubStarsView) {
                 // 传递更新后的 GitHub 仓库列表和用户增强数据
-                leaf.view.renderView();
+                leaf.view.updateData(
+                    this.data.githubRepositories,
+                    this.data.userEnhancements,
+                    this.data.allTags
+                );
             }
         });
     }

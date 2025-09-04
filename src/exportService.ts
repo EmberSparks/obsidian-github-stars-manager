@@ -1,5 +1,6 @@
 import { TFile, TFolder, Vault, normalizePath, Modal, App } from 'obsidian';
 import { GithubRepository, UserRepoEnhancements, ExportOptions, ExportResult, RepoExportData, DEFAULT_EXPORT_OPTIONS } from './types';
+import { EmojiUtils } from './emojiUtils';
 
 /**
  * GitHub Stars 导出服务
@@ -8,12 +9,13 @@ import { GithubRepository, UserRepoEnhancements, ExportOptions, ExportResult, Re
 export class ExportService {
     private vault: Vault;
     private app: App;
-    private overwriteAll: boolean | null = null; // 用于跟踪“覆盖全部”的状态
+    private overwriteAll: boolean | null = null; // 用于跟踪"覆盖全部"的状态
 
     constructor(app: App) {
         this.app = app;
         this.vault = app.vault;
     }
+
 
     /**
      * 导出所有仓库
@@ -206,7 +208,11 @@ export class ExportService {
             for (const property of options.propertiesTemplate) {
                 // 只处理启用的属性
                 if (property.enabled) {
-                    const value = this.resolvePropertyValue(property.value, repository, enhancements, options);
+                    let value = this.resolvePropertyValue(property.value, repository, enhancements, options);
+                    
+                    // 应用emoji保护和恢复
+                    value = EmojiUtils.restoreEmojis(value);
+                    
                     // For checkbox type, the value can be 'true' or 'false', so we don't check trim()
                     if (property.type === 'checkbox' || value.trim()) {
                         lines.push(`${property.key}: ${value}`);
@@ -216,7 +222,11 @@ export class ExportService {
             lines.push('---');
         }
 
-        return lines.join('\n');
+        // 对整个内容应用emoji保护
+        let content = lines.join('\n');
+        content = EmojiUtils.restoreEmojis(content);
+        
+        return content;
     }
 
     /**
