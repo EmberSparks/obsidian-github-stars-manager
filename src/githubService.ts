@@ -52,6 +52,8 @@ class SingleAccountGithubService {
             const per_page = 100;
             
             while (true) {
+                console.log(`获取第 ${page} 页星标仓库 (${this.account.username})`);
+                
                 const response = await this.octokit!.activity.listReposStarredByAuthenticatedUser({
                     per_page,
                     page,
@@ -60,22 +62,33 @@ class SingleAccountGithubService {
                     }
                 });
                 
+                console.log(`第 ${page} 页返回 ${response.data.length} 个仓库 (${this.account.username})`);
+                
                 if (response.data.length === 0) {
                     break;
                 }
                 
                 const starredReposData = response.data.map((item: any) => {
-                    if (item && item.repo && item.starred_at) {
+                    // 使用正确的API格式，item本身就包含repo和starred_at
+                    if (item && item.repo) {
                         return {
                             ...item.repo,
-                            starred_at: item.starred_at,
+                            starred_at: item.starred_at || new Date().toISOString(),
                             account_id: this.account.id // 标记来源账号
+                        };
+                    } else if (item && item.id) {
+                        // 如果直接返回仓库对象（向后兼容）
+                        return {
+                            ...item,
+                            starred_at: new Date().toISOString(),
+                            account_id: this.account.id
                         };
                     }
                     console.warn(`Skipping malformed starred repo item (${this.account.username}):`, item);
                     return null;
                 }).filter(repo => repo !== null);
 
+                console.log(`第 ${page} 页处理后得到 ${starredReposData.length} 个有效仓库 (${this.account.username})`);
                 repositories.push(...starredReposData as GithubRepository[]);
                 
                 if (response.data.length < per_page) {
@@ -131,13 +144,20 @@ export class GithubService {
      * 更新账号列表
      */
     public updateAccounts(accounts: GithubAccount[]): void {
+        console.log('更新GitHub账号列表:', accounts);
         this.accounts = accounts;
         this.services.clear();
         
         // 为每个启用的账号创建服务实例
-        accounts.filter(account => account.enabled).forEach(account => {
+        const enabledAccounts = accounts.filter(account => account.enabled);
+        console.log('启用的账号数量:', enabledAccounts.length);
+        
+        enabledAccounts.forEach(account => {
+            console.log(`创建服务实例: ${account.username} (${account.id})`);
             this.services.set(account.id, new SingleAccountGithubService(account));
         });
+        
+        console.log('GitHub服务实例数量:', this.services.size);
     }
     
     /**
@@ -148,7 +168,6 @@ export class GithubService {
         accountSyncTimes: { [accountId: string]: string };
         errors: { [accountId: string]: string };
     }> {
-        const allRepositories: GithubRepository[] = [];
         const accountSyncTimes: { [accountId: string]: string } = {};
         const errors: { [accountId: string]: string } = {};
         
@@ -160,22 +179,31 @@ export class GithubService {
         // 并行获取所有账号的星标仓库
         const promises = Array.from(this.services.entries()).map(async ([accountId, service]) => {
             const account = this.accounts.find(acc => acc.id === accountId);
-            if (!account) return;
+            if (!account) return { repos: [], accountId, error: null };
             
             try {
                 const repos = await service.fetchStarredRepositories();
-                allRepositories.push(...repos);
                 accountSyncTimes[accountId] = new Date().toISOString();
                 
                 console.log(`成功同步账号 ${account.username}: ${repos.length} 个仓库`);
+                return { repos, accountId, error: null };
             } catch (error) {
                 const errorMsg = `同步失败: ${error instanceof Error ? error.message : '未知错误'}`;
                 errors[accountId] = errorMsg;
                 console.error(`账号 ${account.username} 同步失败:`, error);
+                return { repos: [], accountId, error: errorMsg };
             }
         });
         
-        await Promise.all(promises);
+        const results = await Promise.all(promises);
+        
+        // 收集所有仓库数据
+        const allRepositories: GithubRepository[] = [];
+        results.forEach(result => {
+            if (result && result.repos.length > 0) {
+                allRepositories.push(...result.repos);
+            }
+        });
         
         // 去重处理（基于仓库ID，保留最新的starred_at时间）
         const uniqueRepos = this.deduplicateRepositories(allRepositories);

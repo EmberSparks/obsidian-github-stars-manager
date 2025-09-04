@@ -3,6 +3,7 @@ import GithubStarsPlugin from './main';
 import { GithubRepository, UserRepoEnhancements } from './types'; // Updated imports
 import { EditRepoModal } from './modal';
 import { ExportModal } from './exportModal';
+import { EmojiUtils } from './emojiUtils';
 
 export const VIEW_TYPE_STARS = 'github-stars-view';
 
@@ -397,7 +398,8 @@ export class GithubStarsView extends ItemView {
 
             // Description (from githubRepo)
             if (repo.description) {
-                const descEl = repoEl.createEl('div', { cls: 'github-stars-repo-desc', text: repo.description });
+                const descEl = repoEl.createEl('div', { cls: 'github-stars-repo-desc' });
+                EmojiUtils.setEmojiText(descEl, repo.description); // 使用 EmojiUtils 渲染 emoji
                 
                 // Create tooltip for long descriptions
                 if (repo.description.length > 100) {
@@ -460,7 +462,8 @@ export class GithubStarsView extends ItemView {
 
             // Notes (from enhancement) - show below footer if exists
             if (repo.notes) {
-                repoEl.createEl('div', { cls: 'github-stars-repo-notes', text: repo.notes });
+                const notesEl = repoEl.createEl('div', { cls: 'github-stars-repo-notes' });
+                EmojiUtils.setEmojiText(notesEl, repo.notes); // 使用 EmojiUtils 渲染用户笔记中的 emoji
             }
 
             // Linked Note (from enhancement)
