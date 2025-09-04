@@ -32,7 +32,6 @@
   border: 1px solid var(--ios-glass-border);
   box-shadow: var(--ios-glass-shadow);
   margin: 10px;
-  overflow: hidden;
   position: relative;
 }
 
@@ -338,22 +337,19 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
-/* 修复液态玻璃主题下账户选择器被覆盖的问题 */
+/* 账号选择器 - 液态玻璃主题优化 */
 .github-stars-theme-ios-glass .github-account-selector {
-  z-index: 20;
+  position: relative;
 }
 
-/* 确保在ios-glass主题下，Obsidian的弹出菜单显示在最顶层 */
+/* Obsidian 弹出菜单兼容 */
 .github-stars-theme-ios-glass .menu {
-    z-index: 100;
+    z-index: 1000;
 }
 
+/* 账号弹出列表 - 使用 JavaScript 动态定位到 body */
 .github-stars-theme-ios-glass .github-account-collapsible {
-  position: absolute;
-  z-index: 9999 !important; /* 使用一个非常高的 z-index 确保在最顶层 */
-  right: 0;
-  top: 100%;
-  margin-top: 4px;
+  /* 基础样式保留，定位由 JavaScript 处理 */
 }
 
 /* 仓库标题 */
