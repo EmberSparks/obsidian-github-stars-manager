@@ -1,6 +1,6 @@
 import { App, PluginSettingTab, Setting, Notice, Modal } from 'obsidian';
 import GithubStarsPlugin from './main'; // Reverted to extensionless import
-import { GithubStarsSettings, GithubAccount } from './types';
+import { GithubStarsSettings, GithubAccount, PropertyTemplate, DEFAULT_PROPERTIES_TEMPLATE, DEFAULT_EXPORT_OPTIONS } from './types';
 
 // 默认设置
 export const DEFAULT_SETTINGS: GithubStarsSettings = {
@@ -9,6 +9,9 @@ export const DEFAULT_SETTINGS: GithubStarsSettings = {
     autoSync: true,
     syncInterval: 60, // 默认60分钟
     theme: 'default', // 默认主题
+    enableExport: true, // 默认启用导出功能
+    includeProperties: true, // 默认启用Properties
+    propertiesTemplate: DEFAULT_PROPERTIES_TEMPLATE, // 默认Properties模板
 };
 
 export class GithubStarsSettingTab extends PluginSettingTab {
@@ -89,6 +92,25 @@ export class GithubStarsSettingTab extends PluginSettingTab {
                     this.plugin.applyTheme(value);
                 })
             );
+
+        // 导出功能开关
+        new Setting(containerEl)
+            .setName('启用导出功能')
+            .setDesc('启用后可以将星标仓库导出为Markdown文件')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.enableExport)
+                .onChange(async (value) => {
+                    this.plugin.settings.enableExport = value;
+                    await this.plugin.saveSettings();
+                    // 重新渲染设置页面以显示/隐藏Properties配置
+                    this.display();
+                })
+            );
+
+        // Properties模板配置（仅在启用导出功能时显示）
+        if (this.plugin.settings.enableExport) {
+            this.displayPropertiesSection(containerEl);
+        }
 
         // 立即同步按钮
         new Setting(containerEl)
@@ -367,6 +389,133 @@ export class GithubStarsSettingTab extends PluginSettingTab {
         });
         
         return input;
+    }
+
+    /**
+     * 显示Properties模板配置区域
+     */
+    private displayPropertiesSection(containerEl: HTMLElement): void {
+        // Properties配置标题
+        containerEl.createEl('h3', { text: 'Properties 模板配置' });
+        
+        // 说明文字
+        const descEl = containerEl.createDiv('setting-item-description');
+        descEl.style.marginBottom = '16px';
+        descEl.innerHTML = `
+            <p>配置导出Markdown文件时的Properties（笔记属性）模板。支持以下变量：</p>
+            <ul style="margin: 8px 0; padding-left: 20px;">
+                <li><code>{{full_name}}</code> - 仓库完整名称</li>
+                <li><code>{{name}}</code> - 仓库名称</li>
+                <li><code>{{owner.login}}</code> - 仓库作者</li>
+                <li><code>{{html_url}}</code> - 仓库链接</li>
+                <li><code>{{description}}</code> - 仓库描述</li>
+                <li><code>{{created_at}}</code> - 创建时间</li>
+                <li><code>{{starred_at}}</code> - 加星时间</li>
+                <li><code>{{topics}}</code> - 主题标签</li>
+                <li><code>{{stargazers_count}}</code> - Star数量</li>
+                <li><code>{{language}}</code> - 主要语言</li>
+            </ul>
+        `;
+
+        // 启用Properties开关
+        new Setting(containerEl)
+            .setName('启用 Properties')
+            .setDesc('在导出的Markdown文件开头添加Properties（YAML前置内容）')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.includeProperties ?? true) // 默认启用Properties
+                .onChange(async (value) => {
+                    this.plugin.settings.includeProperties = value;
+                    await this.plugin.saveSettings();
+                    this.display(); // 重新渲染以显示/隐藏模板配置
+                })
+            );
+
+        // 只有启用Properties时才显示模板配置
+        if (this.plugin.settings.includeProperties) {
+            // Properties模板列表
+            this.plugin.settings.propertiesTemplate.forEach((property, index) => {
+                this.createPropertySetting(containerEl, property, index);
+            });
+
+            // 添加新属性按钮
+            new Setting(containerEl)
+                .setName('添加新属性')
+                .setDesc('添加自定义的Properties属性')
+                .addButton(button => button
+                    .setButtonText('添加属性')
+                    .setCta()
+                    .onClick(() => {
+                        this.addNewProperty();
+                    })
+                );
+
+            // 重置为默认模板按钮
+            new Setting(containerEl)
+                .setName('重置模板')
+                .setDesc('恢复为默认的Properties模板配置')
+                .addButton(button => button
+                    .setButtonText('重置为默认')
+                    .setWarning()
+                    .onClick(async () => {
+                        this.plugin.settings.propertiesTemplate = [...DEFAULT_PROPERTIES_TEMPLATE];
+                        await this.plugin.saveSettings();
+                        this.display();
+                        new Notice('已重置为默认Properties模板');
+                    })
+                );
+        }
+    }
+
+    /**
+     * 创建单个属性设置项
+     */
+    private createPropertySetting(containerEl: HTMLElement, property: PropertyTemplate, index: number): void {
+        const setting = new Setting(containerEl)
+            .setName(`${property.key} (${property.description})`)
+            .setDesc(`类型: ${property.type} | 值: ${property.value}`)
+            .addToggle(toggle => toggle
+                .setValue(property.enabled)
+                .onChange(async (value) => {
+                    // 更新属性的启用状态
+                    this.plugin.settings.propertiesTemplate[index].enabled = value;
+                    await this.plugin.saveSettings();
+                    new Notice(`属性 ${property.key} ${value ? '已启用' : '已禁用'}`);
+                })
+            )
+            .addButton(button => button
+                .setButtonText('编辑')
+                .onClick(() => {
+                    this.editProperty(index);
+                })
+            )
+            .addButton(button => button
+                .setButtonText('删除')
+                .setWarning()
+                .onClick(async () => {
+                    if (confirm(`确定要删除属性 ${property.key} 吗？`)) {
+                        this.plugin.settings.propertiesTemplate.splice(index, 1);
+                        await this.plugin.saveSettings();
+                        this.display();
+                        new Notice(`已删除属性 ${property.key}`);
+                    }
+                    this.display();
+                    new Notice(`已删除属性 ${property.key}`);
+                })
+            );
+    }
+
+    /**
+     * 添加新属性（暂时禁用）
+     */
+    private async addNewProperty(): Promise<void> {
+        new Notice('Properties模板编辑功能即将推出');
+    }
+
+    /**
+     * 编辑属性（暂时禁用）
+     */
+    private async editProperty(index: number): Promise<void> {
+        new Notice('Properties模板编辑功能即将推出');
     }
 }
 

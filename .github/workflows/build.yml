@@ -1,0 +1,204 @@
+name: Build and Release
+
+on:
+  workflow_dispatch:  # 只允许手动触发
+    inputs:
+      test_only:
+        description: '仅测试构建，不发布'
+        required: false
+        default: false
+        type: boolean
+      environment:
+        description: '部署环境'
+        required: false
+        default: 'test'
+        type: choice
+        options:
+        - test
+        - production
+  release:
+    types: [ published ]
+    branches: [ main, master, feature/* ]  # 允许在功能分支发布
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Run type checking
+      run: npx tsc --noEmit
+      
+    - name: Build plugin
+      run: npm run build
+      
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: obsidian-github-stars-manager
+        path: |
+          main.js
+          manifest.json
+          styles.css
+          themes.css
+        retention-days: 30
+
+  test:
+    runs-on: ubuntu-latest
+    needs: build
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Download build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: obsidian-github-stars-manager
+        
+    - name: Verify build files exist
+      run: |
+        ls -la main.js
+        ls -la manifest.json
+        ls -la styles.css
+        test -f main.js
+        test -f manifest.json
+        test -f styles.css
+
+  release:
+    runs-on: ubuntu-latest
+    needs: [build, test]
+    if: github.event_name == 'release' && github.event.action == 'published'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Build plugin
+      run: npm run build
+      
+    - name: Create release archive
+      run: |
+        mkdir -p release
+        cp main.js manifest.json styles.css themes.css release/
+        cd release
+        zip -r obsidian-github-stars-manager.zip ./*
+        
+    - name: Upload release assets
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          release/main.js
+          release/manifest.json
+          release/styles.css
+          release/themes.css
+          release/obsidian-github-stars-manager.zip
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  validate:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Validate manifest.json
+      run: |
+        echo "📋 Validating manifest.json..."
+        node -e "
+          const manifest = require('./manifest.json');
+          console.log('🔍 Checking manifest.json structure...');
+          
+          // Check required fields
+          const required = ['id', 'name', 'version', 'minAppVersion', 'description', 'author', 'authorUrl'];
+          let hasError = false;
+          
+          for (const field of required) {
+            if (!manifest[field] || (typeof manifest[field] === 'string' && manifest[field].trim() === '')) {
+              console.error('❌ Missing or empty required field: ' + field);
+              hasError = true;
+            } else {
+              console.log('✅ ' + field + ': ' + manifest[field]);
+            }
+          }
+          
+          // Check version format
+          if (!/^[0-9]+\\.[0-9]+\\.[0-9]+$/.test(manifest.version)) {
+            console.error('❌ Version must be in format x.y.z, got: ' + manifest.version);
+            hasError = true;
+          }
+          
+          if (hasError) {
+            console.log('');
+            console.log('💡 Please ensure all required fields are properly filled in manifest.json');
+            process.exit(1);
+          }
+          
+          console.log('');
+          console.log('🎉 manifest.json validation passed!');
+          console.log('📦 Plugin: ' + manifest.name + ' v' + manifest.version);
+          console.log('👤 Author: ' + manifest.author + ' (' + manifest.authorUrl + ')');
+        "
+      
+    - name: Check TypeScript compilation
+      run: npx tsc --noEmit
+      
+    - name: Check build script exists
+      run: |
+        echo "🔍 Checking build configuration..."
+        if [ ! -f "package.json" ]; then
+          echo "❌ package.json not found"
+          exit 1
+        fi
+        
+        # Check if build script exists using node -p
+        BUILD_SCRIPT=$(node -p "const pkg = require('./package.json'); pkg.scripts && pkg.scripts.build ? pkg.scripts.build : ''")
+        
+        if [ -z "$BUILD_SCRIPT" ]; then
+          echo "❌ Build script not found in package.json"
+          exit 1
+        fi
+        
+        echo "✅ Build script found: $BUILD_SCRIPT"
+        echo "✅ Build configuration is valid"

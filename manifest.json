@@ -5,7 +5,10 @@
 	"minAppVersion": "0.15.0",
 	"description": "在 Obsidian 中管理你的 GitHub Stars。",
 	"author": "sparks",
-	"authorUrl": "",
-	"fundingUrl": "",
-	"isDesktopOnly": false
+	"authorUrl": "https://github.com/sparks",
+	"fundingUrl": "https://github.com/sponsors/sparks",
+	"isDesktopOnly": false,
+	"css": [
+		"styles.css"
+	]
 }

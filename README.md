@@ -102,6 +102,17 @@ npm run lint
 npm run version
 ```
 
+### 本地开发环境配置
+
+为了在本地开发和调试插件，您需要配置一个环境变量，指向您的 Obsidian 插件目录。这样，当您运行 `npm run dev` 或 `npm run build` 时，插件文件会自动部署到您的 Obsidian Vault 中。
+
+1.  **创建 `.env` 文件**: 复制项目根目录下的 `.env.example` 文件，并将其重命名为 `.env`。
+2.  **配置插件目录**: 打开 `.env` 文件，将 `OBSIDIAN_PLUGIN_DIR` 的值修改为您本地的 Obsidian 插件目录的绝对路径。例如：
+    ```
+    OBSIDIAN_PLUGIN_DIR="D:/MyObsidianVault/.obsidian/plugins"
+    ```
+3.  **重启开发服务器**: 如果您正在运行 `npm run dev`，请重新启动它以加载新的环境变量。
+
 ### 项目结构
 
 ```
