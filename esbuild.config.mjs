@@ -4,6 +4,10 @@ import builtins from "builtin-modules";
 import fs from "fs"; // Added for file system operations
 import path from "path"; // Added for path manipulation
 import { fileURLToPath } from 'url';
+import dotenv from 'dotenv';
+
+// Load environment variables from .env file
+dotenv.config();
 
 // 设置正确的字符编码处理
 process.stdout.setEncoding('utf8');

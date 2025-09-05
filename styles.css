@@ -28,21 +28,32 @@
 .github-stars-toolbar {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   margin-bottom: 10px;
   padding: 5px;
   border-radius: 5px;
   background-color: var(--background-secondary);
 }
 
-.github-stars-sync-button {
-  background-color: var(--interactive-accent);
-  color: var(--text-on-accent);
-  border: none;
-  border-radius: 3px;
-  padding: 5px 10px;
-  margin-right: 10px;
+/* 工具栏右侧按钮容器 */
+.github-stars-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+}
+
+.github-stars-toolbar button {
+  background-color: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  padding: 6px 12px;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: all 0.2s ease;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .github-stars-sync-button:hover {
@@ -69,12 +80,20 @@
 /* 排序按钮组样式 */
 .github-stars-sort-group {
   display: flex;
-  gap: 2px;
-  margin-right: 10px;
-  border: 1px solid var(--background-modifier-border);
+  gap: 0;
   border-radius: 6px;
   overflow: hidden;
-  background-color: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+}
+
+.github-stars-sort-group button {
+  border-radius: 0;
+  border: none;
+  border-right: 1px solid var(--background-modifier-border);
+}
+
+.github-stars-sort-group button:last-child {
+  border-right: none;
 }
 
 .github-stars-sort-option {
@@ -704,6 +723,16 @@
   max-width: 900px; /* Adjust max-width accordingly */
 }
 
+/* 确保所有弹出框在所有主题下都位于顶层 */
+.modal-container, .github-stars-edit-modal {
+  z-index: 9999 !important; /* 使用一个非常高的 z-index */
+}
+
+
+
+.github-account-selector {
+  margin-right: 8px;
+}
 
 /* ===== iOS 液态玻璃主题 ===== */
 .github-stars-theme-ios-glass {
@@ -1033,11 +1062,34 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+.github-account-selector {
+    position: relative;
+    z-index: 10;
+}
+
 /* 仓库头像 - 圆角优化 */
 .github-stars-theme-ios-glass .github-stars-repo-avatar {
   border-radius: 16px;
   border: 2px solid var(--ios-glass-border);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* 修复液态玻璃主题下账户选择器被覆盖的问题 */
+.github-stars-theme-ios-glass .github-account-selector {
+  z-index: 20;
+}
+
+/* 确保在ios-glass主题下，Obsidian的弹出菜单显示在最顶层 */
+.github-stars-theme-ios-glass .menu {
+    z-index: 100;
+}
+
+.github-stars-theme-ios-glass .github-account-collapsible {
+  position: absolute;
+  z-index: 9999 !important; /* 使用一个非常高的 z-index 确保在最顶层 */
+  right: 0;
+  top: 100%;
+  margin-top: 4px;
 }
 
 /* 仓库标题 */
@@ -1163,6 +1215,7 @@
   border: 1px solid var(--ios-glass-border);
   border-radius: 20px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  z-index: 100; /* 确保模态框在顶层 */
 }
 
 /* 模态框按钮 */
@@ -1817,4 +1870,364 @@
 .github-stars-theme-ios-glass .account-avatar-small {
   border-color: var(--ios-glass-border);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+
+/* 导出按钮样式 */
+.github-stars-export-button {
+    padding: 8px 12px;
+    border: 1px solid var(--color-accent);
+    border-radius: 6px;
+    background: var(--color-accent);
+    color: var(--text-on-accent);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.github-stars-export-button:hover {
+    background: var(--color-accent-hover);
+    border-color: var(--color-accent-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.github-stars-export-button:active {
+    transform: translateY(0);
+}
+
+.github-stars-export-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* 仓库按钮组样式 */
+.github-stars-repo-buttons {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.github-stars-repo-export {
+    padding: 6px 12px;
+    border: 1px solid var(--color-accent);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--color-accent);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.github-stars-repo-export:hover {
+    background: var(--color-accent);
+    color: var(--text-on-accent);
+    transform: translateY(-1px);
+}
+
+.github-stars-repo-export:active {
+    transform: translateY(0);
+}
+
+.github-stars-repo-export:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.github-stars-repo-edit {
+    padding: 6px 12px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    background: var(--background-primary);
+    color: var(--text-normal);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 12px;
+}
+
+.github-stars-repo-edit:hover {
+    background: var(--background-modifier-hover);
+    border-color: var(--background-modifier-border-hover);
+    transform: translateY(-1px);
+}
+
+.github-stars-repo-edit:active {
+    transform: translateY(0);
+}
+
+
+/* 导出功能样式 */
+.github-stars-export-button {
+  background-color: #20b2aa; /* 青绿色 */
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+  box-shadow: 0 2px 4px rgba(32, 178, 170, 0.2);
+}
+
+.github-stars-export-button:hover {
+  background-color: #1a9a94;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(32, 178, 170, 0.3);
+}
+
+.github-stars-select-all-button,
+.github-stars-export-confirm-button,
+.github-stars-export-cancel-button {
+  background-color: var(--interactive-normal);
+  color: var(--text-normal);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  padding: 6px 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+}
+
+.github-stars-select-all-button:hover,
+.github-stars-export-confirm-button:hover,
+.github-stars-export-cancel-button:hover {
+  background-color: var(--interactive-hover);
+}
+
+.github-stars-export-confirm-button {
+  background-color: #20b2aa;
+  color: white;
+  border-color: #20b2aa;
+}
+
+.github-stars-export-confirm-button:hover {
+  background-color: #1a9a94;
+}
+
+.github-stars-export-confirm-button:disabled {
+  background-color: var(--background-modifier-border);
+  color: var(--text-muted);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.github-stars-export-cancel-button {
+  background-color: #ff6b6b;
+  color: white;
+  border-color: #ff6b6b;
+}
+
+.github-stars-export-cancel-button:hover {
+  background-color: #ff5252;
+}
+
+/* 复选框样式 */
+.github-stars-repo-checkbox-container {
+  display: flex;
+  align-items: center;
+  margin-right: 10px;
+}
+
+.github-stars-repo-checkbox {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--interactive-accent);
+}
+
+/* 导出模式下的仓库卡片样式 */
+.github-stars-repo:has(.github-stars-repo-checkbox:checked) {
+  background-color: var(--background-modifier-hover);
+  border-left: 3px solid var(--interactive-accent);
+}
+
+/* 全选按钮特殊样式 */
+.github-stars-select-all-button {
+  background-color: #f0f8ff;
+  border-color: #20b2aa;
+  color: #20b2aa;
+}
+
+.github-stars-select-all-button:hover {
+  background-color: #20b2aa;
+  color: white;
+}
+
+
+/* 导出模态框样式 */
+.export-modal-description {
+  margin-bottom: 15px;
+  color: var(--text-muted);
+}
+
+.export-modal-select-all {
+  margin-bottom: 15px;
+  text-align: right;
+}
+
+.export-modal-select-all-btn {
+  background-color: #20b2aa;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.export-modal-select-all-btn:hover {
+  background-color: #1a9a94;
+}
+
+.export-modal-repo-list {
+  max-height: 400px;
+  overflow-y: auto;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  padding: 10px;
+  margin-bottom: 20px;
+}
+
+.export-modal-repo-item {
+  display: flex;
+  align-items: flex-start;
+  padding: 10px;
+  border-bottom: 1px solid var(--background-modifier-border-hover);
+  transition: background-color 0.2s;
+}
+
+.export-modal-repo-item:last-child {
+  border-bottom: none;
+}
+
+.export-modal-repo-item:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.export-modal-checkbox {
+  width: 16px;
+  height: 16px;
+  margin-right: 12px;
+  margin-top: 2px;
+  cursor: pointer;
+  accent-color: #20b2aa;
+}
+
+.export-modal-repo-info {
+  flex: 1;
+}
+
+.export-modal-repo-name {
+  font-weight: 500;
+  color: var(--text-normal);
+  margin-bottom: 4px;
+}
+
+.export-modal-repo-description {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+  line-height: 1.4;
+}
+
+.export-modal-repo-stats {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.export-modal-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 15px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.export-modal-export-btn {
+  background-color: #20b2aa;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 16px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.export-modal-export-btn:hover:not(:disabled) {
+  background-color: #1a9a94;
+}
+
+.export-modal-export-btn:disabled {
+  background-color: var(--background-modifier-border);
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+.export-modal-cancel-btn {
+  background-color: var(--interactive-normal);
+  color: var(--text-normal);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  padding: 8px 16px;
+  cursor: pointer;
+}
+
+.export-modal-cancel-btn:hover {
+  background-color: var(--interactive-hover);
+}
+
+/* 优化工具栏图标间隔 */
+.github-stars-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px; /* 增加间隔 */
+  margin-left: auto;
+}
+
+/* 优化导出按钮样式 */
+.github-stars-export-button {
+  background-color: #20b2aa;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+  box-shadow: 0 2px 4px rgba(32, 178, 170, 0.2);
+  font-size: 13px;
+}
+
+.github-stars-export-button:hover {
+  background-color: #1a9a94;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(32, 178, 170, 0.3);
+}
+
+/* 优化其他工具栏按钮间隔 */
+.github-stars-sync-button,
+.github-stars-theme-button {
+  margin-right: 8px;
+}
+
+.github-stars-sort-button-group {
+  gap: 6px;
 }

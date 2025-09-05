@@ -1,0 +1,1493 @@
+/* ===== iOS 液态玻璃主题 ===== */
+.github-stars-theme-ios-glass {
+  --ios-glass-bg: rgba(255, 255, 255, 0.25);
+  --ios-glass-bg-secondary: rgba(255, 255, 255, 0.15);
+  --ios-glass-border: rgba(255, 255, 255, 0.3);
+  --ios-glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  --ios-glass-shadow-hover: 0 12px 40px rgba(0, 0, 0, 0.15);
+  --ios-glass-blur: blur(20px);
+  --ios-glass-accent: rgba(0, 122, 255, 0.8);
+  --ios-glass-accent-hover: rgba(0, 122, 255, 0.9);
+  --ios-glass-text: rgba(0, 0, 0, 0.85);
+  --ios-glass-text-muted: rgba(0, 0, 0, 0.6);
+  --ios-glass-text-strong: rgba(0, 0, 0, 0.9);
+}
+
+/* 主容器 - 液态玻璃效果 */
+.github-stars-theme-ios-glass .github-stars-container {
+  /* 添加彩色渐变背景提高对比度 */
+  background:
+    linear-gradient(135deg,
+      rgba(74, 144, 226, 0.12) 0%,
+      rgba(80, 200, 120, 0.08) 25%,
+      rgba(255, 107, 107, 0.06) 50%,
+      rgba(196, 181, 253, 0.08) 75%,
+      rgba(251, 191, 36, 0.1) 100%),
+    linear-gradient(135deg,
+      rgba(255, 255, 255, 0.15) 0%,
+      rgba(255, 255, 255, 0.08) 100%);
+  backdrop-filter: var(--ios-glass-blur);
+  -webkit-backdrop-filter: var(--ios-glass-blur);
+  border-radius: 20px;
+  border: 1px solid var(--ios-glass-border);
+  box-shadow: var(--ios-glass-shadow);
+  margin: 10px;
+  position: relative;
+}
+
+/* 添加动态背景效果 */
+.github-stars-theme-ios-glass .github-stars-container::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle,
+    rgba(74, 144, 226, 0.03) 0%,
+    transparent 50%);
+  animation: float 20s ease-in-out infinite;
+  pointer-events: none;
+  z-index: -1;
+}
+
+@keyframes float {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  33% { transform: translate(30px, -30px) rotate(120deg); }
+  66% { transform: translate(-20px, 20px) rotate(240deg); }
+}
+
+/* 标题区域 */
+.github-stars-theme-ios-glass .github-stars-header {
+  background: linear-gradient(135deg, 
+    rgba(255, 255, 255, 0.15) 0%, 
+    rgba(255, 255, 255, 0.08) 100%);
+  backdrop-filter: var(--ios-glass-blur);
+  -webkit-backdrop-filter: var(--ios-glass-blur);
+  border: none;
+  border-bottom: 1px solid var(--ios-glass-border);
+  border-radius: 20px 20px 0 0;
+  margin: 0;
+  padding: 20px;
+}
+
+.github-stars-theme-ios-glass .github-stars-header h2 {
+  color: var(--text-normal);
+  font-weight: 600;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* 工具栏 - 液态玻璃效果 */
+.github-stars-theme-ios-glass .github-stars-toolbar {
+  background: linear-gradient(135deg, 
+    rgba(255, 255, 255, 0.12) 0%, 
+    rgba(255, 255, 255, 0.06) 100%);
+  backdrop-filter: var(--ios-glass-blur);
+  -webkit-backdrop-filter: var(--ios-glass-blur);
+  border: 1px solid var(--ios-glass-border);
+  border-radius: 16px;
+  margin: 15px 20px;
+  padding: 12px 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+/* 同步按钮 - iOS风格 */
+.github-stars-theme-ios-glass .github-stars-sync-button {
+  background: linear-gradient(135deg, var(--ios-glass-accent) 0%, rgba(0, 122, 255, 0.7) 100%);
+  border: 1px solid rgba(0, 122, 255, 0.3);
+  border-radius: 12px;
+  padding: 8px 16px;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(0, 122, 255, 0.3);
+  transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.github-stars-theme-ios-glass .github-stars-sync-button:hover {
+  background: linear-gradient(135deg, var(--ios-glass-accent-hover) 0%, rgba(0, 122, 255, 0.8) 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 122, 255, 0.4);
+}
+
+/* 搜索框 - 液态玻璃效果 */
+.github-stars-theme-ios-glass .github-stars-search {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: var(--ios-glass-blur);
+  -webkit-backdrop-filter: var(--ios-glass-blur);
+  border: 1px solid var(--ios-glass-border);
+  border-radius: 12px;
+  padding: 10px 16px;
+  transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.github-stars-theme-ios-glass .github-stars-search:focus {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: var(--ios-glass-accent);
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.2);
+  outline: none;
+}
+
+/* 排序按钮组 - iOS风格 */
+.github-stars-theme-ios-glass .github-stars-sort-group {
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: var(--ios-glass-blur);
+  -webkit-backdrop-filter: var(--ios-glass-blur);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 12px;
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+.github-stars-theme-ios-glass .github-stars-sort-option {
+  color: rgba(255, 255, 255, 0.95);
+  background: transparent;
+  transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  padding: 8px 10px;
+  font-weight: 500;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.github-stars-theme-ios-glass .github-stars-sort-option:hover {
+  background: rgba(255, 255, 255, 0.25);
+  color: white;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(255, 255, 255, 0.2);
+}
+
+.github-stars-theme-ios-glass .github-stars-sort-option.active {
+  background: linear-gradient(135deg,
+    rgba(0, 122, 255, 0.9) 0%,
+    rgba(0, 100, 220, 0.8) 100%);
+  color: white;
+  box-shadow:
+    0 4px 12px rgba(0, 122, 255, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  border: 1px solid rgba(0, 122, 255, 0.6);
+  font-weight: 600;
+}
+
+.github-stars-theme-ios-glass .github-stars-sort-option.active:hover {
+  background: linear-gradient(135deg,
+    rgba(0, 122, 255, 1) 0%,
+    rgba(0, 100, 220, 0.9) 100%);
+  box-shadow:
+    0 6px 16px rgba(0, 122, 255, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+.github-stars-theme-ios-glass .github-stars-sort-option:not(:last-child)::after {
+  background-color: rgba(255, 255, 255, 0.3);
+}
+
+.github-stars-theme-ios-glass .github-stars-sort-option.active:not(:last-child)::after {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+/* iOS主题下的排序方向指示器 - 增强可见性 */
+.github-stars-theme-ios-glass .sort-direction {
+  color: inherit;
+  opacity: 1;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+}
+
+.github-stars-theme-ios-glass .sort-icon {
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
+}
+
+/* 主题按钮 - iOS风格 */
+.github-stars-theme-ios-glass .github-stars-theme-button {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: var(--ios-glass-blur);
+  -webkit-backdrop-filter: var(--ios-glass-blur);
+  border: 1px solid var(--ios-glass-border);
+  border-radius: 12px;
+  padding: 8px 12px;
+  transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.github-stars-theme-ios-glass .github-stars-theme-button:hover {
+  background: rgba(255, 255, 255, 0.15);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.github-stars-theme-ios-glass .github-stars-theme-button.active {
+  background: linear-gradient(135deg,
+    rgba(255, 215, 0, 0.8) 0%,
+    rgba(255, 193, 7, 0.7) 100%);
+  border-color: rgba(255, 215, 0, 0.4);
+  color: rgba(0, 0, 0, 0.8);
+  box-shadow: 0 4px 16px rgba(255, 215, 0, 0.3);
+}
+
+.github-stars-theme-ios-glass .github-stars-theme-button.active:hover {
+  background: linear-gradient(135deg,
+    rgba(255, 215, 0, 0.9) 0%,
+    rgba(255, 193, 7, 0.8) 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(255, 215, 0, 0.4);
+}
+
+/* 标签区域 - 液态玻璃效果 */
+.github-stars-theme-ios-glass .github-stars-tags {
+  margin: 15px 20px 20px 20px;
+  padding: 16px;
+  background: linear-gradient(135deg, 
+    rgba(255, 255, 255, 0.08) 0%, 
+    rgba(255, 255, 255, 0.04) 100%);
+  backdrop-filter: var(--ios-glass-blur);
+  -webkit-backdrop-filter: var(--ios-glass-blur);
+  border: 1px solid var(--ios-glass-border);
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+}
+
+.github-stars-theme-ios-glass .github-stars-tag {
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--ios-glass-border);
+  border-radius: 20px;
+  padding: 8px 16px;
+  font-weight: 600;
+  transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.github-stars-theme-ios-glass .github-stars-tag:hover {
+  background: rgba(255, 255, 255, 0.18);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.github-stars-theme-ios-glass .github-stars-tag.active {
+  background: linear-gradient(135deg, 
+    rgba(52, 199, 89, 0.8) 0%, 
+    rgba(52, 199, 89, 0.6) 100%);
+  border-color: rgba(52, 199, 89, 0.4);
+  color: white;
+  box-shadow: 0 4px 16px rgba(52, 199, 89, 0.3);
+}
+
+/* 仓库卡片 - 液态玻璃效果 */
+.github-stars-theme-ios-glass .github-stars-repos {
+  padding: 0 20px 20px 20px;
+}
+
+.github-stars-theme-ios-glass .github-stars-repo {
+  /* 增强卡片背景对比度 */
+  background: linear-gradient(135deg,
+    rgba(255, 255, 255, 0.25) 0%,
+    rgba(255, 255, 255, 0.15) 50%,
+    rgba(255, 255, 255, 0.12) 100%);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 20px;
+  padding: 20px;
+  /* 添加微妙的内阴影增强玻璃效果 */
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    0 8px 32px rgba(0, 0, 0, 0.12);
+  transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  overflow: hidden;
+  position: relative;
+}
+
+/* 卡片光泽效果 */
+.github-stars-theme-ios-glass .github-stars-repo::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.15) 50%,
+    transparent 100%);
+  transition: left 0.6s ease;
+  pointer-events: none;
+}
+
+.github-stars-theme-ios-glass .github-stars-repo:hover::before {
+  left: 100%;
+}
+
+.github-stars-theme-ios-glass .github-stars-repo:hover {
+  transform: translateY(-3px); /* 移除scale避免字体模糊 */
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.15);
+  background: linear-gradient(135deg,
+    rgba(255, 255, 255, 0.25) 0%,
+    rgba(255, 255, 255, 0.15) 100%);
+  /* 确保文字清晰 */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.github-account-selector {
+    position: relative;
+    z-index: 10;
+}
+
+/* 仓库头像 - 圆角优化 */
+.github-stars-theme-ios-glass .github-stars-repo-avatar {
+  border-radius: 16px;
+  border: 2px solid var(--ios-glass-border);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* 账号选择器 - 液态玻璃主题优化 */
+.github-stars-theme-ios-glass .github-account-selector {
+  position: relative;
+}
+
+/* Obsidian 弹出菜单兼容 */
+.github-stars-theme-ios-glass .menu {
+    z-index: 1000;
+}
+
+/* 账号弹出列表 - 使用 JavaScript 动态定位到 body */
+.github-stars-theme-ios-glass .github-account-collapsible {
+  /* 基础样式保留，定位由 JavaScript 处理 */
+}
+
+/* 仓库标题 */
+.github-stars-theme-ios-glass .github-stars-repo-title {
+  font-weight: 700;
+  color: var(--ios-glass-text-strong);
+  text-shadow: 0 1px 3px rgba(255, 255, 255, 0.5);
+}
+
+.github-stars-theme-ios-glass .github-stars-repo-link {
+  color: var(--ios-glass-text-strong);
+}
+
+.github-stars-theme-ios-glass .github-stars-repo-link:hover {
+  color: var(--ios-glass-accent);
+}
+
+/* 仓库描述 */
+.github-stars-theme-ios-glass .github-stars-repo-desc {
+  background: rgba(255, 255, 255, 0.2);
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: var(--ios-glass-text);
+}
+
+/* 仓库标签 - 液态玻璃效果 */
+.github-stars-theme-ios-glass .github-stars-repo-tag {
+  background: rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--ios-glass-border);
+  border-radius: 12px;
+  padding: 4px 10px;
+  font-weight: 600;
+  color: var(--ios-glass-text);
+  transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+.github-stars-theme-ios-glass .github-stars-repo-tag:hover {
+  background: rgba(255, 255, 255, 0.35);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  color: var(--ios-glass-text-strong);
+}
+
+/* 仓库底部信息 */
+.github-stars-theme-ios-glass .github-stars-repo-footer {
+  background: rgba(255, 255, 255, 0.15);
+  margin: 16px -20px -20px -20px;
+  padding: 16px 20px;
+  border-top: 1px solid var(--ios-glass-border);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/* 仓库信息文字颜色 */
+.github-stars-theme-ios-glass .github-stars-repo-info {
+  color: var(--ios-glass-text);
+}
+
+.github-stars-theme-ios-glass .github-stars-repo-info .github-stars-repo-stars,
+.github-stars-theme-ios-glass .github-stars-repo-info .github-stars-repo-forks,
+.github-stars-theme-ios-glass .github-stars-repo-info .github-stars-repo-updated {
+  color: var(--ios-glass-text-muted);
+}
+
+/* 编辑按钮 - iOS风格 */
+.github-stars-theme-ios-glass .github-stars-repo-edit {
+  background: linear-gradient(135deg, var(--ios-glass-accent) 0%, rgba(0, 122, 255, 0.7) 100%);
+  border: 1px solid rgba(0, 122, 255, 0.3);
+  border-radius: 12px;
+  padding: 8px 16px;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(0, 122, 255, 0.25);
+  transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.github-stars-theme-ios-glass .github-stars-repo-edit:hover {
+  background: linear-gradient(135deg, var(--ios-glass-accent-hover) 0%, rgba(0, 122, 255, 0.8) 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 122, 255, 0.35);
+}
+
+/* 语言标签 */
+.github-stars-theme-ios-glass .github-stars-repo-language {
+  background: rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--ios-glass-border);
+  border-radius: 10px;
+  padding: 4px 8px;
+  font-weight: 600;
+  color: var(--ios-glass-text);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+/* 笔记区域 - 液态玻璃效果 */
+.github-stars-theme-ios-glass .github-stars-repo-notes {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--ios-glass-border);
+  border-radius: 12px;
+  border-left: 3px solid var(--ios-glass-accent);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+/* 链接笔记 */
+.github-stars-theme-ios-glass .github-stars-repo-linked-note a {
+  color: var(--ios-glass-accent);
+  font-weight: 600;
+}
+
+/* 编辑模态框 - 液态玻璃效果 */
+.github-stars-theme-ios-glass .github-stars-edit-modal {
+  background: linear-gradient(135deg,
+    rgba(255, 255, 255, 0.15) 0%,
+    rgba(255, 255, 255, 0.08) 100%);
+  backdrop-filter: var(--ios-glass-blur);
+  -webkit-backdrop-filter: var(--ios-glass-blur);
+  border: 1px solid var(--ios-glass-border);
+  border-radius: 20px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  z-index: 100; /* 确保模态框在顶层 */
+}
+
+/* 模态框按钮 */
+.github-stars-theme-ios-glass .edit-repo-buttons button {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--ios-glass-border);
+  border-radius: 12px;
+  padding: 10px 20px;
+  font-weight: 600;
+  transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.github-stars-theme-ios-glass .edit-repo-buttons button:hover {
+  background: rgba(255, 255, 255, 0.15);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.github-stars-theme-ios-glass .edit-repo-buttons button[class*="mod-cta"] {
+  background: linear-gradient(135deg, var(--ios-glass-accent) 0%, rgba(0, 122, 255, 0.7) 100%);
+  color: white;
+  border-color: rgba(0, 122, 255, 0.3);
+}
+
+/* 现有标签按钮 - 液态玻璃效果 */
+.github-stars-theme-ios-glass .existing-tag-button {
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--ios-glass-border);
+  border-radius: 12px;
+  transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.github-stars-theme-ios-glass .existing-tag-button:hover {
+  background: rgba(255, 255, 255, 0.18);
+  transform: translateY(-1px);
+}
+
+.github-stars-theme-ios-glass .existing-tag-button.active {
+  background: linear-gradient(135deg, var(--ios-glass-accent) 0%, rgba(0, 122, 255, 0.7) 100%);
+  color: white;
+  border-color: rgba(0, 122, 255, 0.3);
+}
+
+/* 输入框和文本区域 - 液态玻璃效果 */
+.github-stars-theme-ios-glass input,
+.github-stars-theme-ios-glass textarea {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--ios-glass-border);
+  border-radius: 12px;
+  transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.github-stars-theme-ios-glass input:focus,
+.github-stars-theme-ios-glass textarea:focus {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: var(--ios-glass-accent);
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.2);
+  outline: none;
+}
+
+/* 滚动条 - iOS风格 */
+.github-stars-theme-ios-glass ::-webkit-scrollbar {
+  width: 8px;
+}
+
+.github-stars-theme-ios-glass ::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+}
+
+.github-stars-theme-ios-glass ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.github-stars-theme-ios-glass ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+
+/* 多账号管理样式 */
+.github-accounts-container {
+    margin-top: 10px;
+}
+
+.github-accounts-empty {
+    color: var(--text-muted);
+    font-style: italic;
+    text-align: center;
+    padding: 20px;
+}
+
+.github-account-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px;
+    margin: 8px 0;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 8px;
+    background: var(--background-secondary);
+}
+
+.github-account-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+}
+
+.github-account-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.github-account-details {
+    flex: 1;
+}
+
+.github-account-name {
+    font-weight: 500;
+    color: var(--text-normal);
+}
+
+.github-account-username {
+    font-size: 0.9em;
+    color: var(--text-muted);
+}
+
+.github-account-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-right: 12px;
+}
+
+.github-account-toggle {
+    margin: 0;
+}
+
+.github-account-status label {
+    font-size: 0.9em;
+    margin: 0;
+}
+
+.github-account-status label.enabled {
+    color: var(--text-success);
+}
+
+.github-account-status label.disabled {
+    color: var(--text-muted);
+}
+
+.github-account-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.github-account-btn {
+    padding: 4px 12px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    background: var(--background-primary);
+    color: var(--text-normal);
+    cursor: pointer;
+    font-size: 0.9em;
+}
+
+.github-account-btn:hover {
+    background: var(--background-modifier-hover);
+}
+
+.github-account-btn.edit {
+    color: var(--text-accent);
+}
+
+.github-account-btn.delete {
+    color: var(--text-error);
+}
+
+.github-account-btn.delete:hover {
+    background: var(--background-modifier-error);
+}
+
+/* 账号信息显示区域样式 */
+.github-account-info-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: var(--background-secondary);
+    border-radius: 6px;
+    margin-bottom: 10px;
+    border: 1px solid var(--background-modifier-border);
+}
+
+.github-account-info-bar .account-avatar {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.github-account-info-bar .account-name {
+    font-size: 0.9em;
+    color: var(--text-normal);
+    font-weight: 500;
+}
+
+.github-account-info-bar .account-toggle {
+    margin-left: auto;
+}
+
+.github-account-info-bar .account-toggle input {
+    margin: 0;
+}
+
+
+/* 多账号信息显示区域样式 */
+.github-accounts-info {
+    margin-bottom: 15px;
+    padding: 10px;
+    background: var(--background-secondary);
+    border-radius: 8px;
+    border: 1px solid var(--background-modifier-border);
+}
+
+.github-accounts-info-title {
+    margin: 0 0 10px 0;
+    font-size: 1.1em;
+    font-weight: 600;
+    color: var(--text-normal);
+}
+
+.github-accounts-info-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.github-account-info-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: var(--background-primary);
+    border-radius: 6px;
+    border: 1px solid var(--background-modifier-border);
+    transition: all 0.2s ease;
+}
+
+.github-account-info-bar.disabled {
+    opacity: 0.6;
+    background: var(--background-modifier-form-field-highlighted);
+}
+
+.github-account-info-bar .account-avatar {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.github-account-info-bar .account-name {
+    font-weight: 500;
+    color: var(--text-normal);
+    font-size: 0.95em;
+}
+
+.github-account-info-bar .account-username {
+    font-size: 0.85em;
+    color: var(--text-muted);
+    margin-left: -5px;
+}
+
+.github-account-info-bar .account-status {
+    flex: 1;
+    text-align: right;
+    margin-right: 10px;
+}
+
+.github-account-info-bar .account-sync-time {
+    font-size: 0.8em;
+    color: var(--text-muted);
+}
+
+.github-account-info-bar .account-toggle {
+    flex-shrink: 0;
+}
+
+.github-account-info-bar .account-toggle-input {
+    margin: 0;
+    cursor: pointer;
+}
+
+.github-account-info-bar:hover {
+    background: var(--background-modifier-hover);
+}
+
+.github-account-info-bar.disabled:hover {
+    background: var(--background-modifier-form-field-highlighted);
+}
+
+
+/* 账号模态框样式 */
+.account-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin: 20px 0;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.form-field label {
+  font-weight: 600;
+  color: var(--text-normal);
+  font-size: 14px;
+}
+
+.form-field-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 5px;
+}
+
+.form-field input {
+  padding: 8px 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  background-color: var(--background-primary);
+  color: var(--text-normal);
+  font-size: 14px;
+  transition: border-color 0.2s ease;
+}
+
+.form-field input:focus {
+  outline: none !important;
+  border-color: var(--interactive-accent) !important;
+  box-shadow: 0 0 0 2px var(--interactive-accent-hover) !important;
+}
+
+.form-field input:disabled,
+.form-field input[readonly] {
+  background-color: var(--background-modifier-border);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.modal-button-container {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.modal-button-container button {
+  padding: 8px 16px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  background-color: var(--background-primary);
+  color: var(--text-normal);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.modal-button-container button:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.modal-button-container button.mod-cta {
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: var(--interactive-accent);
+}
+
+.modal-button-container button.mod-cta:hover {
+  background-color: var(--interactive-accent-hover);
+}
+
+.modal-button-container button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+
+/* 账户空状态样式 */
+.github-accounts-empty-state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background-color: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  margin-bottom: 15px;
+}
+
+.github-accounts-empty-icon {
+  font-size: 16px;
+  opacity: 0.7;
+}
+
+.github-accounts-empty-message {
+  color: var(--text-muted);
+  font-size: 13px;
+  flex: 1;
+}
+
+.github-accounts-empty-link {
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border: none;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.github-accounts-empty-link:hover {
+  background-color: var(--interactive-accent-hover);
+}
+
+
+/* ===== 账户选择器样式 ===== */
+
+/* 账户选择器容器 */
+.github-account-selector {
+  position: relative;
+  margin-left: 8px;
+}
+
+/* 添加账号按钮 */
+.github-account-add-btn {
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border: none;
+  border-radius: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 0.85em;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.github-account-add-btn:hover {
+  background-color: var(--interactive-accent-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+/* 折叠按钮 */
+.github-account-toggle-btn {
+  background-color: transparent;
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+  border-radius: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 0.85em;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.github-account-toggle-btn:hover {
+  background-color: var(--background-modifier-hover);
+  border-color: var(--interactive-accent);
+  color: var(--interactive-accent);
+}
+
+.github-account-toggle-btn.expanded {
+  background-color: var(--interactive-accent);
+  border-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+/* 折叠内容容器 */
+.github-account-collapsible {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 8px;
+  background-color: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  min-width: 280px;
+  max-width: 320px;
+  overflow: hidden;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/* 紧凑账号项 */
+.github-account-item-compact {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  transition: all 0.2s ease;
+  gap: 12px;
+}
+
+.github-account-item-compact:last-child {
+  border-bottom: none;
+}
+
+.github-account-item-compact:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.github-account-item-compact.disabled {
+  opacity: 0.6;
+  background-color: var(--background-modifier-border);
+}
+
+/* 小头像 */
+.account-avatar-small {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--background-modifier-border);
+  flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* 紧凑账号信息 */
+.account-info-compact {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.account-name-compact {
+  font-weight: 600;
+  font-size: 0.9em;
+  color: var(--text-normal);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-username-compact {
+  font-size: 0.8em;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-sync-time-compact {
+  font-size: 0.75em;
+  color: var(--text-faint);
+  margin-top: 2px;
+}
+
+/* 紧凑切换开关 */
+.account-toggle-compact {
+  flex-shrink: 0;
+}
+
+.account-toggle-input-compact {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--interactive-accent);
+}
+
+/* iOS 液态玻璃主题下的账户选择器样式 */
+.github-stars-theme-ios-glass .github-account-add-btn {
+  background: linear-gradient(135deg, var(--ios-glass-accent) 0%, rgba(0, 122, 255, 0.8) 100%);
+  backdrop-filter: var(--ios-glass-blur);
+  -webkit-backdrop-filter: var(--ios-glass-blur);
+  border: 1px solid var(--ios-glass-border);
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.github-stars-theme-ios-glass .github-account-add-btn:hover {
+  background: linear-gradient(135deg, rgba(0, 122, 255, 0.9) 0%, rgba(0, 122, 255, 0.7) 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 122, 255, 0.3);
+}
+
+.github-stars-theme-ios-glass .github-account-toggle-btn {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: var(--ios-glass-blur);
+  -webkit-backdrop-filter: var(--ios-glass-blur);
+  border: 1px solid var(--ios-glass-border);
+  border-radius: 12px;
+}
+
+.github-stars-theme-ios-glass .github-account-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.github-stars-theme-ios-glass .github-account-toggle-btn.expanded {
+  background: linear-gradient(135deg, var(--ios-glass-accent) 0%, rgba(0, 122, 255, 0.7) 100%);
+  border-color: rgba(0, 122, 255, 0.3);
+  color: white;
+}
+
+.github-stars-theme-ios-glass .github-account-collapsible {
+  background: linear-gradient(135deg, 
+    rgba(255, 255, 255, 0.15) 0%, 
+    rgba(255, 255, 255, 0.08) 100%);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--ios-glass-border);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+}
+
+.github-stars-theme-ios-glass .github-account-item-compact {
+  border-bottom-color: var(--ios-glass-border);
+}
+
+.github-stars-theme-ios-glass .github-account-item-compact:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.github-stars-theme-ios-glass .github-account-item-compact.disabled {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.github-stars-theme-ios-glass .account-avatar-small {
+  border-color: var(--ios-glass-border);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+
+/* 导出按钮样式 */
+.github-stars-export-button {
+    padding: 8px 12px;
+    border: 1px solid var(--color-accent);
+    border-radius: 6px;
+    background: var(--color-accent);
+    color: var(--text-on-accent);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.github-stars-export-button:hover {
+    background: var(--color-accent-hover);
+    border-color: var(--color-accent-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.github-stars-export-button:active {
+    transform: translateY(0);
+}
+
+.github-stars-export-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* 仓库按钮组样式 */
+.github-stars-repo-buttons {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.github-stars-repo-export {
+    padding: 6px 12px;
+    border: 1px solid var(--color-accent);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--color-accent);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.github-stars-repo-export:hover {
+    background: var(--color-accent);
+    color: var(--text-on-accent);
+    transform: translateY(-1px);
+}
+
+.github-stars-repo-export:active {
+    transform: translateY(0);
+}
+
+.github-stars-repo-export:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.github-stars-repo-edit {
+    padding: 6px 12px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    background: var(--background-primary);
+    color: var(--text-normal);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 12px;
+}
+
+.github-stars-repo-edit:hover {
+    background: var(--background-modifier-hover);
+    border-color: var(--background-modifier-border-hover);
+    transform: translateY(-1px);
+}
+
+.github-stars-repo-edit:active {
+    transform: translateY(0);
+}
+
+
+/* 导出功能样式 */
+.github-stars-export-button {
+  background-color: #20b2aa; /* 青绿色 */
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+  box-shadow: 0 2px 4px rgba(32, 178, 170, 0.2);
+}
+
+.github-stars-export-button:hover {
+  background-color: #1a9a94;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(32, 178, 170, 0.3);
+}
+
+.github-stars-select-all-button,
+.github-stars-export-confirm-button,
+.github-stars-export-cancel-button {
+  background-color: var(--interactive-normal);
+  color: var(--text-normal);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  padding: 6px 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+}
+
+.github-stars-select-all-button:hover,
+.github-stars-export-confirm-button:hover,
+.github-stars-export-cancel-button:hover {
+  background-color: var(--interactive-hover);
+}
+
+.github-stars-export-confirm-button {
+  background-color: #20b2aa;
+  color: white;
+  border-color: #20b2aa;
+}
+
+.github-stars-export-confirm-button:hover {
+  background-color: #1a9a94;
+}
+
+.github-stars-export-confirm-button:disabled {
+  background-color: var(--background-modifier-border);
+  color: var(--text-muted);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.github-stars-export-cancel-button {
+  background-color: #ff6b6b;
+  color: white;
+  border-color: #ff6b6b;
+}
+
+.github-stars-export-cancel-button:hover {
+  background-color: #ff5252;
+}
+
+/* 复选框样式 */
+.github-stars-repo-checkbox-container {
+  display: flex;
+  align-items: center;
+  margin-right: 10px;
+}
+
+.github-stars-repo-checkbox {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--interactive-accent);
+}
+
+/* 导出模式下的仓库卡片样式 */
+.github-stars-repo:has(.github-stars-repo-checkbox:checked) {
+  background-color: var(--background-modifier-hover);
+  border-left: 3px solid var(--interactive-accent);
+}
+
+/* 全选按钮特殊样式 */
+.github-stars-select-all-button {
+  background-color: #f0f8ff;
+  border-color: #20b2aa;
+  color: #20b2aa;
+}
+
+.github-stars-select-all-button:hover {
+  background-color: #20b2aa;
+  color: white;
+}
+
+
+/* 导出模态框样式 */
+.export-modal-description {
+  margin-bottom: 15px;
+  color: var(--text-muted);
+}
+
+.export-modal-select-all {
+  margin-bottom: 15px;
+  text-align: right;
+}
+
+.export-modal-select-all-btn {
+  background-color: #20b2aa;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.export-modal-select-all-btn:hover {
+  background-color: #1a9a94;
+}
+
+.export-modal-repo-list {
+  max-height: 400px;
+  overflow-y: auto;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  padding: 10px;
+  margin-bottom: 20px;
+}
+
+.export-modal-repo-item {
+  display: flex;
+  align-items: flex-start;
+  padding: 10px;
+  border-bottom: 1px solid var(--background-modifier-border-hover);
+  transition: background-color 0.2s;
+}
+
+.export-modal-repo-item:last-child {
+  border-bottom: none;
+}
+
+.export-modal-repo-item:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.export-modal-checkbox {
+  width: 16px;
+  height: 16px;
+  margin-right: 12px;
+  margin-top: 2px;
+  cursor: pointer;
+  accent-color: #20b2aa;
+}
+
+.export-modal-repo-info {
+  flex: 1;
+}
+
+.export-modal-repo-name {
+  font-weight: 500;
+  color: var(--text-normal);
+  margin-bottom: 4px;
+}
+
+.export-modal-repo-description {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+  line-height: 1.4;
+}
+
+.export-modal-repo-stats {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.export-modal-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 15px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.export-modal-export-btn {
+  background-color: #20b2aa;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 16px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.export-modal-export-btn:hover:not(:disabled) {
+  background-color: #1a9a94;
+}
+
+.export-modal-export-btn:disabled {
+  background-color: var(--background-modifier-border);
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+.export-modal-cancel-btn {
+  background-color: var(--interactive-normal);
+  color: var(--text-normal);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  padding: 8px 16px;
+  cursor: pointer;
+}
+
+.export-modal-cancel-btn:hover {
+  background-color: var(--interactive-hover);
+}
+
+/* 优化工具栏图标间隔 */
+.github-stars-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px; /* 增加间隔 */
+  margin-left: auto;
+}
+
+/* 优化导出按钮样式 */
+.github-stars-export-button {
+  background-color: #20b2aa;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+  box-shadow: 0 2px 4px rgba(32, 178, 170, 0.2);
+  font-size: 13px;
+}
+
+.github-stars-export-button:hover {
+  background-color: #1a9a94;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(32, 178, 170, 0.3);
+}
+
+/* 优化其他工具栏按钮间隔 */
+.github-stars-sync-button,
+.github-stars-theme-button {
+  margin-right: 8px;
+}
+
+.github-stars-sort-button-group {
+  gap: 6px;
+}
