@@ -44,7 +44,7 @@ jobs:
       run: npm run build
       
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v4  # 强制使用 v4 版本避免弃用警告
       with:
         name: obsidian-github-stars-manager
         path: |
@@ -72,7 +72,7 @@ jobs:
       run: npm ci
       
     - name: Download build artifacts
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v4  # 强制使用 v4 版本避免弃用警告
       with:
         name: obsidian-github-stars-manager
         

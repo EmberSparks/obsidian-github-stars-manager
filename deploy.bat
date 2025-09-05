@@ -75,6 +75,28 @@ if exist "styles.css" (
     echo ⚠️  styles.css 不存在
 )
 
+:: 备份并复制 themes.css
+if exist "%TARGET_DIR%\themes.css" (
+    echo 备份 themes.css...
+    copy "%TARGET_DIR%\themes.css" "%BACKUP_DIR%\themes.css.%timestamp%.backup" >nul
+    if %errorlevel% equ 0 (
+        echo ✅ themes.css 备份成功
+    ) else (
+        echo ❌ themes.css 备份失败
+    )
+)
+
+if exist "themes.css" (
+    copy "themes.css" "%TARGET_DIR%\themes.css" >nul
+    if %errorlevel% equ 0 (
+        echo ✅ themes.css 复制成功
+    ) else (
+        echo ❌ themes.css 复制失败
+    )
+) else (
+    echo ⚠️  themes.css 不存在
+)
+
 :: 备份并复制 manifest.json
 if exist "%TARGET_DIR%\manifest.json" (
     echo 备份 manifest.json...
