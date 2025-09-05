@@ -1,10 +1,21 @@
 name: Build and Release
 
 on:
-  push:
-    branches: [ main, master, feature/* ]
-  pull_request:
-    branches: [ main, master ]
+  workflow_dispatch:  # 只允许手动触发
+    inputs:
+      test_only:
+        description: '仅测试构建，不发布'
+        required: false
+        default: false
+        type: boolean
+      environment:
+        description: '部署环境'
+        required: false
+        default: 'test'
+        type: choice
+        options:
+        - test
+        - production
   release:
     types: [ published ]
 
@@ -12,18 +23,14 @@ jobs:
   build:
     runs-on: ubuntu-latest
     
-    strategy:
-      matrix:
-        node-version: [20.x, 22.x]
-    
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
       
-    - name: Setup Node.js ${{ matrix.node-version }}
+    - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: ${{ matrix.node-version }}
+        node-version: '20.x'
         cache: 'npm'
         
     - name: Install dependencies
@@ -38,7 +45,7 @@ jobs:
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: plugin-build-${{ matrix.node-version }}
+        name: obsidian-github-stars-manager
         path: |
           main.js
           manifest.json
@@ -66,7 +73,7 @@ jobs:
     - name: Download build artifacts
       uses: actions/download-artifact@v4
       with:
-        name: plugin-build-20.x
+        name: obsidian-github-stars-manager
         
     - name: Verify build files exist
       run: |
