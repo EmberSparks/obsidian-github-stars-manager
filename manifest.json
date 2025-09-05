@@ -9,6 +9,7 @@
 	"fundingUrl": "https://github.com/sponsors/EmberSparks",
 	"isDesktopOnly": false,
 	"css": [
-		"styles.css"
+		"styles.css",
+		"themes.css"
 	]
 }
