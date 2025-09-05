@@ -18,6 +18,7 @@ on:
         - production
   release:
     types: [ published ]
+    branches: [ main, master, feature/* ]  # 允许在功能分支发布
 
 jobs:
   build:
