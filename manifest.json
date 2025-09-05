@@ -1,12 +1,12 @@
 {
-	"id": "obsidian-github-stars-manager",
+	"id": "gitHub-stars-manager",
 	"name": "GitHub Stars Manager",
 	"version": "0.1.0",
 	"minAppVersion": "0.15.0",
-	"description": "在 Obsidian 中管理你的 GitHub Stars。",
-	"author": "sparks",
-	"authorUrl": "https://github.com/sparks",
-	"fundingUrl": "https://github.com/sponsors/sparks",
+	"description": "管理你的 GitHub Stars!",
+	"author": "EmberSparks",
+	"authorUrl": "https://github.com/EmberSparks",
+	"fundingUrl": "https://github.com/sponsors/EmberSparks",
 	"isDesktopOnly": false,
 	"css": [
 		"styles.css"
