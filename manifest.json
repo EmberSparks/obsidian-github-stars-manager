@@ -7,9 +7,5 @@
 	"author": "EmberSparks",
 	"authorUrl": "https://github.com/EmberSparks",
 	"fundingUrl": "https://github.com/sponsors/EmberSparks",
-	"isDesktopOnly": false,
-	"css": [
-		"styles.css",
-		"themes.css"
-	]
+	"isDesktopOnly": false
 }
