@@ -125,6 +125,11 @@ const copyPlugin = {
                 backupAndCopy("styles.css", path.join(targetDir, "styles.css"), "styles.css");
             }
 
+            // Copy themes.css with backup if it exists
+            if (fs.existsSync("themes.css")) {
+                backupAndCopy("themes.css", path.join(targetDir, "themes.css"), "themes.css");
+            }
+
             // Copy manifest.json with backup
             backupAndCopy("manifest.json", path.join(targetDir, "manifest.json"), "manifest.json");
 
