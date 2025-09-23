@@ -1,15 +1,15 @@
 {
 	"name": "github-stars-manager",
-	"version": "1.0.0",
-	"description": "This is a sample plugin for Obsidian (https://obsidian.md)",
+	"version": "0.1.0",
+	"description": "Obsidian plugin for managing and viewing your GitHub starred repositories with multi-account support and custom themes",
 	"main": "main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
 		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
 		"version": "node version-bump.mjs && git add manifest.json versions.json"
 	},
-	"keywords": [],
-	"author": "",
+	"keywords": ["obsidian", "github", "stars", "repository", "plugin"],
+	"author": "EmberSparks",
 	"license": "MIT",
 	"devDependencies": {
 		"@types/node": "^18.19.0",
