@@ -132,7 +132,7 @@ export class GithubStarsSettingTab extends PluginSettingTab {
                         }, 2000);
                     } catch (error) {
                         button.setButtonText('同步失败');
-                        console.error('同步失败:', error);
+                        new Notice('同步失败，请检查网络连接或令牌设置', 5000);
                         setTimeout(() => {
                             button.setButtonText('同步');
                             button.setDisabled(false);
@@ -197,7 +197,7 @@ export class GithubStarsSettingTab extends PluginSettingTab {
                     }
                 });
                 avatarEl.addEventListener('error', () => {
-                    avatarEl.style.display = 'none';
+                    avatarEl.addClass('display-none');
                 });
             }
             
@@ -343,18 +343,7 @@ export class GithubStarsSettingTab extends PluginSettingTab {
         }) as HTMLInputElement;
         
         // 确保输入框可以正常获得焦点和输入
-        input.style.width = '100%';
-        input.style.padding = '8px';
-        input.style.border = '1px solid var(--background-modifier-border)';
-        input.style.borderRadius = '4px';
-        input.style.backgroundColor = 'var(--background-primary)';
-        input.style.color = 'var(--text-normal)';
-        input.style.fontSize = '14px';
-        input.style.lineHeight = '1.4';
-        
-        // 确保输入框可以接收事件
-        input.style.pointerEvents = 'auto';
-        input.style.userSelect = 'text';
+        input.addClass('form-input-full');
         input.tabIndex = 0;
         
         // 阻止点击事件冒泡
@@ -368,15 +357,9 @@ export class GithubStarsSettingTab extends PluginSettingTab {
             e.stopPropagation();
         });
         
-        // 添加焦点样式
+        // 添加焦点样式处理
         input.addEventListener('focus', (e) => {
             e.stopPropagation();
-            input.style.outline = '2px solid var(--interactive-accent)';
-            input.style.outlineOffset = '0px';
-        });
-        
-        input.addEventListener('blur', () => {
-            input.style.outline = 'none';
         });
         
         // 键盘事件处理
@@ -399,23 +382,31 @@ export class GithubStarsSettingTab extends PluginSettingTab {
         containerEl.createEl('h3', { text: 'Properties 模板配置' });
         
         // 说明文字
-        const descEl = containerEl.createDiv('setting-item-description');
-        descEl.style.marginBottom = '16px';
-        descEl.innerHTML = `
-            <p>配置导出Markdown文件时的Properties（笔记属性）模板。支持以下变量：</p>
-            <ul style="margin: 8px 0; padding-left: 20px;">
-                <li><code>{{full_name}}</code> - 仓库完整名称</li>
-                <li><code>{{name}}</code> - 仓库名称</li>
-                <li><code>{{owner.login}}</code> - 仓库作者</li>
-                <li><code>{{html_url}}</code> - 仓库链接</li>
-                <li><code>{{description}}</code> - 仓库描述</li>
-                <li><code>{{created_at}}</code> - 创建时间</li>
-                <li><code>{{starred_at}}</code> - 加星时间</li>
-                <li><code>{{topics}}</code> - 主题标签</li>
-                <li><code>{{stargazers_count}}</code> - Star数量</li>
-                <li><code>{{language}}</code> - 主要语言</li>
-            </ul>
-        `;
+        const descEl = containerEl.createDiv('setting-item-description description-margin');
+        const p = descEl.createEl('p');
+        p.textContent = '配置导出Markdown文件时的Properties（笔记属性）模板。支持以下变量：';
+        
+        const ul = descEl.createEl('ul', { cls: 'setting-item-description-list' });
+        
+        const variables = [
+            { code: '{{full_name}}', desc: '仓库完整名称' },
+            { code: '{{name}}', desc: '仓库名称' },
+            { code: '{{owner.login}}', desc: '仓库作者' },
+            { code: '{{html_url}}', desc: '仓库链接' },
+            { code: '{{description}}', desc: '仓库描述' },
+            { code: '{{created_at}}', desc: '创建时间' },
+            { code: '{{starred_at}}', desc: '加星时间' },
+            { code: '{{topics}}', desc: '主题标签' },
+            { code: '{{stargazers_count}}', desc: 'Star数量' },
+            { code: '{{language}}', desc: '主要语言' }
+        ];
+        
+        variables.forEach(variable => {
+            const li = ul.createEl('li');
+            const code = li.createEl('code');
+            code.textContent = variable.code;
+            li.appendText(' - ' + variable.desc);
+        });
 
         // 启用Properties开关
         new Setting(containerEl)
@@ -567,8 +558,7 @@ class AccountModal extends Modal {
             placeholder: '自动获取',
             attr: { readonly: 'true' }
         });
-        this.usernameInput.style.backgroundColor = 'var(--background-modifier-border)';
-        this.usernameInput.style.cursor = 'not-allowed';
+        this.usernameInput.addClass('form-input-disabled');
 
         // 个人访问令牌字段
         const tokenContainer = form.createDiv('form-field');
@@ -589,43 +579,43 @@ class AccountModal extends Modal {
             if (token.length > 10) {
                 validationTimeout = setTimeout(async () => {
                     try {
-                        const response = await fetch('https://api.github.com/user', {
+                        const response = await (this.app as any).requestUrl({
+                            url: 'https://api.github.com/user',
+                            method: 'GET',
                             headers: {
                                 'Authorization': `token ${token}`,
                                 'User-Agent': 'Obsidian-GitHub-Stars-Manager'
                             }
                         });
                         
-                        if (response.ok) {
-                            const userData = await response.json();
+                        if (response.status === 200) {
+                            const userData = response.json;
                             this.usernameInput.value = userData.login;
                             if (!this.nameInput.value) {
                                 this.nameInput.value = userData.name || userData.login;
                             }
-                            this.tokenInput.style.borderColor = 'var(--interactive-success)';
-                            this.usernameInput.style.borderColor = 'var(--interactive-success)';
+                            this.tokenInput.addClass('border-color-success');
+                            this.usernameInput.addClass('border-color-success');
                         } else {
-                            this.tokenInput.style.borderColor = 'var(--interactive-critical)';
+                            this.tokenInput.addClass('border-color-error');
                             this.usernameInput.value = '';
                         }
                     } catch (error) {
-                        this.tokenInput.style.borderColor = 'var(--interactive-critical)';
+                        this.tokenInput.addClass('border-color-error');
                         this.usernameInput.value = '';
                     }
                 }, 1000);
             } else {
                 this.usernameInput.value = '';
-                this.tokenInput.style.borderColor = '';
-                this.usernameInput.style.borderColor = '';
+                this.tokenInput.removeClass('border-color-success');
+                this.tokenInput.removeClass('border-color-error');
+                this.usernameInput.removeClass('border-color-success');
+                this.usernameInput.removeClass('border-color-error');
             }
         });
 
         // 按钮区域
-        const buttonContainer = contentEl.createDiv('modal-button-container');
-        buttonContainer.style.display = 'flex';
-        buttonContainer.style.justifyContent = 'flex-end';
-        buttonContainer.style.gap = '10px';
-        buttonContainer.style.marginTop = '20px';
+        const buttonContainer = contentEl.createDiv('modal-button-container button-flex-container');
 
         const cancelBtn = buttonContainer.createEl('button', { text: '取消' });
         const saveBtn = buttonContainer.createEl('button', { 
@@ -668,18 +658,20 @@ class AccountModal extends Modal {
             saveBtn.textContent = '保存中...';
             saveBtn.disabled = true;
 
-            const response = await fetch('https://api.github.com/user', {
+            const response = await (this.app as any).requestUrl({
+                url: 'https://api.github.com/user',
+                method: 'GET',
                 headers: {
                     'Authorization': `token ${token}`,
                     'User-Agent': 'Obsidian-GitHub-Stars-Manager'
                 }
             });
 
-            if (!response.ok) {
+            if (response.status !== 200) {
                 throw new Error('令牌验证失败');
             }
 
-            const userData = await response.json();
+            const userData = response.json;
             
             this.close();
             this.resolve({

@@ -1,6 +1,6 @@
 import { ItemView, WorkspaceLeaf, setIcon, Notice } from 'obsidian';
 import GithubStarsPlugin from './main';
-import { GithubRepository, UserRepoEnhancements } from './types'; // Updated imports
+import { GithubRepository, UserRepoEnhancements, GithubAccount } from './types'; // Updated imports
 import { EditRepoModal } from './modal';
 import { ExportModal } from './exportModal';
 import { EmojiUtils } from './emojiUtils';
@@ -756,7 +756,7 @@ export class GithubStarsView extends ItemView {
         // 创建折叠按钮
         const toggleBtn = accountSelectorContainer.createEl('button', {
             cls: 'github-account-toggle-btn',
-            text: `账号 (${accounts.filter((a: any) => a.enabled).length})`
+            text: `账号 (${accounts.filter((a: GithubAccount) => a.enabled).length})`
         });
         
         // 创建折叠内容容器
@@ -773,8 +773,7 @@ export class GithubStarsView extends ItemView {
             // 重置样式
             collapsibleContent.removeClass('position-fixed');
             collapsibleContent.removeClass('z-index-9999');
-            collapsibleContent.style.top = '';
-            collapsibleContent.style.right = '';
+            collapsibleContent.removeAttribute('style');
             toggleBtn.removeClass('expanded');
             isExpanded = false;
             document.removeEventListener('mousedown', handleOutsideClick);
@@ -801,10 +800,14 @@ export class GithubStarsView extends ItemView {
                 collapsibleContent.addClass('position-fixed');
                 collapsibleContent.addClass('z-index-9999');
                 
-                // 计算位置
+                // 计算位置并设置到元素的data属性
                 const toggleRect = toggleBtn.getBoundingClientRect();
-                collapsibleContent.style.top = `${toggleRect.bottom + 4}px`;
-                collapsibleContent.style.right = `${window.innerWidth - toggleRect.right}px`;
+                collapsibleContent.setAttribute('data-top', `${toggleRect.bottom + 4}px`);
+                collapsibleContent.setAttribute('data-right', `${window.innerWidth - toggleRect.right}px`);
+                
+                // 通过CSS变量设置位置
+                collapsibleContent.style.setProperty('--popup-top', `${toggleRect.bottom + 4}px`);
+                collapsibleContent.style.setProperty('--popup-right', `${window.innerWidth - toggleRect.right}px`);
                 
                 toggleBtn.addClass('expanded');
                 // 延迟添加事件监听器，避免立即触发关闭
@@ -815,7 +818,7 @@ export class GithubStarsView extends ItemView {
         });
 
         // 添加账号列表
-        accounts.forEach((account: any) => {
+        accounts.forEach((account: GithubAccount) => {
             const accountEl = collapsibleContent.createDiv('github-account-item-compact');
             
             // 头像
@@ -829,7 +832,7 @@ export class GithubStarsView extends ItemView {
                     }
                 });
                 avatarEl.addEventListener('error', () => {
-                    avatarEl.style.display = 'none';
+                    avatarEl.addClass('avatar-hidden');
                 });
             }
             
@@ -869,7 +872,7 @@ export class GithubStarsView extends ItemView {
                 accountEl.toggleClass('disabled', !account.enabled);
                 
                 // 更新按钮文本
-                toggleBtn.textContent = `账号 (${accounts.filter((a: any) => a.enabled).length})`;
+                toggleBtn.textContent = `账号 (${accounts.filter((a: GithubAccount) => a.enabled).length})`;
                 
                 // 显示通知
                 new Notice(`账号 ${account.username} ${account.enabled ? '已启用' : '已禁用'}`);

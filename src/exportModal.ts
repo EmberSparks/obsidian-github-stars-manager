@@ -179,12 +179,12 @@ export class ExportModal extends Modal {
                 new Notice(`导出完成！成功导出 ${result.exportedCount} 个仓库`);
             } else {
                 new Notice(`导出完成，但有错误。成功导出 ${result.exportedCount} 个仓库，失败 ${result.errors.length} 个`);
-                console.error('导出错误:', result.errors);
+                // 导出错误信息已在Notice中显示
             }
 
             this.close();
         } catch (error) {
-            console.error('导出失败:', error);
+            new Notice('导出失败，请检查路径和权限设置', 5000);
             new Notice('导出失败，请查看控制台了解详情');
             
             // 恢复按钮状态

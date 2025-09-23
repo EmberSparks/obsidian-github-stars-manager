@@ -92,7 +92,7 @@ export class ExportService {
             // 执行导出
             return await this.exportSingleRepository(exportData, exportOptions);
         } catch (error) {
-            console.error(`导出仓库 ${repository.full_name} 失败:`, error);
+            // 静默处理单个仓库导出错误
             return false;
         }
     }
@@ -133,7 +133,6 @@ export class ExportService {
                     // 用户已选择“覆盖全部”
                 } else if (this.overwriteAll === false) {
                     // 用户已选择“跳过全部”
-                    console.log(`根据用户选择，跳过文件: ${filePath}`);
                     return false;
                 } else {
                     // 询问用户
@@ -142,10 +141,8 @@ export class ExportService {
                         this.overwriteAll = true;
                     } else if (userChoice === 'skipAll') {
                         this.overwriteAll = false;
-                        console.log(`用户选择“跳过全部”，跳过文件: ${filePath}`);
                         return false;
                     } else if (userChoice === 'skip') {
-                        console.log(`用户选择跳过文件: ${filePath}`);
                         return false;
                     }
                     // 如果是 'overwrite'，则继续执行
@@ -161,7 +158,7 @@ export class ExportService {
 
             return true;
         } catch (error) {
-            console.error(`写入文件失败 ${filePath}:`, error);
+            // 静默处理文件写入错误
             throw error;
         }
     }
@@ -366,11 +363,7 @@ class OverwriteConfirmModal extends Modal {
         messageEl.createEl('p', { text: '是否要覆盖现有文件？' });
 
         // 按钮容器
-        const buttonContainer = contentEl.createDiv('overwrite-confirm-buttons');
-        buttonContainer.style.display = 'flex';
-        buttonContainer.style.justifyContent = 'flex-end';
-        buttonContainer.style.gap = '10px';
-        buttonContainer.style.marginTop = '20px';
+        const buttonContainer = contentEl.createDiv('overwrite-confirm-buttons button-flex-container');
 
         // 跳过按钮
         const skipButton = buttonContainer.createEl('button', { text: '跳过' });

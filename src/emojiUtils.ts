@@ -125,7 +125,7 @@ export class EmojiUtils {
         if (!element || !text) return;
         
         const processedText = this.restoreEmojis(text);
-        element.innerHTML = processedText;
+        element.textContent = processedText;
     }
 
     /**
