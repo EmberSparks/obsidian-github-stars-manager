@@ -1,8 +1,11 @@
 # Obsidian GitHub Stars Manager
 
+[![GitHub release](https://img.shields.io/github/release/EmberSparks/obsidian-github-stars-manager.svg)](https://github.com/EmberSparks/obsidian-github-stars-manager/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 [English README](README_en.md)
 
-本插件允许您直接在 Obsidian 中管理和查看您已加星标的 GitHub 仓库。
+本插件允许您直接在 Obsidian 中管理和查看您已加星标的 GitHub 仓库，支持多账号管理和自定义主题。
 
 ## 功能特性
 
@@ -81,7 +84,7 @@
 ### 环境要求
 
 - Node.js 16+
-- npm
+- npm 或 yarn
 
 ### 开发命令
 
@@ -95,12 +98,17 @@ npm run dev
 # 生产构建
 npm run build
 
-# 代码检查
-npm run lint
-
 # 版本升级
 npm run version
 ```
+
+### 技术栈
+
+- **TypeScript**: 类型安全的 JavaScript 超集
+- **Obsidian API**: 插件开发框架
+- **GitHub REST API**: 通过 @octokit/rest 访问 GitHub 数据
+- **CSS3**: 现代样式和动画效果
+- **esbuild**: 快速的 JavaScript 打包工具
 
 ### 本地开发环境配置
 
@@ -129,13 +137,29 @@ npm run version
 └── README.md           # 说明文档
 ```
 
+## 更新日志
+
+### v0.1.0 (当前版本)
+- ✨ 初始版本发布
+- 🎯 多账号 GitHub Stars 管理
+- 🎨 液态玻璃主题支持
+- 📱 响应式瀑布流布局
+- 🔍 高级搜索和筛选功能
+- 🏷️ 自定义标签和笔记功能
+
 ## 许可证
 
-MIT
+MIT License - 详见 [LICENSE](LICENSE) 文件
 
 ## 贡献
 
-欢迎提交 Issues 和 Pull Requests！
+欢迎贡献代码！请遵循以下步骤：
+
+1. Fork 本仓库
+2. 创建功能分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 开启 Pull Request
 
 ## 支持
 
@@ -144,3 +168,10 @@ MIT
 - ⭐ 给项目点个星标
 - 🐛 报告 Bug 或提出改进建议
 - 💡 分享给其他 Obsidian 用户
+- 💖 [赞助开发者](https://github.com/sponsors/EmberSparks)
+
+## 相关链接
+
+- [Obsidian 官网](https://obsidian.md)
+- [GitHub API 文档](https://docs.github.com/en/rest)
+- [插件开发文档](https://docs.obsidian.md/Plugins/Getting+started/Build+a+plugin)
