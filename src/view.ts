@@ -175,13 +175,17 @@ export class GithubStarsView extends ItemView {
                 this.clearInvisibleSelections();
                 
                 // Add visual feedback
-                tagEl.style.transition = 'all 0.15s ease-out';
-                tagEl.style.transform = 'scale(0.95)';
+                tagEl.removeClass('transition-scale');
+                tagEl.removeClass('transform-scale-down');
+                tagEl.addClass('transition-scale');
                 
                 setTimeout(() => {
-                    tagEl.style.transform = '';
-                    this.renderRepositories();
-                }, 150);
+                    tagEl.addClass('transform-scale-down');
+                    setTimeout(() => {
+                        tagEl.removeClass('transform-scale-down');
+                        this.renderRepositories();
+                    }, 100);
+                }, 10);
             });
         });
 
@@ -197,13 +201,17 @@ export class GithubStarsView extends ItemView {
                 this.showAllTags = !this.showAllTags;
                 
                 // Add smooth transition effect
-                moreButton.style.transition = 'all 0.2s ease';
-                moreButton.style.transform = 'scale(0.95)';
+                moreButton.removeClass('transition-button');
+                moreButton.removeClass('transform-scale-down');
+                moreButton.addClass('transition-button');
                 
                 setTimeout(() => {
-                    moreButton.style.transform = '';
-                    this.updateTagsFilter(container);
-                }, 100);
+                    moreButton.addClass('transform-scale-down');
+                    setTimeout(() => {
+                        moreButton.removeClass('transform-scale-down');
+                        this.updateTagsFilter(container);
+                    }, 50);
+                }, 10);
             });
         }
     }
@@ -347,7 +355,7 @@ export class GithubStarsView extends ItemView {
                 
                 // Add error handling for broken images
                 avatarImg.addEventListener('error', () => {
-                    avatarImg.style.display = 'none';
+                    avatarImg.addClass('display-none');
                 });
             }
             
@@ -385,13 +393,17 @@ export class GithubStarsView extends ItemView {
                         this.clearInvisibleSelections();
                         
                         // Add visual feedback
-                        tagEl.style.transition = 'all 0.15s ease-out';
-                        tagEl.style.transform = 'scale(0.95)';
+                        tagEl.removeClass('transition-scale');
+                        tagEl.removeClass('transform-scale-down');
+                        tagEl.addClass('transition-scale');
                         
                         setTimeout(() => {
-                            tagEl.style.transform = '';
-                            this.renderRepositories();
-                        }, 150);
+                            tagEl.addClass('transform-scale-down');
+                            setTimeout(() => {
+                                tagEl.removeClass('transform-scale-down');
+                                this.renderRepositories();
+                            }, 100);
+                        }, 10);
                     });
                 });
             }
@@ -409,11 +421,11 @@ export class GithubStarsView extends ItemView {
                     });
                     
                     descEl.addEventListener('mouseenter', () => {
-                        tooltip.style.display = 'block';
+                        tooltip.addClass('display-block');
                     });
                     
                     descEl.addEventListener('mouseleave', () => {
-                        tooltip.style.display = 'none';
+                        tooltip.removeClass('display-block');
                     });
                 }
             }
@@ -430,19 +442,19 @@ export class GithubStarsView extends ItemView {
             // Stars with icon
             const starsSpan = infoRow.createEl('span', { cls: 'github-stars-repo-stars' });
             const starIcon = starsSpan.createEl('span', { cls: 'github-stars-icon star-icon' });
-            starIcon.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-star text-yellow-600" aria-hidden="true"><path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"></path></svg>';
+            setIcon(starIcon, 'star');
             starsSpan.createEl('span', { text: ` ${this.formatNumber(repo.stargazers_count ?? 0)}` });
             
             // Forks with icon
             const forksSpan = infoRow.createEl('span', { cls: 'github-stars-repo-forks' });
             const forkIcon = forksSpan.createEl('span', { cls: 'github-stars-icon fork-icon' });
-            forkIcon.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-git-fork text-gray-500" aria-hidden="true"><circle cx="12" cy="18" r="3"></circle><circle cx="6" cy="6" r="3"></circle><circle cx="18" cy="6" r="3"></circle><path d="M18 9v2c0 .6-.4 1-1 1H7c-.6 0-1-.4-1-1V9"></path><path d="M12 12v3"></path></svg>';
+            setIcon(forkIcon, 'git-fork');
             forksSpan.createEl('span', { text: ` ${this.formatNumber(repo.forks_count ?? 0)}` });
             
             // Updated time with icon
             const updatedSpan = infoRow.createEl('span', { cls: 'github-stars-repo-updated' });
             const calendarIcon = updatedSpan.createEl('span', { cls: 'github-stars-icon calendar-icon' });
-            calendarIcon.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-calendar text-gray-500" aria-hidden="true"><path d="M8 2v4"></path><path d="M16 2v4"></path><rect width="18" height="18" x="3" y="4" rx="2"></rect><path d="M3 10h18"></path></svg>';
+            setIcon(calendarIcon, 'calendar');
             updatedSpan.createEl('span', { text: ` ${this.formatRelativeTime(repo.updated_at)}` });
 
             // Edit Button (like "安装" button in the image)
@@ -677,7 +689,6 @@ export class GithubStarsView extends ItemView {
      * @param allTags 最新的全局标签列表
      */
     updateData(githubRepositories: GithubRepository[], userEnhancements: { [repoId: number]: UserRepoEnhancements }, allTags: string[]) {
-        console.log('GithubStarsView: Updating data...', { githubRepositories, userEnhancements, allTags });
         this.githubRepositories = githubRepositories || [];
         this.userEnhancements = userEnhancements || {};
         this.allTags = allTags || [];
@@ -693,7 +704,6 @@ export class GithubStarsView extends ItemView {
         } else {
             console.warn('repoContainer not initialized when updateData called');
         }
-        console.log('GithubStarsView: Data updated and view re-rendered.');
     }
 
     /**
@@ -751,17 +761,18 @@ export class GithubStarsView extends ItemView {
         
         // 创建折叠内容容器
         const collapsibleContent = accountSelectorContainer.createDiv('github-account-collapsible');
-        collapsibleContent.style.display = 'none'; // 初始状态为折叠
+        collapsibleContent.addClass('display-none'); // 初始状态为折叠
         
         let isExpanded = false;
 
         const closePopover = () => {
-            collapsibleContent.style.display = 'none';
+            collapsibleContent.removeClass('display-block');
+            collapsibleContent.addClass('display-none');
             // 将元素移回原位置
             accountSelectorContainer.appendChild(collapsibleContent);
             // 重置样式
-            collapsibleContent.style.position = '';
-            collapsibleContent.style.zIndex = '';
+            collapsibleContent.removeClass('position-fixed');
+            collapsibleContent.removeClass('z-index-9999');
             collapsibleContent.style.top = '';
             collapsibleContent.style.right = '';
             toggleBtn.removeClass('expanded');
@@ -777,13 +788,18 @@ export class GithubStarsView extends ItemView {
 
         toggleBtn.addEventListener('click', (event) => {
             event.stopPropagation();
-            isExpanded = !isExpanded;
             if (isExpanded) {
+                // 如果已经展开，则关闭
+                closePopover();
+            } else {
+                // 如果未展开，则打开
+                isExpanded = true;
                 // 将弹出控件添加到 body，避免被父容器限制
                 document.body.appendChild(collapsibleContent);
-                collapsibleContent.style.display = 'block';
-                collapsibleContent.style.position = 'fixed';
-                collapsibleContent.style.zIndex = '9999';
+                collapsibleContent.removeClass('display-none');
+                collapsibleContent.addClass('display-block');
+                collapsibleContent.addClass('position-fixed');
+                collapsibleContent.addClass('z-index-9999');
                 
                 // 计算位置
                 const toggleRect = toggleBtn.getBoundingClientRect();
@@ -791,9 +807,10 @@ export class GithubStarsView extends ItemView {
                 collapsibleContent.style.right = `${window.innerWidth - toggleRect.right}px`;
                 
                 toggleBtn.addClass('expanded');
-                document.addEventListener('mousedown', handleOutsideClick);
-            } else {
-                closePopover();
+                // 延迟添加事件监听器，避免立即触发关闭
+                setTimeout(() => {
+                    document.addEventListener('mousedown', handleOutsideClick);
+                }, 10);
             }
         });
 
