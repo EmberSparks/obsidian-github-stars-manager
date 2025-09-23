@@ -518,13 +518,32 @@ export class GithubStarsView extends ItemView {
             }
         });
 
-        // Search Input (logic unchanged)
-        this.searchInput = toolbarDiv.createEl('input', {
+        // Search Input with Clear Button
+        const searchContainer = toolbarDiv.createDiv('github-stars-search-container');
+        
+        this.searchInput = searchContainer.createEl('input', {
             cls: 'github-stars-search',
             attr: { type: 'text', placeholder: '搜索仓库...' }
         });
+        
+        const clearButton = searchContainer.createEl('button', {
+            cls: 'github-stars-search-clear'
+        });
+        clearButton.setAttribute('aria-label', '清除搜索');
+        clearButton.setAttribute('title', '清除搜索内容');
+        
+        // 初始状态隐藏清除按钮
+        clearButton.addClass('hidden');
+        
         this.searchInput.addEventListener('input', () => {
             this.currentFilter = this.searchInput.value.toLowerCase();
+            
+            // 根据输入内容显示/隐藏清除按钮
+            if (this.searchInput.value.length > 0) {
+                clearButton.removeClass('hidden');
+            } else {
+                clearButton.addClass('hidden');
+            }
             
             // Update tags display to highlight matching tags (but don't activate them)
             this.updateTagsFilter(this.tagsContainer);
@@ -534,6 +553,20 @@ export class GithubStarsView extends ItemView {
                 this.clearInvisibleSelections();
             }
             
+            this.renderRepositories();
+        });
+        
+        // 清除按钮功能
+        clearButton.addEventListener('click', () => {
+            this.searchInput.value = '';
+            this.currentFilter = '';
+            clearButton.addClass('hidden');
+            
+            // 更新显示
+            this.updateTagsFilter(this.tagsContainer);
+            if (this.isExportMode) {
+                this.clearInvisibleSelections();
+            }
             this.renderRepositories();
         });
 

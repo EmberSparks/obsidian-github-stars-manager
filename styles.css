@@ -28,11 +28,92 @@
 .github-stars-toolbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 10px;
-  padding: 5px;
-  border-radius: 5px;
-  background-color: var(--background-secondary);
+  gap: 10px;
+  margin-bottom: 15px;
+  padding: 10px;
+  background: var(--background-secondary);
+  border-radius: 8px;
+  flex-wrap: wrap;
+}
+
+/* 搜索框容器 */
+.github-stars-search-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+/* 搜索框 */
+.github-stars-search {
+  padding: 8px 32px 8px 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  font-size: 14px;
+  min-width: 200px;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.github-stars-search:focus {
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 2px rgba(var(--interactive-accent-rgb), 0.2);
+}
+
+/* 搜索框清除按钮 - 参考百度搜索框设计 */
+.github-stars-search-clear {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: rgba(0, 0, 0, 0.4);
+  color: white;
+  cursor: pointer;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  padding: 0;
+  opacity: 0.7;
+}
+
+.github-stars-search-clear svg {
+  width: 12px;
+  height: 12px;
+}
+
+.github-stars-search-clear:hover {
+  background: rgba(0, 0, 0, 0.6);
+  opacity: 1;
+  transform: translateY(-50%) scale(1.1);
+}
+
+.github-stars-search-clear:active {
+  background: rgba(0, 0, 0, 0.8);
+  transform: translateY(-50%) scale(0.95);
+}
+
+.github-stars-search-clear.hidden {
+  display: none;
+}
+
+/* 暗色主题适配 */
+.theme-dark .github-stars-search-clear {
+  background: rgba(255, 255, 255, 0.3);
+  color: var(--text-normal);
+}
+
+.theme-dark .github-stars-search-clear:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.theme-dark .github-stars-search-clear:active {
+  background: rgba(255, 255, 255, 0.7);
 }
 
 /* 工具栏右侧按钮容器 */
