@@ -80,7 +80,7 @@ const copyPlugin = {
                 return;
             }
 
-            const pluginId = "obsidian-github-stars-manager"; // Must match the 'id' in manifest.json
+            const pluginId = "github-stars-manager"; // Must match the 'id' in manifest.json
             const targetDir = path.join(obsidianPluginDir, pluginId);
             const backupDir = path.join(targetDir, "backup");
 
@@ -171,7 +171,7 @@ const context = await esbuild.context({
 	treeShaking: true,
 	outfile: "main.js",
 	minify: prod,
-    plugins: [copyPlugin], // Add our custom plugin here
+    plugins: [copyPlugin]
 });
 
 if (prod) {

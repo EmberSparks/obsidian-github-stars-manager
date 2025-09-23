@@ -68,7 +68,6 @@ export default class GithubStarsPlugin extends Plugin {
 
     onunload() {
         this.clearSyncInterval();
-        this.app.workspace.detachLeavesOfType(VIEW_TYPE_STARS);
     }
 
     // --- 数据加载/保存 ---
@@ -118,7 +117,6 @@ export default class GithubStarsPlugin extends Plugin {
             );
             if (hasOldTemplate) {
                 this.data.exportOptions.propertiesTemplate = DEFAULT_EXPORT_OPTIONS.propertiesTemplate;
-                console.log('已更新导出选项的属性模板为新的GSM-格式，并添加了enabled字段');
             }
         }
     }
@@ -202,12 +200,8 @@ export default class GithubStarsPlugin extends Plugin {
 
     // --- 核心逻辑 (重构) ---
     async syncStars(): Promise<void> {
-        console.log('开始同步GitHub星标...');
-        console.log('当前设置的账号:', this.settings.accounts);
-        
         // 检查是否有启用的账号
         const enabledAccounts = (this.settings.accounts || []).filter(acc => acc.enabled);
-        console.log('启用的账号:', enabledAccounts);
         
         if (enabledAccounts.length === 0) {
             // 向后兼容：如果没有多账号配置，使用单一令牌
@@ -215,7 +209,6 @@ export default class GithubStarsPlugin extends Plugin {
                 new Notice('请先在设置中配置GitHub账号或个人访问令牌');
                 return;
             }
-            console.log('使用向后兼容模式，创建临时账号');
             // 创建临时账号进行同步
             const tempAccount = {
                 id: 'legacy',
@@ -228,7 +221,6 @@ export default class GithubStarsPlugin extends Plugin {
             this.githubService.updateAccounts([tempAccount]);
         } else {
             // 确保GitHub服务使用最新的账号配置
-            console.log('更新GitHub服务账号配置');
             this.githubService.updateAccounts(this.settings.accounts);
         }
 
@@ -237,8 +229,7 @@ export default class GithubStarsPlugin extends Plugin {
             const syncResult = await this.githubService.fetchAllStarredRepositories();
             await this._handleSyncSuccess(syncResult);
         } catch (error) {
-            console.error('同步GitHub星标失败:', error);
-            new Notice('同步GitHub星标失败，请查看控制台了解详情');
+            new Notice('同步GitHub星标失败，请检查网络连接和令牌设置', 5000);
         }
     }
 
@@ -247,17 +238,11 @@ export default class GithubStarsPlugin extends Plugin {
      * @param syncResult 同步结果
      */
     private async _handleSyncSuccess(syncResult: Awaited<ReturnType<typeof this.githubService.fetchAllStarredRepositories>>) {
-        console.log('Sync result:', syncResult);
-        console.log('Repositories received:', syncResult.repositories?.length || 0);
-        console.log('Account sync times:', syncResult.accountSyncTimes);
-        console.log('Errors:', syncResult.errors);
-
         // 检查是否有有效的仓库数据
         if (!syncResult.repositories || syncResult.repositories.length === 0) {
-            console.warn('同步结果中没有仓库数据');
             const errorCount = Object.keys(syncResult.errors).length;
             if (errorCount > 0) {
-                console.error('同步错误详情:', syncResult.errors);
+                // 同步错误信息已在Notice中显示
                 new Notice(`同步失败：${Object.values(syncResult.errors).join(', ')}`);
             } else {
                 new Notice('同步完成，但没有找到星标仓库');
@@ -267,7 +252,6 @@ export default class GithubStarsPlugin extends Plugin {
 
         // 更新仓库数据
         this.data.githubRepositories = syncResult.repositories;
-        console.log('Updated githubRepositories count:', this.data.githubRepositories.length);
 
         // 更新同步时间
         this.data.lastSyncTime = new Date().toISOString();
@@ -278,12 +262,11 @@ export default class GithubStarsPlugin extends Plugin {
 
         // 保存数据
         await this.savePluginData();
-        console.log('Plugin data saved after sync. Final GitHub Repos count:', this.data.githubRepositories.length);
 
         // 显示同步结果
         const errorCount = Object.keys(syncResult.errors).length;
         if (errorCount > 0) {
-            console.error('同步错误:', syncResult.errors);
+            // 同步错误信息已在以上的显示中包含
         }
 
         // 更新视图
@@ -383,11 +366,10 @@ export default class GithubStarsPlugin extends Plugin {
                 new Notice(`导出完成！成功导出 ${result.exportedCount} 个仓库，跳过 ${result.skippedCount} 个`);
             } else {
                 new Notice(`导出完成，但有错误。成功导出 ${result.exportedCount} 个仓库，失败 ${result.errors.length} 个`);
-                console.error('导出错误:', result.errors);
+                // 导出错误信息已在Notice中显示
             }
         } catch (error) {
-            console.error('导出失败:', error);
-            new Notice('导出失败，请查看控制台了解详情');
+            new Notice('导出失败，请检查路径和权限设置', 5000);
         }
     }
 
