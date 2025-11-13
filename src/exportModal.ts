@@ -183,10 +183,10 @@ export class ExportModal extends Modal {
             }
 
             this.close();
-        } catch (error) {
+        } catch (_error) {
             new Notice('导出失败，请检查路径和权限设置', 5000);
             new Notice('导出失败，请查看控制台了解详情');
-            
+
             // 恢复按钮状态
             this.exportButton.disabled = false;
             this.updateExportButton();
