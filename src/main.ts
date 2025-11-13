@@ -228,7 +228,7 @@ export default class GithubStarsPlugin extends Plugin {
         try {
             const syncResult = await this.githubService.fetchAllStarredRepositories();
             await this._handleSyncSuccess(syncResult);
-        } catch (error) {
+        } catch (_error) {
             new Notice('同步GitHub星标失败，请检查网络连接和令牌设置', 5000);
         }
     }
@@ -368,7 +368,7 @@ export default class GithubStarsPlugin extends Plugin {
                 new Notice(`导出完成，但有错误。成功导出 ${result.exportedCount} 个仓库，失败 ${result.errors.length} 个`);
                 // 导出错误信息已在Notice中显示
             }
-        } catch (error) {
+        } catch (_error) {
             new Notice('导出失败，请检查路径和权限设置', 5000);
         }
     }

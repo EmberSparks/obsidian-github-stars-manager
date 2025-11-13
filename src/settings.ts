@@ -1,5 +1,5 @@
 import { App, PluginSettingTab, Setting, Notice, Modal, requestUrl } from 'obsidian';
-import GithubStarsPlugin from './main'; // Reverted to extensionless import
+import GithubStarsPlugin from './main';
 import { GithubStarsSettings, GithubAccount, PropertyTemplate, DEFAULT_PROPERTIES_TEMPLATE } from './types';
 
 /**
@@ -177,7 +177,7 @@ export class GithubStarsSettingTab extends PluginSettingTab {
                             button.setButtonText('同步');
                             button.setDisabled(false);
                         }, 2000);
-                    } catch (error) {
+                    } catch (_error) {
                         button.setButtonText('同步失败');
                         new Notice('同步失败，请检查网络连接或令牌设置', 5000);
                         setTimeout(() => {
@@ -751,7 +751,7 @@ class AccountModal extends Modal {
                 enabled: this.account.enabled !== false,
                 avatar_url: userData.avatar_url
             });
-        } catch (error) {
+        } catch (_error) {
             new Notice('令牌验证失败，请检查令牌是否正确');
             saveBtn.textContent = '保存';
             saveBtn.disabled = false;

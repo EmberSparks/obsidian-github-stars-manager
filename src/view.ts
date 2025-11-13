@@ -1,6 +1,6 @@
 import { ItemView, WorkspaceLeaf, setIcon, Notice } from 'obsidian';
 import GithubStarsPlugin from './main';
-import { GithubRepository, UserRepoEnhancements, GithubAccount } from './types'; // Updated imports
+import { GithubRepository, UserRepoEnhancements, GithubAccount } from './types';
 import { EditRepoModal } from './modal';
 import { EmojiUtils } from './emojiUtils';
 
