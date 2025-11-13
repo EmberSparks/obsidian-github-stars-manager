@@ -280,7 +280,7 @@ export class GithubStarsView extends ItemView {
         });
 
         // 3. Sort filtered data
-        let sortedRepos = [...filteredRepos]; // Mutable copy
+        const sortedRepos = [...filteredRepos]; // Mutable copy
         const isDesc = this.sortOrder === 'desc';
         
         switch (this.sortBy) {

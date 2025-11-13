@@ -92,7 +92,7 @@ this.modalEl.addClass('github-stars-edit-modal'); // Add specific class for styl
                 tagButtons.set(tag, tagButton); // Store button reference
 
                 tagButton.addEventListener('click', () => {
-                    let currentTagsArray = this.tags.split(',')
+                    const currentTagsArray = this.tags.split(',')
                                              .map(t => t.trim())
                                              .filter(t => t.length > 0);
                     const tagLower = tag.toLowerCase();
