@@ -1,5 +1,5 @@
 import { Plugin, Notice, WorkspaceLeaf, addIcon } from 'obsidian';
-import { GithubStarsSettings, PluginData, CombinedPluginData, GithubRepository, UserRepoEnhancements, ExportOptions, DEFAULT_EXPORT_OPTIONS } from './types'; // 移除 LocalRepository, 添加 GithubRepository, UserRepoEnhancements, ExportOptions
+import { GithubStarsSettings, PluginData, CombinedPluginData, GithubRepository, ExportOptions, DEFAULT_EXPORT_OPTIONS } from './types';
 import { DEFAULT_SETTINGS, GithubStarsSettingTab } from './settings';
 import { GithubService } from './githubService';
 import { GithubStarsView, VIEW_TYPE_STARS } from './view';
@@ -52,7 +52,7 @@ export default class GithubStarsPlugin extends Plugin {
         );
         // 添加功能区图标 (不变)
         this.addRibbonIcon('github-star', 'GitHub Stars', () => {
-            this.activateView();
+            void this.activateView();
         });
 
         // 添加插件命令 (不变)
@@ -159,7 +159,7 @@ export default class GithubStarsPlugin extends Plugin {
         if (this.settings.autoSync && this.settings.syncInterval > 0) {
             const intervalMillis = this.settings.syncInterval * 60 * 1000;
             this.syncIntervalId = window.setInterval(() => {
-                this.syncStars();
+                void this.syncStars();
             }, intervalMillis);
             this.registerInterval(this.syncIntervalId);
         }
@@ -178,14 +178,14 @@ export default class GithubStarsPlugin extends Plugin {
             id: 'sync-github-stars',
             name: '同步 GitHub 星标',
             callback: () => {
-                this.syncStars();
+                void this.syncStars();
             }
         });
         this.addCommand({
             id: 'open-github-stars-view',
             name: '打开 GitHub Stars 视图',
             callback: () => {
-                this.activateView();
+                void this.activateView();
             }
         });
 
@@ -193,7 +193,7 @@ export default class GithubStarsPlugin extends Plugin {
             id: 'export-all-stars',
             name: '导出所有星标仓库',
             callback: () => {
-                this.exportAllStars();
+                void this.exportAllStars();
             }
         });
     }

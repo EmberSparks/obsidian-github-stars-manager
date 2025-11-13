@@ -1,4 +1,4 @@
-import { TFile, TFolder, Vault, normalizePath, Modal, App } from 'obsidian';
+import { TFile, Vault, normalizePath, Modal, App } from 'obsidian';
 import { GithubRepository, UserRepoEnhancements, ExportOptions, ExportResult, RepoExportData, DEFAULT_EXPORT_OPTIONS } from './types';
 import { EmojiUtils } from './emojiUtils';
 
@@ -125,18 +125,17 @@ export class ExportService {
     ): Promise<boolean> {
         const filePath = normalizePath(`${options.targetFolder}/${exportData.filename}.md`);
 
-        try {
-            // 检查文件是否已存在
-            const existingFile = this.vault.getAbstractFileByPath(filePath);
-            if (existingFile && !options.overwriteExisting) {
-                if (this.overwriteAll === true) {
-                    // 用户已选择“覆盖全部”
-                } else if (this.overwriteAll === false) {
-                    // 用户已选择“跳过全部”
-                    return false;
-                } else {
-                    // 询问用户
-                    const userChoice = await this.confirmOverwrite(filePath);
+        // 检查文件是否已存在
+        const existingFile = this.vault.getAbstractFileByPath(filePath);
+        if (existingFile && !options.overwriteExisting) {
+            if (this.overwriteAll === true) {
+                // 用户已选择"覆盖全部"
+            } else if (this.overwriteAll === false) {
+                // 用户已选择"跳过全部"
+                return false;
+            } else {
+                // 询问用户
+                const userChoice = await this.confirmOverwrite(filePath);
                     if (userChoice === 'overwriteAll') {
                         this.overwriteAll = true;
                     } else if (userChoice === 'skipAll') {
@@ -149,18 +148,14 @@ export class ExportService {
                 }
             }
 
-            // 创建或更新文件
-            if (existingFile instanceof TFile) {
-                await this.vault.modify(existingFile, exportData.content);
-            } else {
-                await this.vault.create(filePath, exportData.content);
-            }
-
-            return true;
-        } catch (error) {
-            // 静默处理文件写入错误
-            throw error;
+        // 创建或更新文件
+        if (existingFile instanceof TFile) {
+            await this.vault.modify(existingFile, exportData.content);
+        } else {
+            await this.vault.create(filePath, exportData.content);
         }
+
+        return true;
     }
 
     /**
