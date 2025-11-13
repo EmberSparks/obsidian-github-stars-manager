@@ -271,7 +271,7 @@ export class GithubStarsSettingTab extends PluginSettingTab {
         const result = await this.showAccountModal('添加 GitHub 账号', account);
         if (result) {
             // 生成唯一ID
-            const id = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+            const id = Date.now().toString() + Math.random().toString(36).substring(2, 11);
             const newAccount: GithubAccount = {
                 id,
                 name: result.name,
