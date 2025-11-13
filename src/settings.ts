@@ -523,7 +523,7 @@ export class GithubStarsSettingTab extends PluginSettingTab {
      * 创建单个属性设置项
      */
     private createPropertySetting(containerEl: HTMLElement, property: PropertyTemplate, index: number): void {
-        const setting = new Setting(containerEl)
+        new Setting(containerEl)
             .setName(`${property.key} (${property.description})`)
             .setDesc(`类型: ${property.type} | 值: ${property.value}`)
             .addToggle(toggle => toggle
