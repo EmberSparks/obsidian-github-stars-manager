@@ -3,11 +3,9 @@ import { Notice } from 'obsidian';
 import { GithubRepository, GithubAccount } from './types';
 
 // 添加GitHub API响应类型
-interface StarredRepoItem {
+interface StarredRepoItem extends Partial<GithubRepository> {
     repo?: GithubRepository;
     starred_at?: string;
-    id?: number;
-    [key: string]: any;
 }
 
 /**
@@ -74,23 +72,24 @@ class SingleAccountGithubService {
                     break;
                 }
                 
-                const starredReposData = response.data.map((item: StarredRepoItem) => {
+                const starredReposData = response.data.map((item) => {
                     // 使用正确的API格式，item本身就包含repo和starred_at
-                    if (item && item.repo) {
+                    const starredItem = item as StarredRepoItem;
+                    if (starredItem && starredItem.repo) {
                         return {
-                            ...item.repo,
-                            starred_at: item.starred_at || new Date().toISOString(),
+                            ...starredItem.repo,
+                            starred_at: starredItem.starred_at || new Date().toISOString(),
                             account_id: this.account.id // 标记来源账号
                         };
-                    } else if (item && item.id) {
+                    } else if (starredItem && starredItem.id) {
                         // 如果直接返回仓库对象（向后兼容）
                         return {
-                            ...item,
-                            starred_at: new Date().toISOString(),
+                            ...starredItem,
+                            starred_at: starredItem.starred_at || new Date().toISOString(),
                             account_id: this.account.id
                         };
                     }
-                    console.warn(`Skipping malformed starred repo item (${this.account.username}):`, item);
+                    console.warn(`Skipping malformed starred repo item (${this.account.username}):`, starredItem);
                     return null;
                 }).filter(repo => repo !== null);
 
