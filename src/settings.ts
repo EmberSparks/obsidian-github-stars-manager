@@ -1,6 +1,51 @@
-import { App, PluginSettingTab, Setting, Notice, Modal } from 'obsidian';
+import { App, PluginSettingTab, Setting, Notice, Modal, requestUrl } from 'obsidian';
 import GithubStarsPlugin from './main'; // Reverted to extensionless import
-import { GithubStarsSettings, GithubAccount, PropertyTemplate, DEFAULT_PROPERTIES_TEMPLATE, DEFAULT_EXPORT_OPTIONS } from './types';
+import { GithubStarsSettings, GithubAccount, PropertyTemplate, DEFAULT_PROPERTIES_TEMPLATE } from './types';
+
+/**
+ * 通用确认对话框
+ */
+class ConfirmModal extends Modal {
+    private message: string;
+    private onConfirm: () => void;
+    private confirmText: string;
+    private cancelText: string;
+
+    constructor(app: App, message: string, onConfirm: () => void, confirmText = '确定', cancelText = '取消') {
+        super(app);
+        this.message = message;
+        this.onConfirm = onConfirm;
+        this.confirmText = confirmText;
+        this.cancelText = cancelText;
+    }
+
+    onOpen() {
+        const { contentEl } = this;
+        contentEl.empty();
+
+        contentEl.createEl('h2', { text: '确认操作' });
+        contentEl.createEl('p', { text: this.message });
+
+        const buttonContainer = contentEl.createDiv('modal-button-container');
+
+        const cancelButton = buttonContainer.createEl('button', { text: this.cancelText });
+        cancelButton.addEventListener('click', () => this.close());
+
+        const confirmButton = buttonContainer.createEl('button', {
+            text: this.confirmText,
+            cls: 'mod-warning'
+        });
+        confirmButton.addEventListener('click', () => {
+            this.onConfirm();
+            this.close();
+        });
+    }
+
+    onClose() {
+        const { contentEl } = this;
+        contentEl.empty();
+    }
+}
 
 // 默认设置
 export const DEFAULT_SETTINGS: GithubStarsSettings = {
@@ -27,7 +72,9 @@ export class GithubStarsSettingTab extends PluginSettingTab {
 
         containerEl.empty();
 
-        containerEl.createEl('h2', { text: 'GitHub Stars Manager 设置' });
+        new Setting(containerEl)
+            .setName('GitHub Stars Manager 设置')
+            .setHeading();
 
         // 多账号管理区域
         this.displayAccountsSection(containerEl);
@@ -147,7 +194,9 @@ export class GithubStarsSettingTab extends PluginSettingTab {
      */
     private displayAccountsSection(containerEl: HTMLElement): void {
         // 账号管理标题
-        containerEl.createEl('h3', { text: 'GitHub 账号管理' });
+        new Setting(containerEl)
+            .setName('GitHub 账号管理')
+            .setHeading();
         
         // 添加账号按钮
         new Setting(containerEl)
@@ -219,10 +268,12 @@ export class GithubStarsSettingTab extends PluginSettingTab {
                 cls: 'github-account-toggle'
             });
             toggle.checked = account.enabled;
-            toggle.addEventListener('change', async () => {
-                account.enabled = toggle.checked;
-                await this.plugin.saveSettings();
-                new Notice(`账号 ${account.username} ${account.enabled ? '已启用' : '已禁用'}`);
+            toggle.addEventListener('change', () => {
+                void (async () => {
+                    account.enabled = toggle.checked;
+                    await this.plugin.saveSettings();
+                    new Notice(`账号 ${account.username} ${account.enabled ? '已启用' : '已禁用'}`);
+                })();
             });
             statusEl.createEl('label', { 
                 text: account.enabled ? '已启用' : '已禁用',
@@ -246,13 +297,20 @@ export class GithubStarsSettingTab extends PluginSettingTab {
                 text: '删除',
                 cls: 'github-account-btn delete'
             });
-            deleteBtn.addEventListener('click', async () => {
-                if (confirm(`确定要删除账号 ${account.username} 吗？`)) {
-                    this.plugin.settings.accounts.splice(index, 1);
-                    await this.plugin.saveSettings();
-                    this.displayAccountsList(container);
-                    new Notice(`已删除账号 ${account.username}`);
-                }
+            deleteBtn.addEventListener('click', () => {
+                new ConfirmModal(
+                    this.app,
+                    `确定要删除账号 ${account.username} 吗？`,
+                    () => {
+                        void (async () => {
+                            this.plugin.settings.accounts.splice(index, 1);
+                            await this.plugin.saveSettings();
+                            this.displayAccountsList(container);
+                            new Notice(`已删除账号 ${account.username}`);
+                        })();
+                    },
+                    '删除'
+                ).open();
             });
         });
     }
@@ -340,7 +398,7 @@ export class GithubStarsSettingTab extends PluginSettingTab {
         const input = controlDiv.createEl('input', {
             type: type,
             value: value
-        }) as HTMLInputElement;
+        });
         
         // 确保输入框可以正常获得焦点和输入
         input.addClass('form-input-full');
@@ -379,7 +437,9 @@ export class GithubStarsSettingTab extends PluginSettingTab {
      */
     private displayPropertiesSection(containerEl: HTMLElement): void {
         // Properties配置标题
-        containerEl.createEl('h3', { text: 'Properties 模板配置' });
+        new Setting(containerEl)
+            .setName('Properties 模板配置')
+            .setHeading();
         
         // 说明文字
         const descEl = containerEl.createDiv('setting-item-description description-margin');
@@ -447,11 +507,13 @@ export class GithubStarsSettingTab extends PluginSettingTab {
                 .addButton(button => button
                     .setButtonText('重置为默认')
                     .setWarning()
-                    .onClick(async () => {
-                        this.plugin.settings.propertiesTemplate = [...DEFAULT_PROPERTIES_TEMPLATE];
-                        await this.plugin.saveSettings();
-                        this.display();
-                        new Notice('已重置为默认Properties模板');
+                    .onClick(() => {
+                        void (async () => {
+                            this.plugin.settings.propertiesTemplate = [...DEFAULT_PROPERTIES_TEMPLATE];
+                            await this.plugin.saveSettings();
+                            this.display();
+                            new Notice('已重置为默认Properties模板');
+                        })();
                     })
                 );
         }
@@ -482,15 +544,20 @@ export class GithubStarsSettingTab extends PluginSettingTab {
             .addButton(button => button
                 .setButtonText('删除')
                 .setWarning()
-                .onClick(async () => {
-                    if (confirm(`确定要删除属性 ${property.key} 吗？`)) {
-                        this.plugin.settings.propertiesTemplate.splice(index, 1);
-                        await this.plugin.saveSettings();
-                        this.display();
-                        new Notice(`已删除属性 ${property.key}`);
-                    }
-                    this.display();
-                    new Notice(`已删除属性 ${property.key}`);
+                .onClick(() => {
+                    new ConfirmModal(
+                        this.app,
+                        `确定要删除属性 ${property.key} 吗？`,
+                        () => {
+                            void (async () => {
+                                this.plugin.settings.propertiesTemplate.splice(index, 1);
+                                await this.plugin.saveSettings();
+                                this.display();
+                                new Notice(`已删除属性 ${property.key}`);
+                            })();
+                        },
+                        '删除'
+                    ).open();
                 })
             );
     }
@@ -498,14 +565,14 @@ export class GithubStarsSettingTab extends PluginSettingTab {
     /**
      * 添加新属性（暂时禁用）
      */
-    private async addNewProperty(): Promise<void> {
+    private addNewProperty(): void {
         new Notice('Properties模板编辑功能即将推出');
     }
 
     /**
      * 编辑属性（暂时禁用）
      */
-    private async editProperty(index: number): Promise<void> {
+    private editProperty(_index: number): void {
         new Notice('Properties模板编辑功能即将推出');
     }
 }
@@ -577,33 +644,35 @@ class AccountModal extends Modal {
             const token = this.tokenInput.value.trim();
             
             if (token.length > 10) {
-                validationTimeout = setTimeout(async () => {
-                    try {
-                        const response = await (this.app as any).requestUrl({
-                            url: 'https://api.github.com/user',
-                            method: 'GET',
-                            headers: {
-                                'Authorization': `token ${token}`,
-                                'User-Agent': 'Obsidian-GitHub-Stars-Manager'
+                validationTimeout = setTimeout(() => {
+                    void (async () => {
+                        try {
+                            const response = await requestUrl({
+                                url: 'https://api.github.com/user',
+                                method: 'GET',
+                                headers: {
+                                    'Authorization': `token ${token}`,
+                                    'User-Agent': 'Obsidian-GitHub-Stars-Manager'
+                                }
+                            });
+
+                            if (response.status === 200) {
+                                const userData = response.json;
+                                this.usernameInput.value = userData.login;
+                                if (!this.nameInput.value) {
+                                    this.nameInput.value = userData.name || userData.login;
+                                }
+                                this.tokenInput.addClass('border-color-success');
+                                this.usernameInput.addClass('border-color-success');
+                            } else {
+                                this.tokenInput.addClass('border-color-error');
+                                this.usernameInput.value = '';
                             }
-                        });
-                        
-                        if (response.status === 200) {
-                            const userData = response.json;
-                            this.usernameInput.value = userData.login;
-                            if (!this.nameInput.value) {
-                                this.nameInput.value = userData.name || userData.login;
-                            }
-                            this.tokenInput.addClass('border-color-success');
-                            this.usernameInput.addClass('border-color-success');
-                        } else {
+                        } catch {
                             this.tokenInput.addClass('border-color-error');
                             this.usernameInput.value = '';
                         }
-                    } catch (error) {
-                        this.tokenInput.addClass('border-color-error');
-                        this.usernameInput.value = '';
-                    }
+                    })();
                 }, 1000);
             } else {
                 this.usernameInput.value = '';
@@ -629,8 +698,8 @@ class AccountModal extends Modal {
             this.resolve(null);
         });
 
-        saveBtn.addEventListener('click', async () => {
-            await this.saveAccount(saveBtn);
+        saveBtn.addEventListener('click', () => {
+            void this.saveAccount(saveBtn);
         });
 
         // 设置焦点
@@ -658,7 +727,7 @@ class AccountModal extends Modal {
             saveBtn.textContent = '保存中...';
             saveBtn.disabled = true;
 
-            const response = await (this.app as any).requestUrl({
+            const response = await requestUrl({
                 url: 'https://api.github.com/user',
                 method: 'GET',
                 headers: {

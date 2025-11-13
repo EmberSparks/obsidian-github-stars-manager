@@ -56,9 +56,10 @@ class SingleAccountGithubService {
             const repositories: GithubRepository[] = [];
             let page = 1;
             const per_page = 100;
-            
-            while (true) {
-                
+            let hasMore = true;
+
+            while (hasMore) {
+
                 const response = await this.octokit!.activity.listReposStarredByAuthenticatedUser({
                     per_page,
                     page,
@@ -66,9 +67,10 @@ class SingleAccountGithubService {
                         Accept: 'application/vnd.github.star+json'
                     }
                 });
-                
-                
+
+
                 if (response.data.length === 0) {
+                    hasMore = false;
                     break;
                 }
                 
@@ -308,8 +310,8 @@ export class GithubService {
     /**
      * @deprecated 多账号模式下使用 getAccountUserInfo
      */
-    public async getCurrentUser(): Promise<{login: string, name: string} | null> {
+    public getCurrentUser(): Promise<{login: string, name: string} | null> {
         console.warn('getCurrentUser is deprecated in multi-account mode');
-        return null;
+        return Promise.resolve(null);
     }
 }
