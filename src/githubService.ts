@@ -2,6 +2,12 @@ import { Octokit } from '@octokit/rest';
 import { Notice } from 'obsidian';
 import { GithubRepository, GithubAccount } from './types';
 
+// 添加GitHub API响应类型
+interface StarredRepoItem extends Partial<GithubRepository> {
+    repo?: GithubRepository;
+    starred_at?: string;
+}
+
 /**
  * 单个账号的GitHub服务实例
  */
@@ -50,10 +56,10 @@ class SingleAccountGithubService {
             const repositories: GithubRepository[] = [];
             let page = 1;
             const per_page = 100;
-            
-            while (true) {
-                console.log(`获取第 ${page} 页星标仓库 (${this.account.username})`);
-                
+            let hasMore = true;
+
+            while (hasMore) {
+
                 const response = await this.octokit!.activity.listReposStarredByAuthenticatedUser({
                     per_page,
                     page,
@@ -61,34 +67,34 @@ class SingleAccountGithubService {
                         Accept: 'application/vnd.github.star+json'
                     }
                 });
-                
-                console.log(`第 ${page} 页返回 ${response.data.length} 个仓库 (${this.account.username})`);
-                
+
+
                 if (response.data.length === 0) {
+                    hasMore = false;
                     break;
                 }
                 
-                const starredReposData = response.data.map((item: any) => {
+                const starredReposData = response.data.map((item) => {
                     // 使用正确的API格式，item本身就包含repo和starred_at
-                    if (item && item.repo) {
+                    const starredItem = item as StarredRepoItem;
+                    if (starredItem && starredItem.repo) {
                         return {
-                            ...item.repo,
-                            starred_at: item.starred_at || new Date().toISOString(),
+                            ...starredItem.repo,
+                            starred_at: starredItem.starred_at || new Date().toISOString(),
                             account_id: this.account.id // 标记来源账号
                         };
-                    } else if (item && item.id) {
+                    } else if (starredItem && starredItem.id) {
                         // 如果直接返回仓库对象（向后兼容）
                         return {
-                            ...item,
-                            starred_at: new Date().toISOString(),
+                            ...starredItem,
+                            starred_at: starredItem.starred_at || new Date().toISOString(),
                             account_id: this.account.id
                         };
                     }
-                    console.warn(`Skipping malformed starred repo item (${this.account.username}):`, item);
+                    console.warn(`Skipping malformed starred repo item (${this.account.username}):`, starredItem);
                     return null;
                 }).filter(repo => repo !== null);
 
-                console.log(`第 ${page} 页处理后得到 ${starredReposData.length} 个有效仓库 (${this.account.username})`);
                 repositories.push(...starredReposData as GithubRepository[]);
                 
                 if (response.data.length < per_page) {
@@ -144,20 +150,15 @@ export class GithubService {
      * 更新账号列表
      */
     public updateAccounts(accounts: GithubAccount[]): void {
-        console.log('更新GitHub账号列表:', accounts);
         this.accounts = accounts;
         this.services.clear();
         
         // 为每个启用的账号创建服务实例
         const enabledAccounts = accounts.filter(account => account.enabled);
-        console.log('启用的账号数量:', enabledAccounts.length);
         
         enabledAccounts.forEach(account => {
-            console.log(`创建服务实例: ${account.username} (${account.id})`);
             this.services.set(account.id, new SingleAccountGithubService(account));
         });
-        
-        console.log('GitHub服务实例数量:', this.services.size);
     }
     
     /**
@@ -185,7 +186,6 @@ export class GithubService {
                 const repos = await service.fetchStarredRepositories();
                 accountSyncTimes[accountId] = new Date().toISOString();
                 
-                console.log(`成功同步账号 ${account.username}: ${repos.length} 个仓库`);
                 return { repos, accountId, error: null };
             } catch (error) {
                 const errorMsg = `同步失败: ${error instanceof Error ? error.message : '未知错误'}`;
@@ -310,8 +310,8 @@ export class GithubService {
     /**
      * @deprecated 多账号模式下使用 getAccountUserInfo
      */
-    public async getCurrentUser(): Promise<{login: string, name: string} | null> {
+    public getCurrentUser(): Promise<{login: string, name: string} | null> {
         console.warn('getCurrentUser is deprecated in multi-account mode');
-        return null;
+        return Promise.resolve(null);
     }
 }

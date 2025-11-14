@@ -2,19 +2,24 @@
 
 # Obsidian GitHub Stars Manager
 
-This plugin allows you to manage and view your starred GitHub repositories directly within Obsidian.
+[![GitHub release](https://img.shields.io/github/release/EmberSparks/obsidian-github-stars-manager.svg)](https://github.com/EmberSparks/obsidian-github-stars-manager/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+This plugin allows you to manage and view your starred GitHub repositories directly within Obsidian, with multi-account support and custom themes.
 
 ## Features
 
 - 📋 View all your starred GitHub repositories within Obsidian
+- 👥 **Multi-account support**: Add multiple GitHub accounts and sync stars from all accounts simultaneously
 - 🏷️ Add custom tags and notes to repositories
 - 🔗 Link repositories to Obsidian notes
 - 🔄 Automatic or manual synchronization of starred repositories
 - 🔍 Search and filter by name, language, tags
 - 📊 Sort by starred time, name, language, and more
-- 🎨 Multiple theme support: Default theme and iOS Glass theme
-- 🌊 **iOS Glass Theme**: iOS-style frosted glass effect with dynamic backgrounds and shimmer animations
-- 📱 Waterfall layout: Xiaohongshu-style card display
+- 🎨 Multiple theme support: Default theme and Liquid Glass theme
+- 🔄 **Account management**: Enable/disable sync for specific accounts individually
+- 🌊 **Liquid Glass Theme**: iOS-style frosted glass effect with dynamic backgrounds and shimmer animations
+- 📱 Waterfall layout: Instagram-style card display
 - ✨ Responsive design that integrates seamlessly with Obsidian themes
 
 ## Configuration
@@ -42,6 +47,8 @@ To use this plugin, you need to provide a GitHub Personal Access Token (PAT) wit
 3. Configure your GitHub PAT in the plugin settings on first use
 4. Click the "Sync" button to fetch your starred repositories
 5. You can add personal notes, tags, or link repositories to existing Obsidian notes
+
+📖 **[View Detailed Usage Guide](USAGE_GUIDE_EN.md)** | [中文指南](USAGE_GUIDE.md)
 
 ### Theme Switching
 
@@ -79,7 +86,7 @@ You can quickly switch themes using the theme button at the top of the plugin in
 ### Requirements
 
 - Node.js 16+
-- npm
+- npm or yarn
 
 ### Development Commands
 
@@ -93,12 +100,17 @@ npm run dev
 # Production build
 npm run build
 
-# Code linting
-npm run lint
-
 # Version bump
 npm run version
 ```
+
+### Tech Stack
+
+- **TypeScript**: Type-safe JavaScript superset
+- **Obsidian API**: Plugin development framework
+- **GitHub REST API**: Access GitHub data via @octokit/rest
+- **CSS3**: Modern styling and animation effects
+- **esbuild**: Fast JavaScript bundler
 
 ### Project Structure
 
@@ -116,13 +128,29 @@ npm run version
 └── README.md           # Documentation
 ```
 
+## Changelog
+
+### v0.1.0 (Current Version)
+- ✨ Initial release
+- 🎯 Multi-account GitHub Stars management
+- 🎨 Liquid Glass theme support
+- 📱 Responsive waterfall layout
+- 🔍 Advanced search and filtering
+- 🏷️ Custom tags and notes functionality
+
 ## License
 
-MIT
+MIT License - see [LICENSE](LICENSE) file for details
 
 ## Contributing
 
-Issues and Pull Requests are welcome!
+Contributions are welcome! Please follow these steps:
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
 ## Support
 
@@ -131,3 +159,10 @@ If you find this plugin helpful, consider:
 - ⭐ Starring the project
 - 🐛 Reporting bugs or suggesting improvements
 - 💡 Sharing it with other Obsidian users
+- 💖 [Sponsor the developer](https://github.com/sponsors/EmberSparks)
+
+## Related Links
+
+- [Obsidian Official Website](https://obsidian.md)
+- [GitHub API Documentation](https://docs.github.com/en/rest)
+- [Plugin Development Documentation](https://docs.obsidian.md/Plugins/Getting+started/Build+a+plugin)

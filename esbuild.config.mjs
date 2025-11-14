@@ -80,7 +80,7 @@ const copyPlugin = {
                 return;
             }
 
-            const pluginId = "obsidian-github-stars-manager"; // Must match the 'id' in manifest.json
+            const pluginId = "github-stars-manager"; // Must match the 'id' in manifest.json
             const targetDir = path.join(obsidianPluginDir, pluginId);
             const backupDir = path.join(targetDir, "backup");
 
@@ -125,6 +125,11 @@ const copyPlugin = {
                 backupAndCopy("styles.css", path.join(targetDir, "styles.css"), "styles.css");
             }
 
+            // Copy themes.css with backup if it exists
+            if (fs.existsSync("themes.css")) {
+                backupAndCopy("themes.css", path.join(targetDir, "themes.css"), "themes.css");
+            }
+
             // Copy manifest.json with backup
             backupAndCopy("manifest.json", path.join(targetDir, "manifest.json"), "manifest.json");
 
@@ -166,7 +171,7 @@ const context = await esbuild.context({
 	treeShaking: true,
 	outfile: "main.js",
 	minify: prod,
-    plugins: [copyPlugin], // Add our custom plugin here
+    plugins: [copyPlugin]
 });
 
 if (prod) {
