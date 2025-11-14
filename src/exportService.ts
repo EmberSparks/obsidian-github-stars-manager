@@ -1,4 +1,4 @@
-import { TFile, TFolder, Vault, normalizePath, Modal, App } from 'obsidian';
+import { TFile, Vault, normalizePath, Modal, App } from 'obsidian';
 import { GithubRepository, UserRepoEnhancements, ExportOptions, ExportResult, RepoExportData, DEFAULT_EXPORT_OPTIONS } from './types';
 import { EmojiUtils } from './emojiUtils';
 
@@ -91,8 +91,8 @@ export class ExportService {
 
             // 执行导出
             return await this.exportSingleRepository(exportData, exportOptions);
-        } catch (error) {
-            console.error(`导出仓库 ${repository.full_name} 失败:`, error);
+        } catch (_error) {
+            // 静默处理单个仓库导出错误
             return false;
         }
     }
@@ -125,45 +125,37 @@ export class ExportService {
     ): Promise<boolean> {
         const filePath = normalizePath(`${options.targetFolder}/${exportData.filename}.md`);
 
-        try {
-            // 检查文件是否已存在
-            const existingFile = this.vault.getAbstractFileByPath(filePath);
-            if (existingFile && !options.overwriteExisting) {
-                if (this.overwriteAll === true) {
-                    // 用户已选择“覆盖全部”
-                } else if (this.overwriteAll === false) {
-                    // 用户已选择“跳过全部”
-                    console.log(`根据用户选择，跳过文件: ${filePath}`);
-                    return false;
-                } else {
-                    // 询问用户
-                    const userChoice = await this.confirmOverwrite(filePath);
+        // 检查文件是否已存在
+        const existingFile = this.vault.getAbstractFileByPath(filePath);
+        if (existingFile && !options.overwriteExisting) {
+            if (this.overwriteAll === true) {
+                // 用户已选择"覆盖全部"
+            } else if (this.overwriteAll === false) {
+                // 用户已选择"跳过全部"
+                return false;
+            } else {
+                // 询问用户
+                const userChoice = await this.confirmOverwrite(filePath);
                     if (userChoice === 'overwriteAll') {
                         this.overwriteAll = true;
                     } else if (userChoice === 'skipAll') {
                         this.overwriteAll = false;
-                        console.log(`用户选择“跳过全部”，跳过文件: ${filePath}`);
                         return false;
                     } else if (userChoice === 'skip') {
-                        console.log(`用户选择跳过文件: ${filePath}`);
                         return false;
                     }
                     // 如果是 'overwrite'，则继续执行
                 }
             }
 
-            // 创建或更新文件
-            if (existingFile instanceof TFile) {
-                await this.vault.modify(existingFile, exportData.content);
-            } else {
-                await this.vault.create(filePath, exportData.content);
-            }
-
-            return true;
-        } catch (error) {
-            console.error(`写入文件失败 ${filePath}:`, error);
-            throw error;
+        // 创建或更新文件
+        if (existingFile instanceof TFile) {
+            await this.vault.modify(existingFile, exportData.content);
+        } else {
+            await this.vault.create(filePath, exportData.content);
         }
+
+        return true;
     }
 
     /**
@@ -242,7 +234,7 @@ export class ExportService {
                 hour: '2-digit',
                 minute: '2-digit'
             });
-        } catch (error) {
+        } catch (_error) {
             return dateString;
         }
     }
@@ -366,11 +358,7 @@ class OverwriteConfirmModal extends Modal {
         messageEl.createEl('p', { text: '是否要覆盖现有文件？' });
 
         // 按钮容器
-        const buttonContainer = contentEl.createDiv('overwrite-confirm-buttons');
-        buttonContainer.style.display = 'flex';
-        buttonContainer.style.justifyContent = 'flex-end';
-        buttonContainer.style.gap = '10px';
-        buttonContainer.style.marginTop = '20px';
+        const buttonContainer = contentEl.createDiv('overwrite-confirm-buttons button-flex-container');
 
         // 跳过按钮
         const skipButton = buttonContainer.createEl('button', { text: '跳过' });

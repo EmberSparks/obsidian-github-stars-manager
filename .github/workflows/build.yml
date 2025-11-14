@@ -1,21 +1,13 @@
 name: Build and Release
 
 on:
-  workflow_dispatch:  # 只允许手动触发
+  workflow_dispatch:  # 手动触发
     inputs:
       test_only:
         description: '仅测试构建，不发布'
         required: false
         default: false
         type: boolean
-      environment:
-        description: '部署环境'
-        required: false
-        default: 'test'
-        type: choice
-        options:
-        - test
-        - production
   release:
     types: [ published ]
     branches: [ main, master, feature/* ]  # 允许在功能分支发布
@@ -44,7 +36,7 @@ jobs:
       run: npm run build
       
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v4  # 强制使用 v4 版本避免弃用警告
       with:
         name: obsidian-github-stars-manager
         path: |
@@ -72,7 +64,7 @@ jobs:
       run: npm ci
       
     - name: Download build artifacts
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v4  # 强制使用 v4 版本避免弃用警告
       with:
         name: obsidian-github-stars-manager
         

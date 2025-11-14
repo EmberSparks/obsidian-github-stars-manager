@@ -44,6 +44,15 @@ The plugin uses Obsidian's settings system with the following key configurations
 - Theme files: `styles.css`, `themes.css`
 - Emoji support utility (`src/emojiUtils.ts`)
 
+### Development Principles
+1. **多主题兼容性 (Multi-theme Compatibility)**: 所有对功能的修改都需要适配不同主题，且操作逻辑要相同 (All functionality modifications must be adapted to different themes with identical operation logic)
+2. **自动构建部署 (Auto Build & Deploy)**: 添加或者修改功能后自动重新编译，并部署到本地插件目录 (After adding or modifying functionality, automatically recompile and deploy to local plugin directory):
+   ```bash
+   npm run build && cp main.js manifest.json styles.css themes.css "/mnt/e/cai的黑曜石/.obsidian/plugins/github-stars-manager/"
+   ```
+3. **代码安全 (Code Security)**: 遵循Obsidian插件商店安全要求，使用requestUrl替代fetch，避免innerHTML等不安全操作 (Follow Obsidian plugin store security requirements, use requestUrl instead of fetch, avoid unsafe operations like innerHTML)
+4. **类型安全 (Type Safety)**: 使用严格的TypeScript类型定义，避免any类型，确保代码可维护性 (Use strict TypeScript type definitions, avoid any types, ensure code maintainability)
+
 ### Important Technical Notes
 - Uses esbuild for bundling (`esbuild.config.mjs`)
 - TypeScript configuration optimized for Obsidian plugin development

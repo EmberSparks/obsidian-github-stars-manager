@@ -28,11 +28,105 @@
 .github-stars-toolbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 10px;
-  padding: 5px;
-  border-radius: 5px;
-  background-color: var(--background-secondary);
+  gap: 8px; /* 减小间距 */
+  margin-bottom: 15px;
+  padding: 8px; /* 减小内边距 */
+  background: var(--background-secondary);
+  border-radius: 8px;
+  flex-wrap: wrap;
+}
+
+/* 刷新按钮 */
+.github-stars-refresh-button {
+  background-color: transparent;
+  border: none;
+  color: var(--text-muted);
+  padding: 6px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.github-stars-refresh-button:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+/* 搜索框容器 */
+.github-stars-search-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex-grow: 1;
+  max-width: 400px;
+}
+
+/* 搜索框 */
+.github-stars-search {
+  padding: 8px 32px 8px 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  font-size: 14px;
+  width: 100%;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.github-stars-search:focus {
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 2px rgba(var(--interactive-accent-rgb), 0.2);
+}
+
+/* 搜索框清除按钮 - Chrome风格 */
+.github-stars-search-clear {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  border: none;
+  background: var(--text-muted);
+  color: white;
+  cursor: pointer;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  padding: 0;
+  font-size: 12px;
+  line-height: 1;
+  opacity: 0;
+  visibility: hidden;
+}
+
+.github-stars-search-clear::before {
+  content: '×';
+  font-weight: bold;
+}
+
+.github-stars-search-container:hover .github-stars-search-clear:not(.hidden) {
+  opacity: 0.6;
+  visibility: visible;
+}
+
+.github-stars-search-clear:hover {
+  opacity: 1 !important;
+  background: var(--text-normal);
+  transform: translateY(-50%) scale(1.1);
+}
+
+.github-stars-search-clear:active {
+  transform: translateY(-50%) scale(0.95);
+}
+
+.github-stars-search-clear.hidden {
+  opacity: 0 !important;
+  visibility: hidden !important;
 }
 
 /* 工具栏右侧按钮容器 */
@@ -47,13 +141,29 @@
   background-color: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
   border-radius: 6px;
-  padding: 6px 12px;
+  padding: 8px 12px; /* 统一按钮大小 */
   cursor: pointer;
   transition: all 0.2s ease;
   color: var(--text-muted);
   display: flex;
   align-items: center;
+  justify-content: center; /* 居中内容 */
   gap: 6px;
+  font-size: 14px; /* 统一字体大小 */
+  font-weight: 500;
+}
+
+/* 主要操作按钮（例如 "Search"） */
+.github-stars-action-button {
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border: 1px solid var(--interactive-accent);
+}
+
+.github-stars-action-button:hover {
+  background-color: var(--interactive-accent-hover);
+  border-color: var(--interactive-accent-hover);
+  color: var(--text-on-accent);
 }
 
 .github-stars-sync-button:hover {
@@ -63,18 +173,6 @@
 .github-stars-sync-button:disabled {
   opacity: 0.7;
   cursor: not-allowed;
-}
-
-.github-stars-search {
-  /* flex-grow: 1; */ /* Removed to prevent taking all space */
-  width: 250px; /* Give it a fixed width, adjust as needed */
-  max-width: 50%; /* Or a max width relative to the toolbar */
-  margin-right: 10px; /* Add some space between search and sort button */
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 3px;
-  padding: 5px 10px;
-  background-color: var(--background-primary);
-  color: var(--text-normal);
 }
 
 /* 排序按钮组样式 */
@@ -2230,4 +2328,114 @@
 
 .github-stars-sort-button-group {
   gap: 6px;
+}
+
+/* ===== 动态定位样式 ===== */
+
+/* 账号弹出菜单的动态定位 */
+.github-account-collapsible.position-fixed {
+  position: fixed !important;
+  z-index: 9999 !important;
+}
+
+/* 隐藏头像的通用类 */
+.avatar-hidden {
+  display: none !important;
+}
+
+/* 动态显示和隐藏的通用类 */
+.display-block {
+  display: block !important;
+}
+
+.display-none {
+  display: none !important;
+}
+
+.position-fixed {
+  position: fixed !important;
+  top: var(--popup-top, auto) !important;
+  right: var(--popup-right, auto) !important;
+}
+
+.z-index-9999 {
+  z-index: 9999 !important;
+}
+
+/* 设置页面样式类 */
+.setting-item-description-list {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+
+/* 内联样式替代类 */
+.transition-scale {
+  transition: all 0.15s ease-out;
+}
+
+.transform-scale-down {
+  transform: scale(0.95);
+}
+
+.transition-button {
+  transition: all 0.2s ease;
+}
+
+.display-none {
+  display: none !important;
+}
+
+.display-block {
+  display: block !important;
+}
+
+.position-fixed {
+  position: fixed !important;
+}
+
+.z-index-9999 {
+  z-index: 9999 !important;
+}
+
+/* 表单样式 */
+.form-input-full {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  background-color: var(--background-primary);
+  color: var(--text-normal);
+  font-size: 14px;
+  line-height: 1.4;
+  pointer-events: auto;
+  user-select: text;
+}
+
+.form-input-full:focus {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 0px;
+}
+
+.form-input-disabled {
+  background-color: var(--background-modifier-border);
+  cursor: not-allowed;
+}
+
+.description-margin {
+  margin-bottom: 16px;
+}
+
+.button-flex-container {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.border-color-success {
+  border-color: var(--interactive-success) !important;
+}
+
+.border-color-error {
+  border-color: var(--interactive-critical) !important;
 }

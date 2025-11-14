@@ -92,7 +92,7 @@ this.modalEl.addClass('github-stars-edit-modal'); // Add specific class for styl
                 tagButtons.set(tag, tagButton); // Store button reference
 
                 tagButton.addEventListener('click', () => {
-                    let currentTagsArray = this.tags.split(',')
+                    const currentTagsArray = this.tags.split(',')
                                              .map(t => t.trim())
                                              .filter(t => t.length > 0);
                     const tagLower = tag.toLowerCase();
@@ -154,7 +154,7 @@ this.modalEl.addClass('github-stars-edit-modal'); // Add specific class for styl
         const cancelButton = buttonDiv.createEl('button', { text: '取消' });
         cancelButton.addEventListener('click', () => this.close());
         const saveButton = buttonDiv.createEl('button', { text: '保存', cls: 'mod-cta' });
-        saveButton.addEventListener('click', () => this.saveChanges());
+        saveButton.addEventListener('click', () => void this.saveChanges());
     }
 
     onClose() {
