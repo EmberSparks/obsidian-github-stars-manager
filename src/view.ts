@@ -364,7 +364,7 @@ export class GithubStarsView extends ItemView {
             const titleEl = titleGroupEl.createEl('div', { cls: 'github-stars-repo-title' });
             titleEl.createEl('a', {
                 cls: 'github-stars-repo-link',
-                text: repo.full_name || repo.name || 'Unnamed Repo',
+                text: repo.full_name || repo.name || 'Unnamed repo',
                 attr: { href: repo.html_url || '#', target: '_blank' }
             });
 
