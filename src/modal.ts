@@ -69,7 +69,7 @@ this.modalEl.addClass('github-stars-edit-modal'); // Add specific class for styl
 
         tagSetting.addText(text => {
             tagInputEl = text.inputEl;
-            text.setPlaceholder('例如: react, typescript, 学习')
+            text.setPlaceholder('For example: react, typescript, learning')
                .setValue(this.tags)
                .onChange(value => {
                    this.tags = value;
@@ -81,7 +81,7 @@ this.modalEl.addClass('github-stars-edit-modal'); // Add specific class for styl
         const allTags = this.plugin.getAllTags();
         if (allTags.length > 0) {
             const existingTagsContainer = contentEl.createDiv('existing-tags-container');
-            existingTagsContainer.createSpan({ text: '选择已有标签: ', cls: 'existing-tags-label' });
+            existingTagsContainer.createSpan({ text: 'Select existing tags: ', cls: 'existing-tags-label' });
 
             allTags.forEach(tag => {
                 const tagButton = existingTagsContainer.createEl('button', {

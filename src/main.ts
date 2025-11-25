@@ -51,8 +51,8 @@ export default class GithubStarsPlugin extends Plugin {
             (leaf) => new GithubStarsView(leaf, this)
         );
         // 添加功能区图标 (不变)
-        this.addRibbonIcon('github-star', 'GitHub Stars', () => {
-            this.activateView();
+        this.addRibbonIcon('github-star', 'GitHub stars', () => {
+            void this.activateView();
         });
 
         // 添加插件命令 (不变)
@@ -63,12 +63,11 @@ export default class GithubStarsPlugin extends Plugin {
         // 应用主题
         this.applyTheme(this.settings.theme);
 
-        new Notice('GitHub Stars Manager 已加载');
+        new Notice('GitHub stars manager loaded');
     }
 
     onunload() {
         this.clearSyncInterval();
-        this.app.workspace.detachLeavesOfType(VIEW_TYPE_STARS);
     }
 
     // --- 数据加载/保存 ---
@@ -161,7 +160,7 @@ export default class GithubStarsPlugin extends Plugin {
         if (this.settings.autoSync && this.settings.syncInterval > 0) {
             const intervalMillis = this.settings.syncInterval * 60 * 1000;
             this.syncIntervalId = window.setInterval(() => {
-                this.syncStars();
+                void this.syncStars();
             }, intervalMillis);
             this.registerInterval(this.syncIntervalId);
         }
@@ -178,24 +177,24 @@ export default class GithubStarsPlugin extends Plugin {
     addCommands() {
         this.addCommand({
             id: 'sync-github-stars',
-            name: '同步 GitHub 星标',
+            name: 'Sync GitHub stars',
             callback: () => {
-                this.syncStars();
+                void this.syncStars();
             }
         });
         this.addCommand({
             id: 'open-github-stars-view',
-            name: '打开 GitHub Stars 视图',
+            name: 'Open GitHub stars view',
             callback: () => {
-                this.activateView();
+                void this.activateView();
             }
         });
 
         this.addCommand({
             id: 'export-all-stars',
-            name: '导出所有星标仓库',
+            name: 'Export all starred repositories',
             callback: () => {
-                this.exportAllStars();
+                void this.exportAllStars();
             }
         });
     }
@@ -306,7 +305,7 @@ export default class GithubStarsPlugin extends Plugin {
             });
         }
         if (leaf) {
-             workspace.revealLeaf(leaf);
+            workspace.revealLeaf(leaf);
         }
     }
 
