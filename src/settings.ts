@@ -72,10 +72,6 @@ export class GithubStarsSettingTab extends PluginSettingTab {
 
         containerEl.empty();
 
-        new Setting(containerEl)
-            .setName('Settings')
-            .setHeading();
-
         // 多账号管理区域
         this.displayAccountsSection(containerEl);
 

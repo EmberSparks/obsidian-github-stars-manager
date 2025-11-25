@@ -488,7 +488,7 @@ export class GithubStarsView extends ItemView {
                 });
                 link.addEventListener('click', (ev) => {
                     ev.preventDefault();
-                    this.app.workspace.openLinkText(repo.linked_note!, '', false);
+                    void this.app.workspace.openLinkText(repo.linked_note!, '', false);
                 });
             }
         });
