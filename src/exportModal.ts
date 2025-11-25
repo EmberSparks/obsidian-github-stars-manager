@@ -1,4 +1,4 @@
-import { App, Modal, Setting, Notice } from 'obsidian';
+import { App, Modal, Notice } from 'obsidian';
 import GithubStarsPlugin from './main';
 import { GithubRepository } from './types';
 
@@ -63,9 +63,9 @@ export class ExportModal extends Modal {
 
             // 仓库信息
             const repoInfo = repoItem.createDiv('export-modal-repo-info');
-            
+
             // 仓库名称
-            const repoName = repoInfo.createEl('div', {
+            repoInfo.createEl('div', {
                 text: repo.full_name,
                 cls: 'export-modal-repo-name'
             });
@@ -95,8 +95,8 @@ export class ExportModal extends Modal {
             cls: 'mod-cta export-modal-export-btn'
         });
         exportButton.disabled = true;
-        exportButton.addEventListener('click', async () => {
-            await this.exportSelected();
+        exportButton.addEventListener('click', () => {
+            void this.exportSelected();
         });
 
         // 取消按钮
@@ -183,10 +183,10 @@ export class ExportModal extends Modal {
             }
 
             this.close();
-        } catch (error) {
+        } catch (_error) {
             new Notice('导出失败，请检查路径和权限设置', 5000);
             new Notice('导出失败，请查看控制台了解详情');
-            
+
             // 恢复按钮状态
             this.exportButton.disabled = false;
             this.updateExportButton();

@@ -3,11 +3,9 @@ import { Notice } from 'obsidian';
 import { GithubRepository, GithubAccount } from './types';
 
 // 添加GitHub API响应类型
-interface StarredRepoItem {
+interface StarredRepoItem extends Partial<GithubRepository> {
     repo?: GithubRepository;
     starred_at?: string;
-    id?: number;
-    [key: string]: any;
 }
 
 /**
@@ -58,9 +56,10 @@ class SingleAccountGithubService {
             const repositories: GithubRepository[] = [];
             let page = 1;
             const per_page = 100;
-            
-            while (true) {
-                
+            let hasMore = true;
+
+            while (hasMore) {
+
                 const response = await this.octokit!.activity.listReposStarredByAuthenticatedUser({
                     per_page,
                     page,
@@ -68,29 +67,31 @@ class SingleAccountGithubService {
                         Accept: 'application/vnd.github.star+json'
                     }
                 });
-                
-                
+
+
                 if (response.data.length === 0) {
+                    hasMore = false;
                     break;
                 }
                 
-                const starredReposData = response.data.map((item: StarredRepoItem) => {
+                const starredReposData = response.data.map((item) => {
                     // 使用正确的API格式，item本身就包含repo和starred_at
-                    if (item && item.repo) {
+                    const starredItem = item as StarredRepoItem;
+                    if (starredItem && starredItem.repo) {
                         return {
-                            ...item.repo,
-                            starred_at: item.starred_at || new Date().toISOString(),
+                            ...starredItem.repo,
+                            starred_at: starredItem.starred_at || new Date().toISOString(),
                             account_id: this.account.id // 标记来源账号
                         };
-                    } else if (item && item.id) {
+                    } else if (starredItem && starredItem.id) {
                         // 如果直接返回仓库对象（向后兼容）
                         return {
-                            ...item,
-                            starred_at: new Date().toISOString(),
+                            ...starredItem,
+                            starred_at: starredItem.starred_at || new Date().toISOString(),
                             account_id: this.account.id
                         };
                     }
-                    console.warn(`Skipping malformed starred repo item (${this.account.username}):`, item);
+                    console.warn(`Skipping malformed starred repo item (${this.account.username}):`, starredItem);
                     return null;
                 }).filter(repo => repo !== null);
 
@@ -309,8 +310,8 @@ export class GithubService {
     /**
      * @deprecated 多账号模式下使用 getAccountUserInfo
      */
-    public async getCurrentUser(): Promise<{login: string, name: string} | null> {
+    public getCurrentUser(): Promise<{login: string, name: string} | null> {
         console.warn('getCurrentUser is deprecated in multi-account mode');
-        return null;
+        return Promise.resolve(null);
     }
 }
