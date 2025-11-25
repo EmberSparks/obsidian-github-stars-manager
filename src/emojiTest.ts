@@ -9,7 +9,7 @@ export class EmojiTest {
      * 测试emoji短代码转换
      */
     static testEmojiConversion(): void {
-        console.log('=== Emoji转换测试 ===');
+        console.debug('=== Emoji转换测试 ===');
         
         const testCases = [
             ':rocket: 快速部署',
@@ -24,11 +24,11 @@ export class EmojiTest {
 
         testCases.forEach((testCase, index) => {
             const result = EmojiUtils.restoreEmojis(testCase);
-            console.log(`测试 ${index + 1}:`);
-            console.log(`  输入: ${testCase}`);
-            console.log(`  输出: ${result}`);
-            console.log(`  包含短代码: ${EmojiUtils.hasEmojiShortcodes(testCase)}`);
-            console.log('---');
+            console.debug(`测试 ${index + 1}:`);
+            console.debug(`  输入: ${testCase}`);
+            console.debug(`  输出: ${result}`);
+            console.debug(`  包含短代码: ${EmojiUtils.hasEmojiShortcodes(testCase)}`);
+            console.debug('---');
         });
     }
 
@@ -36,7 +36,7 @@ export class EmojiTest {
      * 测试仓库描述中的emoji处理
      */
     static testRepositoryDescription(): void {
-        console.log('=== 仓库描述Emoji测试 ===');
+        console.debug('=== 仓库描述Emoji测试 ===');
         
         const mockDescriptions = [
             '🚀 A fast and modern web framework',
@@ -49,10 +49,10 @@ export class EmojiTest {
 
         mockDescriptions.forEach((desc, index) => {
             const processed = EmojiUtils.restoreEmojis(desc);
-            console.log(`描述 ${index + 1}:`);
-            console.log(`  原始: ${desc}`);
-            console.log(`  处理后: ${processed}`);
-            console.log('---');
+            console.debug(`描述 ${index + 1}:`);
+            console.debug(`  原始: ${desc}`);
+            console.debug(`  处理后: ${processed}`);
+            console.debug('---');
         });
     }
 
@@ -60,7 +60,7 @@ export class EmojiTest {
      * 测试用户笔记中的emoji处理
      */
     static testUserNotes(): void {
-        console.log('=== 用户笔记Emoji测试 ===');
+        console.debug('=== 用户笔记Emoji测试 ===');
         
         const mockNotes = [
             '很有用的工具 :thumbsup:',
@@ -73,10 +73,10 @@ export class EmojiTest {
 
         mockNotes.forEach((note, index) => {
             const processed = EmojiUtils.restoreEmojis(note);
-            console.log(`笔记 ${index + 1}:`);
-            console.log(`  原始: ${note}`);
-            console.log(`  处理后: ${processed}`);
-            console.log('---');
+            console.debug(`笔记 ${index + 1}:`);
+            console.debug(`  原始: ${note}`);
+            console.debug(`  处理后: ${processed}`);
+            console.debug('---');
         });
     }
 
@@ -84,7 +84,7 @@ export class EmojiTest {
      * 测试导出内容中的emoji处理
      */
     static testExportContent(): void {
-        console.log('=== 导出内容Emoji测试 ===');
+        console.debug('=== 导出内容Emoji测试 ===');
         
         const mockExportContent = `---
 GSM-title: awesome-project
@@ -96,42 +96,43 @@ GSM-user-tags:
 ---`;
 
         const processed = EmojiUtils.restoreEmojis(mockExportContent);
-        console.log('导出内容测试:');
-        console.log('原始内容:');
-        console.log(mockExportContent);
-        console.log('\n处理后内容:');
-        console.log(processed);
+        console.debug('导出内容测试:');
+        console.debug('原始内容:');
+        console.debug(mockExportContent);
+        console.debug('\n处理后内容:');
+        console.debug(processed);
     }
 
     /**
      * 运行所有测试
      */
     static runAllTests(): void {
-        console.log('🧪 开始Emoji处理功能测试...\n');
+        console.debug('🧪 开始Emoji处理功能测试...\n');
         
         this.testEmojiConversion();
         this.testRepositoryDescription();
         this.testUserNotes();
         this.testExportContent();
         
-        console.log('✅ 所有测试完成！');
-        console.log('\n支持的emoji短代码:');
-        console.log(EmojiUtils.getSupportedShortcodes().join(', '));
+        console.debug('✅ 所有测试完成！');
+        console.debug('\n支持的emoji短代码:');
+        console.debug(EmojiUtils.getSupportedShortcodes().join(', '));
     }
 
     /**
      * 模拟HTML元素设置测试
      */
     static testHTMLElementSetting(): void {
-        console.log('=== HTML元素设置测试 ===');
+        console.debug('=== HTML元素设置测试 ===');
         
         // 创建模拟的HTML元素
         const mockElement = {
             innerHTML: '',
+            textContent: '',
             setAttribute: function(attr: string, value: string) {
-                console.log(`设置属性 ${attr}: ${value}`);
+                console.debug(`设置属性 ${attr}: ${value}`);
             }
-        } as any;
+        } as Partial<HTMLElement> as HTMLElement;
 
         const testTexts = [
             ':rocket: 快速启动',
@@ -140,11 +141,11 @@ GSM-user-tags:
         ];
 
         testTexts.forEach((text, index) => {
-            console.log(`HTML测试 ${index + 1}:`);
-            console.log(`  原始文本: ${text}`);
+            console.debug(`HTML测试 ${index + 1}:`);
+            console.debug(`  原始文本: ${text}`);
             EmojiUtils.setEmojiText(mockElement, text);
-            console.log(`  设置结果: ${mockElement.innerHTML}`);
-            console.log('---');
+            console.debug(`  设置结果: ${mockElement.innerHTML}`);
+            console.debug('---');
         });
     }
 }
