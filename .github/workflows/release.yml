@@ -1,35 +1,195 @@
-name: Release Obsidian plugin
+name: Release Obsidian Plugin
 
 on:
-  push:
-    tags:
-      - "*"
+  release:
+    types: [created, published]  # 当在 GitHub 上创建或发布 Release 时触发
+  workflow_dispatch:  # 支持手动触发测试
 
 jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+
     steps:
-      - uses: actions/checkout@v3
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-      - name: Use Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: "18.x"
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
 
-      - name: Build plugin
-        run: |
-          npm install
-          npm run build
+    - name: Install dependencies
+      run: npm ci
 
-      - name: Create release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          tag="${GITHUB_REF#refs/tags/}"
+    - name: Run type checking
+      run: npx tsc --noEmit
 
-          gh release create "$tag" \
-            --title="$tag" \
-            --draft \
-            main.js manifest.json styles.css themes.css
+    - name: Build plugin
+      run: npm run build
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: obsidian-github-stars-manager-build
+        path: |
+          main.js
+          manifest.json
+          styles.css
+          themes.css
+          versions.json
+        retention-days: 30
+
+  test:
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: obsidian-github-stars-manager-build
+
+    - name: Verify build files exist
+      run: |
+        echo "🔍 Verifying build files..."
+        test -f main.js && echo "✅ main.js exists" || (echo "❌ main.js missing" && exit 1)
+        test -f manifest.json && echo "✅ manifest.json exists" || (echo "❌ manifest.json missing" && exit 1)
+        test -f styles.css && echo "✅ styles.css exists" || (echo "❌ styles.css missing" && exit 1)
+        test -f themes.css && echo "✅ themes.css exists" || (echo "❌ themes.css missing" && exit 1)
+        test -f versions.json && echo "✅ versions.json exists" || (echo "❌ versions.json missing" && exit 1)
+        echo "🎉 All required files are present!"
+
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Validate manifest.json
+      run: |
+        echo "📋 Validating manifest.json..."
+        node -e "
+          const manifest = require('./manifest.json');
+          console.log('🔍 Checking manifest.json structure...');
+
+          // Check required fields
+          const required = ['id', 'name', 'version', 'minAppVersion', 'description', 'author', 'authorUrl'];
+          let hasError = false;
+
+          for (const field of required) {
+            if (!manifest[field] || (typeof manifest[field] === 'string' && manifest[field].trim() === '')) {
+              console.error('❌ Missing or empty required field: ' + field);
+              hasError = true;
+            } else {
+              console.log('✅ ' + field + ': ' + manifest[field]);
+            }
+          }
+
+          // Check version format
+          if (!/^[0-9]+\\.[0-9]+\\.[0-9]+$/.test(manifest.version)) {
+            console.error('❌ Version must be in format x.y.z, got: ' + manifest.version);
+            hasError = true;
+          }
+
+          if (hasError) {
+            console.log('');
+            console.log('💡 Please ensure all required fields are properly filled in manifest.json');
+            process.exit(1);
+          }
+
+          console.log('');
+          console.log('🎉 manifest.json validation passed!');
+          console.log('📦 Plugin: ' + manifest.name + ' v' + manifest.version);
+          console.log('👤 Author: ' + manifest.author + ' (' + manifest.authorUrl + ')');
+        "
+
+    - name: Validate versions.json
+      run: |
+        echo "📋 Validating versions.json..."
+        node -e "
+          const versions = require('./versions.json');
+          const manifest = require('./manifest.json');
+
+          console.log('🔍 Checking versions.json structure...');
+
+          // Check if current version is in versions.json
+          if (!versions[manifest.version]) {
+            console.error('❌ Current version ' + manifest.version + ' not found in versions.json');
+            console.log('');
+            console.log('💡 Run: npm version [patch|minor|major] to update version files');
+            process.exit(1);
+          }
+
+          console.log('✅ Current version ' + manifest.version + ' found in versions.json');
+          console.log('📱 Minimum Obsidian version: ' + versions[manifest.version]);
+          console.log('');
+          console.log('🎉 versions.json validation passed!');
+        "
+
+  release:
+    runs-on: ubuntu-latest
+    needs: [build, test, validate]
+    if: github.event_name == 'release'
+    permissions:
+      contents: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: obsidian-github-stars-manager-build
+
+    - name: Create release archive
+      run: |
+        echo "📦 Creating release archive..."
+        zip -r obsidian-github-stars-manager.zip main.js manifest.json styles.css themes.css versions.json
+        ls -lh obsidian-github-stars-manager.zip
+
+    - name: Upload release assets
+      uses: softprops/action-gh-release@v2
+      with:
+        files: |
+          main.js
+          manifest.json
+          styles.css
+          themes.css
+          versions.json
+          obsidian-github-stars-manager.zip
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+        fail_on_unmatched_files: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Release summary
+      run: |
+        echo "🎉 Release completed successfully!"
+        echo "📦 Files uploaded:"
+        echo "  - main.js"
+        echo "  - manifest.json"
+        echo "  - styles.css"
+        echo "  - themes.css"
+        echo "  - versions.json"
+        echo "  - obsidian-github-stars-manager.zip"
+        echo ""
+        echo "✨ Release Notes automatically generated from commit history"
