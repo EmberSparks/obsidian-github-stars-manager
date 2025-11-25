@@ -305,7 +305,7 @@ export default class GithubStarsPlugin extends Plugin {
             });
         }
         if (leaf) {
-            workspace.revealLeaf(leaf);
+            await workspace.revealLeaf(leaf);
         }
     }
 

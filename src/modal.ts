@@ -32,7 +32,7 @@ this.modalEl.addClass('github-stars-edit-modal'); // Add specific class for styl
 
         // Title (using githubRepo)
         contentEl.createEl('h2', {
-            text: `编辑仓库信息: ${this.githubRepo.name}`
+            text: `Edit repository: ${this.githubRepo.name}`
         });
 
         // Basic Repo Info (from githubRepo)
@@ -50,8 +50,8 @@ this.modalEl.addClass('github-stars-edit-modal'); // Add specific class for styl
 
         // Tags Setting
         const tagSetting = new Setting(contentEl)
-            .setName('标签')
-            .setDesc('用逗号分隔多个标签');
+            .setName('Tags')
+            .setDesc('Separate tags with commas');
 
         let tagInputEl: HTMLInputElement;
         const tagButtons = new Map<string, HTMLButtonElement>(); // Map to store tag buttons
@@ -120,11 +120,11 @@ this.modalEl.addClass('github-stars-edit-modal'); // Add specific class for styl
 
         // Notes Setting
         new Setting(contentEl)
-            .setName('笔记')
+            .setName('Notes')
             // .setDesc('关于此仓库的个人笔记') // Removed description
             .addTextArea(text => {
                 text.inputEl.addClass('edit-repo-notes-textarea'); // Add specific class
-                text.setPlaceholder('在这里添加笔记...')
+                text.setPlaceholder('Add notes here...')
                    .setValue(this.notes) // Populated from constructor
                    .onChange(value => {
                        this.notes = value;
@@ -133,17 +133,17 @@ this.modalEl.addClass('github-stars-edit-modal'); // Add specific class for styl
 
         // Linked Note Setting
         new Setting(contentEl)
-            .setName('链接到笔记')
-            .setDesc('链接到Obsidian中的笔记')
+            .setName('Link to note')
+            .setDesc('Link to a note in Obsidian')
             .addText(text => text
-                .setPlaceholder('笔记路径')
+                .setPlaceholder('Note path')
                 .setValue(this.linkedNote) // Populated from constructor
                 .onChange(value => {
                     this.linkedNote = value;
                 })
             )
             .addButton(button => button
-                .setButtonText('浏览')
+                .setButtonText('Browse')
                 .onClick(() => {
                     this.openNoteBrowser();
                 })
@@ -151,9 +151,9 @@ this.modalEl.addClass('github-stars-edit-modal'); // Add specific class for styl
 
         // Buttons (unchanged structure)
         const buttonDiv = contentEl.createDiv('edit-repo-buttons');
-        const cancelButton = buttonDiv.createEl('button', { text: '取消' });
+        const cancelButton = buttonDiv.createEl('button', { text: 'Cancel' });
         cancelButton.addEventListener('click', () => this.close());
-        const saveButton = buttonDiv.createEl('button', { text: '保存', cls: 'mod-cta' });
+        const saveButton = buttonDiv.createEl('button', { text: 'Save', cls: 'mod-cta' });
         saveButton.addEventListener('click', () => void this.saveChanges());
     }
 
@@ -221,14 +221,14 @@ class NoteSelectorModal extends Modal {
     
     onOpen() {
         const { contentEl } = this;
-        
-        contentEl.createEl('h2', { text: '选择笔记' });
-        
+
+        contentEl.createEl('h2', { text: 'Select note' });
+
         // 搜索框
         const searchDiv = contentEl.createDiv('note-selector-search');
         this.searchInput = searchDiv.createEl('input', {
             type: 'text',
-            placeholder: '搜索笔记...'
+            placeholder: 'Search notes...'
         });
         
         this.searchInput.addEventListener('input', () => {
@@ -258,7 +258,7 @@ class NoteSelectorModal extends Modal {
         
         if (filteredFiles.length === 0) {
             fileListDiv.createEl('div', {
-                text: '没有匹配的笔记',
+                text: 'No matching notes',
                 cls: 'note-selector-empty'
             });
             return;
