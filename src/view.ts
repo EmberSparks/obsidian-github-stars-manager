@@ -36,7 +36,7 @@ export class GithubStarsView extends ItemView {
     }
 
     getDisplayText(): string {
-        return 'GitHub Stars';
+        return 'GitHub stars';
     }
 
     getIcon(): string {
@@ -50,7 +50,7 @@ export class GithubStarsView extends ItemView {
 
         // Header (unchanged)
         const headerDiv = container.createDiv('github-stars-header');
-        headerDiv.createEl('h2', { text: 'GitHub 星标仓库' });
+        headerDiv.createEl('h2', { text: 'GitHub starred repositories' });
 
         // Toolbar (unchanged structure, button logic remains)
         const toolbarDiv = container.createDiv('github-stars-toolbar');

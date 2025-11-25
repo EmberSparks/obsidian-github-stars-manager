@@ -91,8 +91,9 @@ export class ExportService {
 
             // 执行导出
             return await this.exportSingleRepository(exportData, exportOptions);
-        } catch (_error) {
+        } catch (error) {
             // 静默处理单个仓库导出错误
+            console.debug('Export single repository failed:', error);
             return false;
         }
     }
@@ -234,7 +235,8 @@ export class ExportService {
                 hour: '2-digit',
                 minute: '2-digit'
             });
-        } catch (_error) {
+        } catch (error) {
+            console.debug('Date formatting failed:', error);
             return dateString;
         }
     }

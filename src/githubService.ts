@@ -173,7 +173,7 @@ export class GithubService {
         const errors: { [accountId: string]: string } = {};
         
         if (this.services.size === 0) {
-            new Notice('GitHub Stars Manager: 没有启用的GitHub账号');
+            new Notice('GitHub stars manager: no enabled GitHub accounts');
             return { repositories: [], accountSyncTimes, errors };
         }
         
