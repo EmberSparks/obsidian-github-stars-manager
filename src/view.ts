@@ -1,8 +1,7 @@
 import { ItemView, WorkspaceLeaf, setIcon, Notice } from 'obsidian';
 import GithubStarsPlugin from './main';
-import { GithubRepository, UserRepoEnhancements, GithubAccount } from './types'; // Updated imports
+import { GithubRepository, UserRepoEnhancements, GithubAccount } from './types';
 import { EditRepoModal } from './modal';
-import { ExportModal } from './exportModal';
 import { EmojiUtils } from './emojiUtils';
 
 export const VIEW_TYPE_STARS = 'github-stars-view';
@@ -281,7 +280,7 @@ export class GithubStarsView extends ItemView {
         });
 
         // 3. Sort filtered data
-        let sortedRepos = [...filteredRepos]; // Mutable copy
+        const sortedRepos = [...filteredRepos]; // Mutable copy
         const isDesc = this.sortOrder === 'desc';
         
         switch (this.sortBy) {
@@ -365,7 +364,7 @@ export class GithubStarsView extends ItemView {
             const titleEl = titleGroupEl.createEl('div', { cls: 'github-stars-repo-title' });
             titleEl.createEl('a', {
                 cls: 'github-stars-repo-link',
-                text: repo.full_name || repo.name || 'Unnamed Repo',
+                text: repo.full_name || repo.name || 'Unnamed repo',
                 attr: { href: repo.html_url || '#', target: '_blank' }
             });
 
@@ -503,19 +502,21 @@ export class GithubStarsView extends ItemView {
         const syncButton = toolbarDiv.createEl('button', { cls: 'github-stars-sync-button' });
         setIcon(syncButton, 'refresh-cw');
         syncButton.setAttribute('aria-label', '同步仓库');
-        syncButton.addEventListener('click', async () => {
-            syncButton.setAttribute('disabled', 'true');
-            setIcon(syncButton, 'loader');
-            try {
-                await this.plugin.syncStars(); // Sync logic is now in main.ts
-                new Notice('GitHub 星标同步成功');
-            } catch (error) {
-                new Notice('同步失败，请检查设置和网络连接');
-                console.error('同步失败:', error);
-            } finally {
-                syncButton.removeAttribute('disabled');
-                setIcon(syncButton, 'refresh-cw');
-            }
+        syncButton.addEventListener('click', () => {
+            void (async () => {
+                syncButton.setAttribute('disabled', 'true');
+                setIcon(syncButton, 'loader');
+                try {
+                    await this.plugin.syncStars(); // Sync logic is now in main.ts
+                    new Notice('GitHub 星标同步成功');
+                } catch (error) {
+                    new Notice('同步失败，请检查设置和网络连接');
+                    console.error('同步失败:', error);
+                } finally {
+                    syncButton.removeAttribute('disabled');
+                    setIcon(syncButton, 'refresh-cw');
+                }
+            })();
         });
 
         // Search Input with Clear Button
@@ -649,7 +650,7 @@ export class GithubStarsView extends ItemView {
             const currentTheme = this.plugin.settings.theme;
             const newTheme = currentTheme === 'default' ? 'ios-glass' : 'default';
             this.plugin.settings.theme = newTheme;
-            this.plugin.saveSettings();
+            void this.plugin.saveSettings();
             this.plugin.applyTheme(newTheme);
             this.updateThemeButton(themeButton);
             new Notice(`已切换到${newTheme === 'ios-glass' ? 'iOS液态玻璃' : '默认'}主题`);
@@ -678,7 +679,7 @@ export class GithubStarsView extends ItemView {
                 exportConfirmButton.setAttribute('aria-label', '确认导出');
                 exportConfirmButton.setAttribute('title', '导出选中的仓库');
                 exportConfirmButton.addEventListener('click', () => {
-                    this.exportSelectedRepos();
+                    void this.exportSelectedRepos();
                 });
 
                 const cancelButton = rightButtonsContainer.createEl('button', { cls: 'github-stars-cancel-button' });
@@ -897,21 +898,23 @@ export class GithubStarsView extends ItemView {
             });
             toggleInput.checked = account.enabled;
             
-            toggleInput.addEventListener('change', async () => {
-                account.enabled = toggleInput.checked;
-                await this.plugin.saveSettings();
-                
-                // 更新视觉状态
-                accountEl.toggleClass('disabled', !account.enabled);
-                
-                // 更新按钮文本
-                toggleBtn.textContent = `账号 (${accounts.filter((a: GithubAccount) => a.enabled).length})`;
-                
-                // 显示通知
-                new Notice(`账号 ${account.username} ${account.enabled ? '已启用' : '已禁用'}`);
-                
-                // 重新渲染仓库列表以应用账户过滤
-                this.renderRepositories();
+            toggleInput.addEventListener('change', () => {
+                void (async () => {
+                    account.enabled = toggleInput.checked;
+                    await this.plugin.saveSettings();
+
+                    // 更新视觉状态
+                    accountEl.toggleClass('disabled', !account.enabled);
+
+                    // 更新按钮文本
+                    toggleBtn.textContent = `账号 (${accounts.filter((a: GithubAccount) => a.enabled).length})`;
+
+                    // 显示通知
+                    new Notice(`账号 ${account.username} ${account.enabled ? '已启用' : '已禁用'}`);
+
+                    // 重新渲染仓库列表以应用账户过滤
+                    this.renderRepositories();
+                })();
             });
             
             // 设置初始状态

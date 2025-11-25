@@ -48,6 +48,8 @@ To use this plugin, you need to provide a GitHub Personal Access Token (PAT) wit
 4. Click the "Sync" button to fetch your starred repositories
 5. You can add personal notes, tags, or link repositories to existing Obsidian notes
 
+📖 **[View Detailed Usage Guide](USAGE_GUIDE_EN.md)** | [中文指南](USAGE_GUIDE.md)
+
 ### Theme Switching
 
 The plugin provides two visual themes:
