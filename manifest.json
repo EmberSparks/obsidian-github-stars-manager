@@ -3,7 +3,7 @@
 	"name": "GitHub Stars Manager",
 	"version": "0.1.0",
 	"minAppVersion": "1.0.0",
-	"description": "管理你的 GitHub Stars!",
+	"description": "Manage your GitHub starred repositories in Obsidian",
 	"author": "EmberSparks",
 	"authorUrl": "https://github.com/EmberSparks",
 	"fundingUrl": "https://github.com/sponsors/EmberSparks",
