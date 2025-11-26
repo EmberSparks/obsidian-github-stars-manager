@@ -174,6 +174,7 @@ export class GithubStarsSettingTab extends PluginSettingTab {
                             button.setDisabled(false);
                         }, 2000);
                     } catch (error) {
+                        console.error('Sync failed:', error);
                         button.setButtonText('Sync failed');
                         new Notice('Sync failed, please check your network connection or token settings', 5000);
                         setTimeout(() => {
@@ -440,7 +441,7 @@ export class GithubStarsSettingTab extends PluginSettingTab {
         // 说明文字
         const descEl = containerEl.createDiv('setting-item-description description-margin');
         const p = descEl.createEl('p');
-        p.textContent = 'Configure the Properties (note attributes) template for exporting Markdown files. Supported variables:';
+        p.textContent = 'Configure the properties (note attributes) template for exporting Markdown files. Supported variables:';
 
         const ul = descEl.createEl('ul', { cls: 'setting-item-description-list' });
 
@@ -748,6 +749,7 @@ class AccountModal extends Modal {
                 avatar_url: userData.avatar_url
             });
         } catch (error) {
+            console.error('Token validation failed:', error);
             new Notice('Token validation failed, please check if token is correct');
             saveBtn.textContent = 'Save';
             saveBtn.disabled = false;

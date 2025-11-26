@@ -44,6 +44,7 @@ export class GithubStarsView extends ItemView {
     }
 
     async onOpen(): Promise<void> {
+        await Promise.resolve();
         const container = this.containerEl.children[1];
         container.empty();
         container.classList.add('github-stars-container');
