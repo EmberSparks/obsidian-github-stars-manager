@@ -78,10 +78,10 @@ export class GithubStarsSettingTab extends PluginSettingTab {
         // 向后兼容的单一令牌设置（如果没有配置多账号）
         if (this.plugin.settings.accounts.length === 0) {
             new Setting(containerEl)
-                .setName('GitHub personal access token (PAT)')
+                .setName('GitHub personal access token')
                 .setDesc('Token for accessing your GitHub starred repositories. Requires repo scope permission. It is recommended to use the multi-account management feature above.')
                 .addText(text => text
-                    .setPlaceholder('Enter your GitHub PAT')
+                    .setPlaceholder('Enter your GitHub personal access token')
                     .setValue(this.plugin.settings.githubToken)
                     .onChange(async (value) => {
                         this.plugin.settings.githubToken = value;
@@ -626,12 +626,12 @@ class AccountModal extends Modal {
 
         // 个人访问令牌字段
         const tokenContainer = form.createDiv('form-field');
-        tokenContainer.createEl('label', { text: 'Personal access token (PAT)' });
-        tokenContainer.createEl('div', { text: 'GitHub PAT with repo scope permission required', cls: 'form-field-desc' });
+        tokenContainer.createEl('label', { text: 'Personal access token' });
+        tokenContainer.createEl('div', { text: 'GitHub personal access token with repo scope permission required', cls: 'form-field-desc' });
         this.tokenInput = tokenContainer.createEl('input', {
             type: 'password',
             value: this.account.token || '',
-            placeholder: 'Enter your GitHub PAT'
+            placeholder: 'Enter your GitHub personal access token'
         });
 
         // 添加令牌验证功能
