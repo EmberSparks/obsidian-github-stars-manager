@@ -69,7 +69,7 @@ this.modalEl.addClass('github-stars-edit-modal'); // Add specific class for styl
 
         tagSetting.addText(text => {
             tagInputEl = text.inputEl;
-            text.setPlaceholder('For example: React, TypeScript, learning')
+            text.setPlaceholder('React typeScript learning')
                .setValue(this.tags)
                .onChange(value => {
                    this.tags = value;
