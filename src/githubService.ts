@@ -212,11 +212,24 @@ export class GithubService {
         const successCount = Object.keys(accountSyncTimes).length;
         const errorCount = Object.keys(errors).length;
         const totalRepos = uniqueRepos.length;
-        
+
         if (errorCount === 0) {
             new Notice(`GitHub Stars Manager: 成功同步 ${successCount} 个账号，共 ${totalRepos} 个仓库`);
         } else {
-            new Notice(`GitHub Stars Manager: 同步完成，${successCount} 个成功，${errorCount} 个失败，共 ${totalRepos} 个仓库`);
+            // 显示详细的错误信息
+            const failedAccounts = Object.keys(errors).map(accountId => {
+                const account = this.accounts.find(acc => acc.id === accountId);
+                return account ? `${account.username}` : accountId;
+            }).join('、');
+
+            if (successCount > 0) {
+                new Notice(`同步部分完成：${successCount} 个账号成功，共 ${totalRepos} 个仓库\n失败账号: ${failedAccounts}`, 8000);
+            } else {
+                new Notice(`同步失败：所有账号都无法同步\n失败账号: ${failedAccounts}\n请检查访问令牌是否有效`, 8000);
+            }
+
+            // 在控制台输出详细错误
+            console.error('账号同步错误详情:', errors);
         }
         
         return {
