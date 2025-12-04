@@ -2,6 +2,7 @@ import { App, Modal, Setting, Notice, TFile } from 'obsidian';
 import { GithubRepository, UserRepoEnhancements } from './types'; // Updated imports
 import GithubStarsPlugin from './main';
 import { EmojiUtils } from './emojiUtils';
+import { t } from './i18n';
 
 /**
  * 编辑仓库信息的模态框
@@ -32,7 +33,7 @@ this.modalEl.addClass('github-stars-edit-modal'); // Add specific class for styl
 
         // Title (using githubRepo)
         contentEl.createEl('h2', {
-            text: `Edit repository: ${this.githubRepo.name}`
+            text: `${t('modal.editRepo')}: ${this.githubRepo.name}`
         });
 
         // Basic Repo Info (from githubRepo)
@@ -50,8 +51,8 @@ this.modalEl.addClass('github-stars-edit-modal'); // Add specific class for styl
 
         // Tags Setting
         const tagSetting = new Setting(contentEl)
-            .setName('Tags')
-            .setDesc('Separate tags with commas');
+            .setName(t('modal.tags'))
+            .setDesc(t('modal.tagsDesc'));
 
         let tagInputEl: HTMLInputElement;
         const tagButtons = new Map<string, HTMLButtonElement>(); // Map to store tag buttons
@@ -69,7 +70,7 @@ this.modalEl.addClass('github-stars-edit-modal'); // Add specific class for styl
 
         tagSetting.addText(text => {
             tagInputEl = text.inputEl;
-            text.setPlaceholder('web development, api, tutorial')
+            text.setPlaceholder(t('modal.tagsPlaceholder'))
                .setValue(this.tags)
                .onChange(value => {
                    this.tags = value;
@@ -81,7 +82,7 @@ this.modalEl.addClass('github-stars-edit-modal'); // Add specific class for styl
         const allTags = this.plugin.getAllTags();
         if (allTags.length > 0) {
             const existingTagsContainer = contentEl.createDiv('existing-tags-container');
-            existingTagsContainer.createSpan({ text: 'Select existing tags: ', cls: 'existing-tags-label' });
+            existingTagsContainer.createSpan({ text: t('modal.selectExistingTags'), cls: 'existing-tags-label' });
 
             allTags.forEach(tag => {
                 const tagButton = existingTagsContainer.createEl('button', {
@@ -120,11 +121,10 @@ this.modalEl.addClass('github-stars-edit-modal'); // Add specific class for styl
 
         // Notes Setting
         new Setting(contentEl)
-            .setName('Notes')
-            // .setDesc('关于此仓库的个人笔记') // Removed description
+            .setName(t('modal.notes'))
             .addTextArea(text => {
                 text.inputEl.addClass('edit-repo-notes-textarea'); // Add specific class
-                text.setPlaceholder('Add notes here...')
+                text.setPlaceholder(t('modal.notesPlaceholder'))
                    .setValue(this.notes) // Populated from constructor
                    .onChange(value => {
                        this.notes = value;
@@ -133,17 +133,17 @@ this.modalEl.addClass('github-stars-edit-modal'); // Add specific class for styl
 
         // Linked Note Setting
         new Setting(contentEl)
-            .setName('Link to note')
-            .setDesc('Link to a note in Obsidian')
+            .setName(t('modal.linkedNote'))
+            .setDesc(t('modal.linkedNoteDesc'))
             .addText(text => text
-                .setPlaceholder('Note path')
+                .setPlaceholder(t('modal.notePath'))
                 .setValue(this.linkedNote) // Populated from constructor
                 .onChange(value => {
                     this.linkedNote = value;
                 })
             )
             .addButton(button => button
-                .setButtonText('Browse')
+                .setButtonText(t('modal.browse'))
                 .onClick(() => {
                     this.openNoteBrowser();
                 })
@@ -151,9 +151,9 @@ this.modalEl.addClass('github-stars-edit-modal'); // Add specific class for styl
 
         // Buttons (unchanged structure)
         const buttonDiv = contentEl.createDiv('edit-repo-buttons');
-        const cancelButton = buttonDiv.createEl('button', { text: 'Cancel' });
+        const cancelButton = buttonDiv.createEl('button', { text: t('modal.cancel') });
         cancelButton.addEventListener('click', () => this.close());
-        const saveButton = buttonDiv.createEl('button', { text: 'Save', cls: 'mod-cta' });
+        const saveButton = buttonDiv.createEl('button', { text: t('modal.save'), cls: 'mod-cta' });
         saveButton.addEventListener('click', () => void this.saveChanges());
     }
 
@@ -200,7 +200,7 @@ this.modalEl.addClass('github-stars-edit-modal'); // Add specific class for styl
         // Save the entire plugin data (this will also update allTags)
         await this.plugin.savePluginData(); // savePluginData now calls updateViews internally
 
-        new Notice('仓库信息已更新');
+        new Notice(t('notices.repoUpdated'));
         this.close();
     }
 }
@@ -222,13 +222,13 @@ class NoteSelectorModal extends Modal {
     onOpen() {
         const { contentEl } = this;
 
-        contentEl.createEl('h2', { text: 'Select note' });
+        contentEl.createEl('h2', { text: t('modal.selectNote') });
 
         // 搜索框
         const searchDiv = contentEl.createDiv('note-selector-search');
         this.searchInput = searchDiv.createEl('input', {
             type: 'text',
-            placeholder: 'Search notes...'
+            placeholder: t('modal.searchNotes')
         });
         
         this.searchInput.addEventListener('input', () => {
@@ -258,7 +258,7 @@ class NoteSelectorModal extends Modal {
         
         if (filteredFiles.length === 0) {
             fileListDiv.createEl('div', {
-                text: 'No matching notes',
+                text: t('modal.noMatchingNotes'),
                 cls: 'note-selector-empty'
             });
             return;
