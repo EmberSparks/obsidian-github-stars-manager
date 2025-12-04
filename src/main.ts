@@ -4,6 +4,7 @@ import { DEFAULT_SETTINGS, GithubStarsSettingTab } from './settings';
 import { GithubService } from './githubService';
 import { GithubStarsView, VIEW_TYPE_STARS } from './view';
 import { ExportService } from './exportService';
+import { I18n } from './i18n';
 
 // GitHub星标图标 (不变)
 const GITHUB_STAR_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-star"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>`;
@@ -36,6 +37,9 @@ export default class GithubStarsPlugin extends Plugin {
 
         // 加载合并后的数据
         await this.loadCombinedData();
+
+        // 初始化i18n系统
+        I18n.setLanguage(this.settings.language || 'en');
 
         // 初始化GitHub服务 (支持多账号)
         this.githubService = new GithubService(this.settings.accounts || []);

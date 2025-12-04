@@ -54,6 +54,7 @@ export const DEFAULT_SETTINGS: GithubStarsSettings = {
     autoSync: true,
     syncInterval: 60, // 默认60分钟
     theme: 'default', // 默认主题
+    language: 'en', // 默认语言
     enableExport: true, // 默认启用导出功能
     includeProperties: true, // 默认启用Properties
     propertiesTemplate: DEFAULT_PROPERTIES_TEMPLATE, // 默认Properties模板
@@ -133,6 +134,21 @@ export class GithubStarsSettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                     // 应用主题
                     this.plugin.applyTheme(value);
+                })
+            );
+
+        // 语言设置
+        new Setting(containerEl)
+            .setName('Language')
+            .setDesc('Select display language (requires reload)')
+            .addDropdown(dropdown => dropdown
+                .addOption('en', 'English')
+                .addOption('zh', '简体中文')
+                .setValue(this.plugin.settings.language)
+                .onChange(async (value: 'en' | 'zh') => {
+                    this.plugin.settings.language = value;
+                    await this.plugin.saveSettings();
+                    new Notice('Language will be applied after reloading the plugin');
                 })
             );
 
