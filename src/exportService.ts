@@ -1,6 +1,7 @@
 import { TFile, Vault, normalizePath, Modal, App } from 'obsidian';
 import { GithubRepository, UserRepoEnhancements, ExportOptions, ExportResult, RepoExportData, DEFAULT_EXPORT_OPTIONS } from './types';
 import { EmojiUtils } from './emojiUtils';
+import { t } from './i18n';
 
 /**
  * GitHub Stars 导出服务
@@ -55,7 +56,10 @@ export class ExportService {
                         result.skippedCount++;
                     }
                 } catch (error) {
-                    result.errors.push(`导出 ${exportData.repository.full_name} 失败: ${error.message}`);
+                    result.errors.push(t('export.repoExportFailed', {
+                        name: exportData.repository.full_name,
+                        error: error.message
+                    }));
                     result.skippedCount++;
                 }
             }
@@ -66,7 +70,7 @@ export class ExportService {
 
         } catch (error) {
             result.success = false;
-            result.errors.push(`导出过程失败: ${error.message}`);
+            result.errors.push(t('export.processExportFailed', { error: error.message }));
         }
 
         return result;
@@ -351,40 +355,40 @@ class OverwriteConfirmModal extends Modal {
         contentEl.empty();
 
         // 标题
-        contentEl.createEl('h2', { text: '文件已存在' });
+        contentEl.createEl('h2', { text: t('export.fileExists') });
 
         // 提示信息
         const messageEl = contentEl.createDiv('overwrite-confirm-message');
-        messageEl.createEl('p', { text: '以下文件已存在：' });
+        messageEl.createEl('p', { text: t('export.fileExistsMessage') });
         messageEl.createEl('code', { text: this.filePath });
-        messageEl.createEl('p', { text: '是否要覆盖现有文件？' });
+        messageEl.createEl('p', { text: t('export.fileExistsDesc') });
 
         // 按钮容器
         const buttonContainer = contentEl.createDiv('overwrite-confirm-buttons button-flex-container');
 
         // 跳过按钮
-        const skipButton = buttonContainer.createEl('button', { text: '跳过' });
+        const skipButton = buttonContainer.createEl('button', { text: t('export.skip') });
         skipButton.addEventListener('click', () => {
             this.resolve('skip');
             this.close();
         });
 
         // 跳过全部按钮
-        const skipAllButton = buttonContainer.createEl('button', { text: '跳过全部' });
+        const skipAllButton = buttonContainer.createEl('button', { text: t('export.skipAll') });
         skipAllButton.addEventListener('click', () => {
             this.resolve('skipAll');
             this.close();
         });
 
         // 覆盖按钮
-        const overwriteButton = buttonContainer.createEl('button', { text: '覆盖' });
+        const overwriteButton = buttonContainer.createEl('button', { text: t('export.overwrite') });
         overwriteButton.addEventListener('click', () => {
             this.resolve('overwrite');
             this.close();
         });
 
         // 覆盖全部按钮
-        const overwriteAllButton = buttonContainer.createEl('button', { text: '覆盖全部', cls: 'mod-cta' });
+        const overwriteAllButton = buttonContainer.createEl('button', { text: t('export.overwriteAll'), cls: 'mod-cta' });
         overwriteAllButton.addEventListener('click', () => {
             this.resolve('overwriteAll');
             this.close();

@@ -1,6 +1,7 @@
 import { App, Modal, Notice } from 'obsidian';
 import GithubStarsPlugin from './main';
 import { GithubRepository } from './types';
+import { t } from './i18n';
 
 export class ExportModal extends Modal {
     plugin: GithubStarsPlugin;
@@ -19,18 +20,18 @@ export class ExportModal extends Modal {
         contentEl.empty();
 
         // 标题
-        contentEl.createEl('h2', { text: '批量导出仓库' });
+        contentEl.createEl('h2', { text: t('export.title') });
 
         // 描述
-        contentEl.createEl('p', { 
-            text: '选择要导出为Markdown文件的仓库：',
+        contentEl.createEl('p', {
+            text: t('export.selectRepos'),
             cls: 'export-modal-description'
         });
 
         // 全选/取消全选按钮
         const selectAllContainer = contentEl.createDiv('export-modal-select-all');
         const selectAllButton = selectAllContainer.createEl('button', {
-            text: '全选',
+            text: t('common.selectAll'),
             cls: 'mod-cta export-modal-select-all-btn'
         });
         selectAllButton.addEventListener('click', () => {
@@ -88,10 +89,10 @@ export class ExportModal extends Modal {
 
         // 底部按钮
         const buttonContainer = contentEl.createDiv('export-modal-buttons');
-        
+
         // 导出按钮
         const exportButton = buttonContainer.createEl('button', {
-            text: '导出选中的仓库',
+            text: t('export.exportButton'),
             cls: 'mod-cta export-modal-export-btn'
         });
         exportButton.disabled = true;
@@ -101,7 +102,7 @@ export class ExportModal extends Modal {
 
         // 取消按钮
         const cancelButton = buttonContainer.createEl('button', {
-            text: '取消',
+            text: t('common.cancel'),
             cls: 'export-modal-cancel-btn'
         });
         cancelButton.addEventListener('click', () => {
@@ -136,32 +137,32 @@ export class ExportModal extends Modal {
 
     updateSelectAllButton() {
         if (!this.selectAllButton) return;
-        
+
         const allSelected = this.selectedRepos.size === this.repositories.length;
-        this.selectAllButton.textContent = allSelected ? '取消全选' : '全选';
+        this.selectAllButton.textContent = allSelected ? t('common.deselectAll') : t('common.selectAll');
     }
 
     updateExportButton() {
         if (!this.exportButton) return;
-        
+
         const selectedCount = this.selectedRepos.size;
         this.exportButton.disabled = selectedCount === 0;
-        this.exportButton.textContent = selectedCount > 0 ? `导出 ${selectedCount} 个仓库` : '导出选中的仓库';
+        this.exportButton.textContent = selectedCount > 0 ? t('export.exportCount', { count: String(selectedCount) }) : t('export.exportButton');
     }
 
     async exportSelected() {
         if (this.selectedRepos.size === 0) {
-            new Notice('请先选择要导出的仓库');
+            new Notice(t('export.selectFirst'));
             return;
         }
 
-        const selectedRepositories = this.repositories.filter(repo => 
+        const selectedRepositories = this.repositories.filter(repo =>
             this.selectedRepos.has(repo.id)
         );
 
         // 禁用导出按钮，显示进度
         this.exportButton.disabled = true;
-        this.exportButton.textContent = '导出中...';
+        this.exportButton.textContent = t('export.exporting');
 
         try {
             const exportOptions = {
@@ -176,17 +177,17 @@ export class ExportModal extends Modal {
             );
 
             if (result.success) {
-                new Notice(`导出完成！成功导出 ${result.exportedCount} 个仓库`);
+                new Notice(t('export.success', { count: String(result.exportedCount) }));
             } else {
-                new Notice(`导出完成，但有错误。成功导出 ${result.exportedCount} 个仓库，失败 ${result.errors.length} 个`);
+                new Notice(t('export.partialSuccess', { success: String(result.exportedCount), failed: String(result.errors.length) }));
                 // 导出错误信息已在Notice中显示
             }
 
             this.close();
         } catch (error) {
             console.error('Export failed:', error);
-            new Notice('Export failed, please check path and permission settings', 5000);
-            new Notice('Export failed, please check console for details');
+            new Notice(t('export.failed'), 5000);
+            new Notice(t('export.error'));
 
             // 恢复按钮状态
             this.exportButton.disabled = false;
