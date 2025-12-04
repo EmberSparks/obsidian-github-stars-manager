@@ -792,7 +792,18 @@ export class GithubStarsView extends ItemView {
             cls: 'github-account-toggle-btn',
             text: `账号 (${accounts.filter((a: GithubAccount) => a.enabled).length})`
         });
-        
+
+        // 创建star总数显示元素
+        const totalStarsEl = accountSelectorContainer.createDiv('github-stars-total-count');
+        totalStarsEl.createEl('span', {
+            cls: 'total-stars-icon',
+            text: '⭐'
+        });
+        const totalStarsCount = totalStarsEl.createEl('span', {
+            cls: 'total-stars-number',
+            text: `${this.githubRepositories.length}`
+        });
+
         // 创建折叠内容容器
         const collapsibleContent = accountSelectorContainer.createDiv('github-account-collapsible');
         collapsibleContent.addClass('display-none'); // 初始状态为折叠
