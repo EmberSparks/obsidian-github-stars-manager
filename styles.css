@@ -2032,6 +2032,29 @@
   letter-spacing: 0.3px;
 }
 
+/* star总数显示 */
+.github-stars-total-count {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background-color: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  font-size: 0.85em;
+  color: var(--text-muted);
+}
+
+.total-stars-icon {
+  font-size: 1em;
+  line-height: 1;
+}
+
+.total-stars-number {
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
 /* 折叠内容容器 */
 .github-account-collapsible {
   position: absolute;
@@ -2190,6 +2213,20 @@
   color: var(--text-normal);
   font-weight: 700;
   text-shadow: 0 1px 2px rgba(255, 215, 0, 0.2);
+}
+
+/* iOS主题 - star总数显示 */
+.github-stars-theme-ios-glass .github-stars-total-count {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: var(--ios-glass-blur);
+  -webkit-backdrop-filter: var(--ios-glass-blur);
+  border: 1px solid var(--ios-glass-border);
+  border-radius: 12px;
+}
+
+.github-stars-theme-ios-glass .total-stars-number {
+  color: var(--text-normal);
+  font-weight: 600;
 }
 
 .github-stars-theme-ios-glass .github-account-collapsible {
