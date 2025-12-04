@@ -1,6 +1,7 @@
 import { Octokit } from '@octokit/rest';
 import { Notice } from 'obsidian';
 import { GithubRepository, GithubAccount } from './types';
+import { t } from './i18n';
 
 // 添加GitHub API响应类型
 interface StarredRepoItem extends Partial<GithubRepository> {
@@ -173,7 +174,7 @@ export class GithubService {
         const errors: { [accountId: string]: string } = {};
         
         if (this.services.size === 0) {
-            new Notice('GitHub stars manager: no enabled GitHub accounts');
+            new Notice(t('sync.noAccounts'));
             return { repositories: [], accountSyncTimes, errors };
         }
         
@@ -188,9 +189,9 @@ export class GithubService {
                 
                 return { repos, accountId, error: null };
             } catch (error) {
-                const errorMsg = `同步失败: ${error instanceof Error ? error.message : '未知错误'}`;
+                const errorMsg = error instanceof Error ? error.message : 'Unknown error';
                 errors[accountId] = errorMsg;
-                console.error(`账号 ${account.username} 同步失败:`, error);
+                console.error(`Account ${account.username} sync failed:`, error);
                 return { repos: [], accountId, error: errorMsg };
             }
         });
@@ -212,11 +213,28 @@ export class GithubService {
         const successCount = Object.keys(accountSyncTimes).length;
         const errorCount = Object.keys(errors).length;
         const totalRepos = uniqueRepos.length;
-        
+
         if (errorCount === 0) {
-            new Notice(`GitHub Stars Manager: 成功同步 ${successCount} 个账号，共 ${totalRepos} 个仓库`);
+            new Notice(t('sync.success', { count: String(successCount), repos: String(totalRepos) }));
         } else {
-            new Notice(`GitHub Stars Manager: 同步完成，${successCount} 个成功，${errorCount} 个失败，共 ${totalRepos} 个仓库`);
+            // 显示详细的错误信息
+            const failedAccounts = Object.keys(errors).map(accountId => {
+                const account = this.accounts.find(acc => acc.id === accountId);
+                return account ? `${account.username}` : accountId;
+            }).join(', ');
+
+            if (successCount > 0) {
+                new Notice(t('sync.partialSuccess', {
+                    success: String(successCount),
+                    repos: String(totalRepos),
+                    failed: failedAccounts
+                }), 8000);
+            } else {
+                new Notice(t('sync.failed', { failed: failedAccounts }), 8000);
+            }
+
+            // 在控制台输出详细错误
+            console.error('Account sync error details:', errors);
         }
         
         return {
@@ -265,12 +283,12 @@ export class GithubService {
             if (userInfo) {
                 return { valid: true, userInfo };
             } else {
-                return { valid: false, error: '无法获取用户信息' };
+                return { valid: false, error: 'Unable to fetch user information' };
             }
         } catch (error) {
-            return { 
-                valid: false, 
-                error: error instanceof Error ? error.message : '验证失败' 
+            return {
+                valid: false,
+                error: error instanceof Error ? error.message : 'Validation failed'
             };
         }
     }
