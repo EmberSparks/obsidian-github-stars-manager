@@ -508,7 +508,7 @@ export class GithubStarsView extends ItemView {
                 setIcon(syncButton, 'loader');
                 try {
                     await this.plugin.syncStars(); // Sync logic is now in main.ts
-                    new Notice('GitHub 星标同步成功');
+                    // 移除了重复的成功通知，githubService已经会显示详细的同步结果
                 } catch (error) {
                     new Notice('同步失败，请检查设置和网络连接');
                     console.error('同步失败:', error);
