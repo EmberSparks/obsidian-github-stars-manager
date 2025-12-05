@@ -56,7 +56,7 @@ export default class GithubStarsPlugin extends Plugin {
         );
         // 添加功能区图标 (不变)
         this.addRibbonIcon('github-star', 'GitHub stars', () => {
-            void this.activateView();
+            this.activateView().catch(err => console.error('Failed to activate view:', err));
         });
 
         // 添加插件命令 (不变)
@@ -164,7 +164,7 @@ export default class GithubStarsPlugin extends Plugin {
         if (this.settings.autoSync && this.settings.syncInterval > 0) {
             const intervalMillis = this.settings.syncInterval * 60 * 1000;
             this.syncIntervalId = window.setInterval(() => {
-                void this.syncStars();
+                this.syncStars().catch(err => console.error('Auto sync failed:', err));
             }, intervalMillis);
             this.registerInterval(this.syncIntervalId);
         }
@@ -183,14 +183,14 @@ export default class GithubStarsPlugin extends Plugin {
             id: 'sync-github-stars',
             name: t('plugin.syncCommandName'),
             callback: () => {
-                void this.syncStars();
+                this.syncStars().catch(err => console.error('Sync command failed:', err));
             }
         });
         this.addCommand({
             id: 'open-github-stars-view',
             name: t('plugin.openViewCommandName'),
             callback: () => {
-                void this.activateView();
+                this.activateView().catch(err => console.error('Open view command failed:', err));
             }
         });
 
@@ -198,7 +198,7 @@ export default class GithubStarsPlugin extends Plugin {
             id: 'export-all-stars',
             name: t('plugin.exportAllCommandName'),
             callback: () => {
-                void this.exportAllStars();
+                this.exportAllStars().catch(err => console.error('Export command failed:', err));
             }
         });
     }

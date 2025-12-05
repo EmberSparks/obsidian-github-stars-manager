@@ -220,7 +220,7 @@ export class GithubStarsSettingTab extends PluginSettingTab {
                 .setButtonText(t('settings.addAccountButton'))
                 .setCta()
                 .onClick(() => {
-                    void this.showAddAccountModal();
+                    this.showAddAccountModal().catch(err => console.error('Failed to show add account modal:', err));
                 })
             );
 
@@ -304,7 +304,7 @@ export class GithubStarsSettingTab extends PluginSettingTab {
                 cls: 'github-account-btn edit'
             });
             editBtn.addEventListener('click', () => {
-                void this.showEditAccountModal(account, index);
+                this.showEditAccountModal(account, index).catch(err => console.error('Failed to show edit account modal:', err));
             });
 
             // 删除按钮
@@ -715,7 +715,7 @@ class AccountModal extends Modal {
         });
 
         saveBtn.addEventListener('click', () => {
-            void this.saveAccount(saveBtn);
+            this.saveAccount(saveBtn).catch(err => console.error('Failed to save account:', err));
         });
 
         // 设置焦点

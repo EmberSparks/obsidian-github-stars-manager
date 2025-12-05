@@ -44,8 +44,7 @@ export class GithubStarsView extends ItemView {
         return 'star';
     }
 
-    async onOpen(): Promise<void> {
-        await Promise.resolve();
+    onOpen(): Promise<void> {
         const container = this.containerEl.children[1];
         container.empty();
         container.classList.add('github-stars-container');
@@ -69,6 +68,8 @@ export class GithubStarsView extends ItemView {
 
         // Initial rendering of repositories
         this.renderRepositories();
+
+        return Promise.resolve();
     }
 
     /**
@@ -490,7 +491,9 @@ export class GithubStarsView extends ItemView {
                 });
                 link.addEventListener('click', (ev) => {
                     ev.preventDefault();
-                    void this.app.workspace.openLinkText(repo.linked_note!, '', false);
+                    this.app.workspace.openLinkText(repo.linked_note!, '', false).catch(err =>
+                        console.error('Failed to open linked note:', err)
+                    );
                 });
             }
         });
@@ -652,7 +655,7 @@ export class GithubStarsView extends ItemView {
             const currentTheme = this.plugin.settings.theme;
             const newTheme = currentTheme === 'default' ? 'ios-glass' : 'default';
             this.plugin.settings.theme = newTheme;
-            void this.plugin.saveSettings();
+            this.plugin.saveSettings().catch(err => console.error('Failed to save theme settings:', err));
             this.plugin.applyTheme(newTheme);
             this.updateThemeButton(themeButton);
             const themeName = newTheme === 'ios-glass' ? t('view.theme.iosGlass') : t('view.theme.default');
@@ -682,7 +685,7 @@ export class GithubStarsView extends ItemView {
                 exportConfirmButton.setAttribute('aria-label', t('view.confirmExport'));
                 exportConfirmButton.setAttribute('title', t('view.exportSelected'));
                 exportConfirmButton.addEventListener('click', () => {
-                    void this.exportSelectedRepos();
+                    this.exportSelectedRepos().catch(err => console.error('Failed to export selected repos:', err));
                 });
 
                 const cancelButton = rightButtonsContainer.createEl('button', { cls: 'github-stars-cancel-button' });
@@ -802,7 +805,7 @@ export class GithubStarsView extends ItemView {
             cls: 'total-stars-icon',
             text: '⭐'
         });
-        const totalStarsCount = totalStarsEl.createEl('span', {
+        totalStarsEl.createEl('span', {
             cls: 'total-stars-number',
             text: `${this.githubRepositories.length}`
         });
