@@ -17,7 +17,7 @@ export const en = {
 
     // View
     view: {
-        title: 'GitHub Stars',
+        title: 'GitHub stars',
         syncButton: 'Sync repositories',
         searchPlaceholder: 'Search repositories...',
         clearSearch: 'Clear search',
@@ -47,9 +47,9 @@ export const en = {
         theme: {
             toggle: 'Toggle theme',
             switchToDefault: 'Switch to default theme',
-            switchToIosGlass: 'Switch to iOS Glass theme',
+            switchToIosGlass: 'Switch to iOS glass theme',
             default: 'default',
-            iosGlass: 'iOS Glass',
+            iosGlass: 'iOS glass',
         },
     },
 
@@ -80,7 +80,7 @@ export const en = {
 
     // Modal
     modal: {
-        editRepo: 'Edit Repository',
+        editRepo: 'Edit repository',
         notes: 'Notes',
         notesPlaceholder: 'Add your notes here...',
         tags: 'Tags',
@@ -215,8 +215,8 @@ export const en = {
         themeDesc: 'Select the plugin interface theme',
         themeDefault: 'Default',
         themeDefaultOption: 'Default theme',
-        themeIosGlass: 'iOS Glass',
-        themeIosGlassOption: 'iOS Glass',
+        themeIosGlass: 'iOS glass',
+        themeIosGlassOption: 'iOS glass',
 
         // Language settings
         languageHeading: 'Language',

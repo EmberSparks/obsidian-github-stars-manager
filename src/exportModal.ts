@@ -97,7 +97,7 @@ export class ExportModal extends Modal {
         });
         exportButton.disabled = true;
         exportButton.addEventListener('click', () => {
-            void this.exportSelected();
+            this.exportSelected().catch(err => console.error('Failed to export selected:', err));
         });
 
         // 取消按钮
