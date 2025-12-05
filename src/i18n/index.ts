@@ -34,12 +34,11 @@ export class I18n {
      */
     static t(keyPath: string, variables?: Record<string, string | number>): string {
         const keys = keyPath.split('.');
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        let value: any = translations[this.currentLanguage];
+        let value: unknown = translations[this.currentLanguage];
 
         for (const key of keys) {
             if (typeof value === 'object' && value !== null && key in value) {
-                value = value[key];
+                value = (value as Record<string, unknown>)[key];
             } else {
                 console.warn(`Translation key not found: ${keyPath}`);
                 return keyPath;
