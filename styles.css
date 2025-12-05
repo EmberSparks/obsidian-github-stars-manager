@@ -1762,6 +1762,9 @@
 .github-account-selector {
   position: relative;
   margin-left: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 /* 添加账号按钮 */
@@ -1786,28 +1789,65 @@
 
 /* 折叠按钮 */
 .github-account-toggle-btn {
-  background-color: transparent;
+  background: linear-gradient(135deg, var(--background-secondary) 0%, var(--background-primary) 100%);
   border: 1px solid var(--background-modifier-border);
   color: var(--text-muted);
-  border-radius: 6px;
-  padding: 6px 12px;
+  border-radius: 8px;
+  padding: 7px 14px;
   cursor: pointer;
   font-size: 0.85em;
-  font-weight: 500;
-  transition: all 0.2s ease;
+  font-weight: 600;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
 .github-account-toggle-btn:hover {
-  background-color: var(--background-modifier-hover);
+  background: var(--background-modifier-hover);
   border-color: var(--interactive-accent);
   color: var(--interactive-accent);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
 }
 
 .github-account-toggle-btn.expanded {
-  background-color: var(--interactive-accent);
+  background: linear-gradient(135deg, var(--interactive-accent) 0%, var(--interactive-accent-hover) 100%);
   border-color: var(--interactive-accent);
   color: var(--text-on-accent);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* star总数显示 */
+.github-stars-total-count {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 12px;
+  background: linear-gradient(135deg, rgba(255, 215, 0, 0.1) 0%, rgba(255, 165, 0, 0.05) 100%);
+  border: 1px solid rgba(255, 215, 0, 0.3);
+  border-radius: 8px;
+  font-size: 0.85em;
+  color: var(--text-muted);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 3px rgba(255, 215, 0, 0.1);
+}
+
+.github-stars-total-count:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(255, 215, 0, 0.2);
+  border-color: rgba(255, 215, 0, 0.5);
+}
+
+.total-stars-icon {
+  font-size: 1.1em;
+  line-height: 1;
+  filter: drop-shadow(0 1px 2px rgba(255, 215, 0, 0.3));
+}
+
+.total-stars-number {
+  font-weight: 700;
+  color: var(--text-normal);
+  letter-spacing: 0.3px;
 }
 
 /* 折叠内容容器 */
@@ -1923,23 +1963,51 @@
 }
 
 .github-stars-theme-ios-glass .github-account-toggle-btn {
-  background: rgba(255, 255, 255, 0.1);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.08) 100%);
   backdrop-filter: var(--ios-glass-blur);
   -webkit-backdrop-filter: var(--ios-glass-blur);
   border: 1px solid var(--ios-glass-border);
-  border-radius: 12px;
+  border-radius: 14px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
 .github-stars-theme-ios-glass .github-account-toggle-btn:hover {
-  background: rgba(255, 255, 255, 0.15);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.12) 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 
 .github-stars-theme-ios-glass .github-account-toggle-btn.expanded {
-  background: linear-gradient(135deg, var(--ios-glass-accent) 0%, rgba(0, 122, 255, 0.7) 100%);
-  border-color: rgba(0, 122, 255, 0.3);
+  background: linear-gradient(135deg, var(--ios-glass-accent) 0%, rgba(0, 122, 255, 0.8) 100%);
+  border-color: rgba(0, 122, 255, 0.4);
   color: white;
+  box-shadow: 0 4px 16px rgba(0, 122, 255, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+/* iOS主题 - star总数显示 */
+.github-stars-theme-ios-glass .github-stars-total-count {
+  background: linear-gradient(135deg, rgba(255, 215, 0, 0.2) 0%, rgba(255, 165, 0, 0.15) 100%);
+  backdrop-filter: var(--ios-glass-blur);
+  -webkit-backdrop-filter: var(--ios-glass-blur);
+  border: 1px solid rgba(255, 215, 0, 0.4);
+  border-radius: 14px;
+  box-shadow: 0 2px 12px rgba(255, 215, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.github-stars-theme-ios-glass .github-stars-total-count:hover {
+  background: linear-gradient(135deg, rgba(255, 215, 0, 0.25) 0%, rgba(255, 165, 0, 0.2) 100%);
+  border-color: rgba(255, 215, 0, 0.6);
+  box-shadow: 0 6px 20px rgba(255, 215, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.github-stars-theme-ios-glass .total-stars-icon {
+  filter: drop-shadow(0 2px 4px rgba(255, 215, 0, 0.4));
+}
+
+.github-stars-theme-ios-glass .total-stars-number {
+  color: var(--text-normal);
+  font-weight: 700;
+  text-shadow: 0 1px 2px rgba(255, 215, 0, 0.2);
 }
 
 .github-stars-theme-ios-glass .github-account-collapsible {

@@ -510,7 +510,7 @@ export class GithubStarsView extends ItemView {
                 setIcon(syncButton, 'loader');
                 try {
                     await this.plugin.syncStars(); // Sync logic is now in main.ts
-                    new Notice(t('sync.success'));
+                    // 移除了重复的成功通知，githubService已经会显示详细的同步结果
                 } catch (error) {
                     new Notice(t('sync.error'));
                     console.error('同步失败:', error);
@@ -795,7 +795,18 @@ export class GithubStarsView extends ItemView {
             cls: 'github-account-toggle-btn',
             text: `${t('view.accountsLabel')} (${accounts.filter((a: GithubAccount) => a.enabled).length})`
         });
-        
+
+        // 创建star总数显示元素
+        const totalStarsEl = accountSelectorContainer.createDiv('github-stars-total-count');
+        totalStarsEl.createEl('span', {
+            cls: 'total-stars-icon',
+            text: '⭐'
+        });
+        const totalStarsCount = totalStarsEl.createEl('span', {
+            cls: 'total-stars-number',
+            text: `${this.githubRepositories.length}`
+        });
+
         // 创建折叠内容容器
         const collapsibleContent = accountSelectorContainer.createDiv('github-account-collapsible');
         collapsibleContent.addClass('display-none'); // 初始状态为折叠
