@@ -14,6 +14,7 @@ export class EditRepoModal extends Modal {
     tags: string;
     notes: string;
     linkedNote: string;
+    linkedNoteInputEl?: HTMLInputElement; // Store reference to input element
 
     constructor(app: App, plugin: GithubStarsPlugin, githubRepo: GithubRepository) {
         super(app);
@@ -135,13 +136,15 @@ this.modalEl.addClass('github-stars-edit-modal'); // Add specific class for styl
         new Setting(contentEl)
             .setName(t('modal.linkedNote'))
             .setDesc(t('modal.linkedNoteDesc'))
-            .addText(text => text
-                .setPlaceholder(t('modal.notePath'))
-                .setValue(this.linkedNote) // Populated from constructor
-                .onChange(value => {
-                    this.linkedNote = value;
-                })
-            )
+            .addText(text => {
+                text.setPlaceholder(t('modal.notePath'))
+                    .setValue(this.linkedNote) // Populated from constructor
+                    .onChange(value => {
+                        this.linkedNote = value;
+                    });
+                // Store reference to input element for later use
+                this.linkedNoteInputEl = text.inputEl;
+            })
             .addButton(button => button
                 .setButtonText(t('modal.browse'))
                 .onClick(() => {
@@ -169,10 +172,9 @@ this.modalEl.addClass('github-stars-edit-modal'); // Add specific class for styl
         const files = this.app.vault.getMarkdownFiles();
         const modal = new NoteSelectorModal(this.app, files, (file) => {
             this.linkedNote = file.path;
-            // Update the input field directly
-            const inputEl = this.contentEl.querySelector('.setting-item:nth-child(4) input') as HTMLInputElement; // Adjusted selector if needed
-            if (inputEl) {
-                inputEl.value = file.path;
+            // Update the input field using stored reference
+            if (this.linkedNoteInputEl) {
+                this.linkedNoteInputEl.value = file.path;
             }
         });
         modal.open();
