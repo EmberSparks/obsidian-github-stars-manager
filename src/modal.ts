@@ -157,7 +157,9 @@ this.modalEl.addClass('github-stars-edit-modal'); // Add specific class for styl
         const cancelButton = buttonDiv.createEl('button', { text: t('modal.cancel') });
         cancelButton.addEventListener('click', () => this.close());
         const saveButton = buttonDiv.createEl('button', { text: t('modal.save'), cls: 'mod-cta' });
-        saveButton.addEventListener('click', () => this.saveChanges().catch(err => console.error('Failed to save changes:', err)));
+        saveButton.addEventListener('click', () => {
+            void this.saveChanges();
+        });
     }
 
     onClose() {
