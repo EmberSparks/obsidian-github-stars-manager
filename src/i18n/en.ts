@@ -67,8 +67,8 @@ export const en = {
     repo: {
         stars: 'stars',
         forks: 'forks',
-        updated: 'Updated',
-        language: 'Language',
+        updated: 'updated',
+        language: 'language',
         addNote: 'Add note',
         editNote: 'Edit note',
         addTags: 'Add tags',
@@ -81,9 +81,9 @@ export const en = {
     // Modal
     modal: {
         editRepo: 'Edit repository',
-        notes: 'Notes',
+        notes: 'notes',
         notesPlaceholder: 'Add your notes here...',
-        tags: 'Tags',
+        tags: 'tags',
         tagsDesc: 'Separate tags with commas',
         tagsPlaceholder: 'web development, api, tutorial',
         selectExistingTags: 'Select existing tags:',
@@ -138,13 +138,13 @@ export const en = {
         noAccountsMessage: 'No GitHub accounts configured. Click the button above to add an account.',
 
         // Account item
-        accountEnabled: 'Enabled',
-        accountDisabled: 'Disabled',
+        accountEnabled: 'enabled',
+        accountDisabled: 'disabled',
         enabled: 'enabled',
         disabled: 'disabled',
         lastSync: 'Last sync:',
-        validate: 'Validate',
-        remove: 'Remove',
+        validate: 'validate',
+        remove: 'remove',
         validating: 'Validating...',
         valid: 'Token valid',
         invalid: 'Token invalid',
