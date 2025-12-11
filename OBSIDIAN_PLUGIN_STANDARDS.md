@@ -5,6 +5,7 @@
 ## 1. 代码质量规范 (Code Quality Standards)
 
 ### 1.1 Console 方法限制
+
 **规则**: 只允许使用 `console.warn()`, `console.error()`, 和 `console.debug()`
 
 **禁止**: `console.log()`, `console.info()`, `console.trace()`
@@ -23,6 +24,7 @@ console.error('Error occurred');
 ```
 
 ### 1.2 类型安全
+
 **规则**: 避免使用 `any` 类型，为所有变量、参数和返回值指定明确的类型
 
 ```typescript
@@ -48,9 +50,11 @@ function process(data: unknown): string {
 **特殊说明**: 如果确实需要动态类型，使用 `unknown` 类型并配合类型守卫，不要使用 `eslint-disable` 注释
 
 ### 1.3 Promise 处理
+
 **规则**: 所有 Promise 必须被正确处理
 
 处理方式：
+
 1. 在 async 函数中使用 `await`
 2. 添加 `.catch()` 错误处理器
 3. 添加 `.then()` 和 rejection 处理器
@@ -79,6 +83,7 @@ async function example() {
 ```
 
 ### 1.4 Async/Await 使用
+
 **规则**: 只有在函数包含 `await` 表达式时才使用 `async` 关键字
 
 ```typescript
@@ -94,6 +99,7 @@ onOpen(): void {
 ```
 
 ### 1.5 TypeScript 注解禁用
+
 **规则**: 避免使用 `eslint-disable` 或 `@ts-ignore` 等禁用类型检查的注释
 
 ```typescript
@@ -114,6 +120,7 @@ if (typeof value === 'object' && value !== null) {
 ## 2. UI 文本规范 (UI Text Standards)
 
 ### 2.1 句式大小写 (Sentence Case)
+
 **规则**: 所有 UI 文本必须使用句式大小写（首字母大写，其余小写，专有名词除外）
 
 ```typescript
@@ -129,7 +136,9 @@ if (typeof value === 'object' && value !== null) {
 ```
 
 ### 2.2 设置标题规范
+
 **规则**:
+
 - 不要在设置标题中包含插件名称
 - 不要在设置标签标题中使用"settings"一词
 
@@ -144,6 +153,7 @@ if (typeof value === 'object' && value !== null) {
 ```
 
 ### 2.3 设置 UI 一致性
+
 **规则**: 使用 Obsidian 的 Setting API 创建标题，不要直接创建 HTML 标题元素
 
 ```typescript
@@ -157,6 +167,7 @@ new Setting(containerEl)
 ```
 
 ### 2.4 占位符文本
+
 **规则**: 占位符文本也必须使用句式大小写，使用有意义的示例
 
 ```typescript
@@ -170,6 +181,7 @@ placeholder: 'web development, api, tutorial'  // 句式大小写
 ## 3. 命名和文档规范 (Naming and Documentation)
 
 ### 3.1 项目命名
+
 **规则**: 不要在项目名称中使用"Obsidian"前缀（该前缀为第一方产品保留）
 
 ```markdown
@@ -181,6 +193,7 @@ placeholder: 'web development, api, tutorial'  // 句式大小写
 ```
 
 ### 3.2 Manifest 描述
+
 **规则**: 在 manifest.json 的描述中不要包含"in Obsidian"或类似短语
 
 ```json
@@ -191,11 +204,12 @@ placeholder: 'web development, api, tutorial'  // 句式大小写
 
 // ✅ 正确
 {
-    "description": "Manage your GitHub starred repositories"
+    "description": "Manage your GitHub starred repositories."
 }
 ```
 
 ### 3.3 版权信息
+
 **规则**: 确保 LICENSE 文件中的版权信息正确，包含实际作者和当前年份
 
 ```
@@ -210,6 +224,7 @@ Permission is hereby granted...
 ## 4. API 使用规范 (API Usage)
 
 ### 4.1 网络请求
+
 **规则**: 使用 Obsidian 的 `requestUrl()` 而不是原生的 `fetch()`
 
 **原因**: 安全性和与 Obsidian 请求处理的兼容性
@@ -228,6 +243,7 @@ const response = await requestUrl({
 ```
 
 ### 4.2 浏览器 API
+
 **规则**: 避免使用原生浏览器确认对话框，使用 Obsidian 的 Modal API
 
 **禁止**: `confirm()`, `alert()`, `prompt()`
@@ -247,6 +263,7 @@ new ConfirmModal(
 ```
 
 ### 4.3 DOM 操作安全
+
 **规则**: 避免不安全的 DOM 操作
 
 **禁止**: `innerHTML`, `document.write`, `eval()`
@@ -261,6 +278,7 @@ div.textContent = userInput;
 ```
 
 ### 4.4 已弃用的方法
+
 **规则**: 不要使用已弃用的 JavaScript 方法
 
 ```typescript
@@ -274,6 +292,7 @@ const result = text.substring(0, 10);
 ## 5. 生命周期管理 (Lifecycle Management)
 
 ### 5.1 插件卸载
+
 **规则**: 不要在 `onunload()` 中 detach leaves
 
 **原因**: 这会将 leaf 重置到默认位置
@@ -294,6 +313,7 @@ onunload() {
 ## 6. CSS 规范 (CSS Standards)
 
 ### 6.1 CSS 选择器
+
 **规则**: 避免使用脆弱的 CSS 选择器（如 nth-child），为需要样式的元素添加特定的类名或 ID
 
 ```css
@@ -318,7 +338,9 @@ const input = containerEl.createEl('input', {
 ## 7. 国际化规范 (Internationalization)
 
 ### 7.1 语言一致性
+
 **规则**:
+
 - 实现 i18n 系统以支持多语言，或
 - 保持单一语言（推荐英语）
 
@@ -335,7 +357,9 @@ button.textContent = t('sync.button');
 ```
 
 ### 7.2 i18n 实现建议
+
 如果实现 i18n 系统：
+
 - 使用键值对存储翻译
 - 支持变量替换
 - 提供语言切换功能
@@ -362,6 +386,7 @@ export const translations = {
 ## 8. 安全规范 (Security Standards)
 
 ### 8.1 敏感数据处理
+
 **规则**: 不要提交包含敏感信息的文件（.env, credentials.json 等）
 
 ```gitignore
@@ -375,7 +400,9 @@ secrets.json
 ```
 
 ### 8.2 用户输入验证
+
 **规则**: 始终验证和清理用户输入，特别是在以下情况：
+
 - 插入到 DOM 之前
 - 用于网络请求之前
 - 存储到文件系统之前
@@ -394,6 +421,7 @@ function saveUsername(input: string) {
 ## 9. 错误处理规范 (Error Handling)
 
 ### 9.1 错误信息
+
 **规则**: 提供清晰、有用的错误消息，避免暴露敏感信息
 
 ```typescript
@@ -410,6 +438,7 @@ catch (error) {
 ```
 
 ### 9.2 错误日志
+
 **规则**: 使用 `console.error()` 或 `console.warn()` 记录错误详情供调试使用
 
 ```typescript
@@ -424,6 +453,7 @@ try {
 ## 10. 测试和质量保证 (Testing and QA)
 
 ### 10.1 编译检查
+
 **规则**: 提交前确保代码通过 TypeScript 编译
 
 ```bash
@@ -432,7 +462,9 @@ npx tsc --noEmit
 ```
 
 ### 10.2 清理代码
+
 **规则**: 在提交前：
+
 - 移除未使用的导入
 - 移除未使用的变量
 - 移除注释掉的代码
@@ -441,6 +473,7 @@ npx tsc --noEmit
 ## 11. Git 提交规范 (Git Commit Standards)
 
 ### 11.1 提交消息格式
+
 **规则**: 使用清晰、描述性的提交消息
 
 ```bash
@@ -460,7 +493,9 @@ chore: update dependencies
 ```
 
 ### 11.2 提交内容
+
 **规则**:
+
 - 每个提交应该是一个逻辑单元
 - 避免在一个提交中混合多个不相关的更改
 - 确保每个提交都能通过编译

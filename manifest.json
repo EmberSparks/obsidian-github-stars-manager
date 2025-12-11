@@ -3,7 +3,7 @@
 	"name": "GitHub Stars Manager",
 	"version": "0.1.0",
 	"minAppVersion": "1.0.0",
-	"description": "Manage your GitHub starred repositories",
+	"description": "Manage your GitHub starred repositories.",
 	"author": "EmberSparks",
 	"authorUrl": "https://github.com/EmberSparks",
 	"fundingUrl": "https://github.com/sponsors/EmberSparks",
