@@ -21,7 +21,7 @@ export const en = {
         syncButton: 'Sync repositories',
         searchPlaceholder: 'Search repositories...',
         clearSearch: 'Clear search',
-        addAccount: '+ Add account',
+        addAccount: 'Add account',
         accountsLabel: 'Accounts',
         exportMode: 'Export mode',
         exitExportMode: 'Exit export mode',
