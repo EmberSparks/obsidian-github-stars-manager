@@ -48,7 +48,7 @@ export const en = {
             toggle: 'Toggle theme',
             switchToDefault: 'Switch to default theme',
             switchToIosGlass: 'Switch to iOS glass theme',
-            default: 'default',
+            default: 'Default',
             iosGlass: 'iOS glass',
         },
     },
@@ -65,10 +65,10 @@ export const en = {
 
     // Repository
     repo: {
-        stars: 'stars',
-        forks: 'forks',
-        updated: 'updated',
-        language: 'language',
+        stars: 'Stars',
+        forks: 'Forks',
+        updated: 'Updated',
+        language: 'Language',
         addNote: 'Add note',
         editNote: 'Edit note',
         addTags: 'Add tags',
@@ -81,11 +81,11 @@ export const en = {
     // Modal
     modal: {
         editRepo: 'Edit repository',
-        notes: 'notes',
+        notes: 'Notes',
         notesPlaceholder: 'Add your notes here...',
-        tags: 'tags',
+        tags: 'Tags',
         tagsDesc: 'Separate tags with commas',
-        tagsPlaceholder: 'web development, api, tutorial',
+        tagsPlaceholder: 'Web development, API, tutorial',
         selectExistingTags: 'Select existing tags:',
         linkedNote: 'Linked note',
         linkedNoteDesc: 'Link to a note in Obsidian',
@@ -138,13 +138,13 @@ export const en = {
         noAccountsMessage: 'No GitHub accounts configured. Click the button above to add an account.',
 
         // Account item
-        accountEnabled: 'enabled',
-        accountDisabled: 'disabled',
-        enabled: 'enabled',
-        disabled: 'disabled',
+        accountEnabled: 'Enabled',
+        accountDisabled: 'Disabled',
+        enabled: 'Enabled',
+        disabled: 'Disabled',
         lastSync: 'Last sync:',
-        validate: 'validate',
-        remove: 'remove',
+        validate: 'Validate',
+        remove: 'Remove',
         validating: 'Validating...',
         valid: 'Token valid',
         invalid: 'Token invalid',
