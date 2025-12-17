@@ -497,8 +497,17 @@ export class GithubStarsView extends ItemView {
 
             // Notes (from enhancement) - show below footer if exists
             if (repo.notes) {
-                const notesEl = repoEl.createEl('div', { cls: 'github-stars-repo-notes' });
-                EmojiUtils.setEmojiText(notesEl, repo.notes); // 使用 EmojiUtils 渲染用户笔记中的 emoji
+                const notesContainer = repoEl.createEl('div', { cls: 'github-stars-repo-notes' });
+
+                // 添加笔记图标
+                notesContainer.createEl('span', {
+                    cls: 'github-stars-repo-notes-icon',
+                    text: '📝'
+                });
+
+                // 添加笔记内容
+                const contentEl = notesContainer.createEl('div', { cls: 'github-stars-repo-notes-content' });
+                EmojiUtils.setEmojiText(contentEl, repo.notes); // 使用 EmojiUtils 渲染用户笔记中的 emoji
             }
 
             // Linked Note (from enhancement)

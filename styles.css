@@ -669,15 +669,49 @@
   color: white;
 }
 
+/* 笔记容器 - 现代卡片风格 */
 .github-stars-repo-notes {
-    margin-top: 8px;
-    padding: 8px;
-    border-radius: 6px;
-    background-color: var(--background-secondary);
-    font-size: 0.85em;
-    color: var(--text-muted);
-    font-style: italic;
+    margin-top: 12px;
+    padding: 12px 14px;
+    border-radius: 8px;
+    background: linear-gradient(135deg,
+        var(--background-secondary) 0%,
+        var(--background-secondary-alt) 100%);
+    border: 1px solid var(--background-modifier-border);
     border-left: 3px solid var(--interactive-accent);
+    box-shadow:
+        0 2px 4px rgba(0, 0, 0, 0.06),
+        0 4px 12px rgba(0, 0, 0, 0.08);
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+.github-stars-repo-notes:hover {
+    box-shadow:
+        0 4px 8px rgba(0, 0, 0, 0.1),
+        0 8px 20px rgba(0, 0, 0, 0.12);
+    border-color: var(--interactive-accent);
+    border-left-color: var(--interactive-accent-hover);
+    transform: translateY(-1px);
+}
+
+/* 笔记图标 */
+.github-stars-repo-notes-icon {
+    font-size: 1.1em;
+    line-height: 1;
+    flex-shrink: 0;
+    opacity: 0.8;
+}
+
+/* 笔记内容 */
+.github-stars-repo-notes-content {
+    flex: 1;
+    font-size: 0.9em;
+    color: var(--text-normal);
+    line-height: 1.5;
+    word-wrap: break-word;
 }
 
 .github-stars-repo-linked-note {
@@ -1531,6 +1565,129 @@
     color: var(--text-error);
     border-color: var(--text-error);
     background: var(--background-modifier-error);
+}
+
+/* 标签芯片输入组件样式 */
+.tag-chips-input-wrapper {
+    margin-top: 8px;
+    margin-bottom: 16px;
+}
+
+.tag-chips-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    min-height: 40px;
+    background: var(--background-primary);
+    align-items: center;
+}
+
+.tag-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+    border-radius: var(--radius-s);
+    font-size: var(--font-ui-small);
+    line-height: 1.4;
+}
+
+.tag-chip-remove {
+    cursor: pointer;
+    opacity: 0.7;
+    font-size: 16px;
+    line-height: 1;
+    padding: 0 2px;
+    transition: opacity 0.1s ease;
+}
+
+.tag-chip-remove:hover {
+    opacity: 1;
+}
+
+.tag-input {
+    flex: 1;
+    min-width: 120px;
+    border: none;
+    outline: none;
+    background: transparent;
+    padding: 4px;
+    font-size: var(--font-ui-small);
+    color: var(--text-normal);
+}
+
+.tag-input::placeholder {
+    color: var(--text-muted);
+}
+
+.tag-suggestions {
+    position: fixed;
+    background: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 1000;
+    box-shadow: var(--shadow-s);
+}
+
+.tag-suggestion-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: var(--font-ui-small);
+    transition: background-color 0.1s ease;
+}
+
+.tag-suggestion-item:hover,
+.tag-suggestion-item.selected {
+    background: var(--background-modifier-hover);
+}
+
+/* 可用标签选择器样式 */
+.available-tags-container {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--background-modifier-border);
+}
+
+.available-tags-label {
+    display: block;
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+    margin-bottom: 8px;
+}
+
+.available-tag-button {
+    background-color: var(--background-secondary);
+    border: 1px solid var(--background-modifier-border);
+    color: var(--text-normal);
+    padding: 4px 10px;
+    margin-right: 6px;
+    margin-bottom: 6px;
+    border-radius: var(--radius-s);
+    cursor: pointer;
+    font-size: var(--font-ui-small);
+    transition: all 0.15s ease;
+}
+
+.available-tag-button:hover {
+    background-color: var(--background-modifier-hover);
+    border-color: var(--interactive-accent);
+}
+
+.available-tag-button.active {
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent);
+    border-color: var(--interactive-accent-hover);
+}
+
+.available-tag-button.active:hover {
+    background-color: var(--interactive-accent-hover);
 }
 
 /* 账号信息显示区域样式 */
