@@ -298,6 +298,87 @@ export class GithubStarsSettingTab extends PluginSettingTab {
             // 操作按钮
             const actionsEl = accountEl.createDiv('github-account-actions');
 
+            // 测试令牌按钮
+            const testBtn = actionsEl.createEl('button', {
+                text: '测试',
+                cls: 'github-account-btn test'
+            });
+            testBtn.addEventListener('click', () => {
+                void (async () => {
+                    testBtn.textContent = '测试中...';
+                    testBtn.disabled = true;
+
+                    try {
+                        const response = await requestUrl({
+                            url: 'https://api.github.com/user',
+                            method: 'GET',
+                            headers: {
+                                'Authorization': `token ${account.token}`,
+                                'User-Agent': 'Obsidian-GitHub-Stars-Manager'
+                            }
+                        });
+
+                        if (response.status === 200) {
+                            // 检查令牌过期时间
+                            const rateResponse = await requestUrl({
+                                url: 'https://api.github.com/rate_limit',
+                                method: 'GET',
+                                headers: {
+                                    'Authorization': `token ${account.token}`,
+                                    'User-Agent': 'Obsidian-GitHub-Stars-Manager'
+                                }
+                            });
+
+                            let expiryInfo = '';
+                            const expiresHeader = response.headers['github-authentication-token-expiration'];
+                            if (expiresHeader) {
+                                const expiryDate = new Date(expiresHeader);
+                                const now = new Date();
+                                const daysLeft = Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+
+                                if (daysLeft > 0) {
+                                    expiryInfo = `\n过期时间: ${expiryDate.toLocaleDateString()} (剩余${daysLeft}天)`;
+                                } else {
+                                    expiryInfo = '\n令牌已过期';
+                                }
+                            } else {
+                                expiryInfo = '\n无过期时间 (经典令牌)';
+                            }
+
+                            const rateData = rateResponse.json;
+                            const rateLimitInfo = `\nAPI限额: ${rateData.rate.remaining}/${rateData.rate.limit}`;
+
+                            new Notice(`✅ 令牌有效${expiryInfo}${rateLimitInfo}`, 8000);
+                            testBtn.textContent = '✓ 有效';
+                            testBtn.addClass('test-success');
+                            setTimeout(() => {
+                                testBtn.textContent = '测试';
+                                testBtn.removeClass('test-success');
+                            }, 3000);
+                        } else {
+                            new Notice('❌ 令牌无效或已过期', 5000);
+                            testBtn.textContent = '✗ 无效';
+                            testBtn.addClass('test-error');
+                            setTimeout(() => {
+                                testBtn.textContent = '测试';
+                                testBtn.removeClass('test-error');
+                            }, 3000);
+                        }
+                    } catch (error) {
+                        console.error('Token test failed:', error);
+                        new Notice('❌ 令牌测试失败: ' + (error instanceof Error ? error.message : '未知错误'), 5000);
+                        testBtn.textContent = '✗ 错误';
+                        testBtn.addClass('test-error');
+                        setTimeout(() => {
+                            testBtn.textContent = '测试';
+                            testBtn.removeClass('test-error');
+                        }, 3000);
+                    } finally {
+                        testBtn.disabled = false;
+                    }
+                })();
+            });
+
             // 编辑按钮
             const editBtn = actionsEl.createEl('button', {
                 text: t('common.edit'),

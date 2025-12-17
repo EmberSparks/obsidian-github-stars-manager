@@ -22,6 +22,7 @@ export class GithubStarsView extends ItemView {
     showAllTags: boolean = false; // Add state for showing all tags
     selectedRepos: Set<number> = new Set(); // 选中的仓库ID集合
     isExportMode: boolean = false; // 是否处于导出模式
+    totalStarsNumberEl: HTMLElement | null = null; // star总数显示元素
 
     constructor(leaf: WorkspaceLeaf, plugin: GithubStarsPlugin) {
         super(leaf);
@@ -365,11 +366,31 @@ export class GithubStarsView extends ItemView {
             const titleGroupEl = headerEl.createEl('div', { cls: 'github-stars-repo-title-group' });
             
             const titleEl = titleGroupEl.createEl('div', { cls: 'github-stars-repo-title' });
-            titleEl.createEl('a', {
-                cls: 'github-stars-repo-link',
-                text: repo.full_name || repo.name || 'Unnamed repo',
-                attr: { href: repo.html_url || '#', target: '_blank' }
+
+            // 创建可点击的项目名称链接
+            const linkEl = titleEl.createEl('div', {
+                cls: 'github-stars-repo-link'
             });
+            linkEl.textContent = repo.full_name || repo.name || 'Unnamed repo';
+
+            // 添加点击事件处理，打开外部链接
+            linkEl.onclick = () => {
+                if (repo.html_url) {
+                    // 在桌面版使用 electron.shell，移动版使用 window.open
+                    try {
+                        // @ts-ignore - Electron API
+                        const { shell } = require('electron');
+                        shell.openExternal(repo.html_url).catch(() => {
+                            // 如果 electron 方式失败，尝试 window.open
+                            window.open(repo.html_url, '_blank');
+                        });
+                    } catch {
+                        // 如果不在 Electron 环境，使用 window.open
+                        window.open(repo.html_url, '_blank');
+                    }
+                }
+                return false;
+            };
 
             // Tags in title group (moved from below description)
             if (Array.isArray(repo.tags) && repo.tags.length > 0) {
@@ -497,6 +518,9 @@ export class GithubStarsView extends ItemView {
                 });
             }
         });
+
+        // 更新star总数显示
+        this.updateTotalStarsCount();
     }
 
     /**
@@ -805,10 +829,13 @@ export class GithubStarsView extends ItemView {
             cls: 'total-stars-icon',
             text: '⭐'
         });
-        totalStarsEl.createEl('span', {
+        const totalStarsNumber = totalStarsEl.createEl('span', {
             cls: 'total-stars-number',
-            text: `${this.githubRepositories.length}`
+            text: `${this.getVisibleRepoCount()}`
         });
+
+        // 保存引用以便更新
+        this.totalStarsNumberEl = totalStarsNumber;
 
         // 创建折叠内容容器
         const collapsibleContent = accountSelectorContainer.createDiv('github-account-collapsible');
@@ -1165,16 +1192,32 @@ githubRepo.id] || {};
     clearInvisibleSelections() {
         const visibleRepoIds = this.getFilteredRepositories().map(repo => repo.id);
         const invisibleSelections = Array.from(this.selectedRepos).filter(repoId => !visibleRepoIds.includes(repoId));
-        
+
         // 移除不可见仓库的选择状态
         invisibleSelections.forEach(repoId => {
             this.selectedRepos.delete(repoId);
         });
-        
+
         // 更新按钮状态
         if (invisibleSelections.length > 0) {
             this.updateExportConfirmButton();
             this.updateSelectAllButton();
+        }
+    }
+
+    /**
+     * 获取当前可见的仓库数量（考虑过滤）
+     */
+    getVisibleRepoCount(): number {
+        return this.getFilteredRepositories().length;
+    }
+
+    /**
+     * 更新star总数显示
+     */
+    updateTotalStarsCount() {
+        if (this.totalStarsNumberEl) {
+            this.totalStarsNumberEl.textContent = `${this.getVisibleRepoCount()}`;
         }
     }
 } // End of GithubStarsView class

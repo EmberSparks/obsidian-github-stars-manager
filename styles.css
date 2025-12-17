@@ -448,6 +448,10 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    pointer-events: auto;
+    cursor: pointer;
+    position: relative;
+    z-index: 10;
 }
 
 .github-stars-repo-link:hover {
@@ -1505,6 +1509,27 @@
 }
 
 .github-account-btn.delete:hover {
+    background: var(--background-modifier-error);
+}
+
+.github-account-btn.test {
+    color: var(--text-accent);
+    border-color: var(--text-accent);
+}
+
+.github-account-btn.test:hover {
+    background: var(--background-modifier-hover);
+}
+
+.github-account-btn.test-success {
+    color: var(--text-success);
+    border-color: var(--text-success);
+    background: var(--background-success-rgb);
+}
+
+.github-account-btn.test-error {
+    color: var(--text-error);
+    border-color: var(--text-error);
     background: var(--background-modifier-error);
 }
 
