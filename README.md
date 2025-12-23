@@ -2,25 +2,44 @@
 
 [![GitHub release](https://img.shields.io/github/release/EmberSparks/obsidian-github-stars-manager.svg)](https://github.com/EmberSparks/obsidian-github-stars-manager/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Obsidian Downloads](https://img.shields.io/badge/dynamic/json?logo=obsidian&color=%23483699&label=downloads&query=%24%5B%22github-stars-manager%22%5D.downloads&url=https%3A%2F%2Fraw.githubusercontent.com%2Fobsidianmd%2Fobsidian-releases%2Fmaster%2Fcommunity-plugin-stats.json)](https://obsidian.md/plugins?id=github-stars-manager)
 
-[English README](README_en.md)
+[English README](README_en.md) | [使用指南](USAGE_GUIDE.md) | [English Guide](USAGE_GUIDE_EN.md)
 
-本插件允许您直接在 Obsidian 中管理和查看您已加星标的 GitHub 仓库，支持多账号管理和自定义主题。
+一个功能强大的 Obsidian 插件，让您可以直接在 Obsidian 中管理和查看 GitHub 星标仓库，支持多账号管理、自定义标签、智能搜索和精美主题。
 
-## 功能特性
+## ✨ 核心功能
 
+### 📊 仓库管理
 - 📋 在 Obsidian 中查看所有已加星标的 GitHub 仓库
-- 👥 **多账号支持**：支持添加多个 GitHub 账号，同时同步多个账号的星标
-- 🏷️ 为仓库添加自定义标签和笔记
-- 🔗 关联仓库到 Obsidian 笔记
-- 🔄 自动或手动同步星标仓库
-- 🔍 通过名称、语言、标签进行搜索和筛选
-- 📊 按星标时间、名称、语言等多种方式排序
-- 🎨 多种主题支持：默认主题和液态玻璃主题
+- 👥 **多账号支持**：同时管理多个 GitHub 账号的星标
+- ⭐ **星标统计**：实时显示仓库总数和星标数量
+- 🔄 智能同步：自动或手动同步星标仓库
 - 🔄 **账号管理**：可单独启用/禁用特定账号的同步
+
+### 🏷️ 个性化标注
+- 🏷️ **Tag Chips 组件**：直观的标签芯片输入，支持快速选择已有标签
+- 📝 为仓库添加自定义标签和笔记
+- 🔗 关联仓库到 Obsidian 笔记文件
+- 💾 所有标注数据本地存储，保护隐私
+
+### 🔍 智能搜索与筛选
+- 🔎 通过名称、描述、语言、标签进行实时搜索
+- 🎯 支持正则表达式和模糊匹配
+- 📊 按星标时间、名称、语言、星标数等多维度排序
+- 🏷️ 基于标签的高级筛选
+
+### 🎨 精美主题
+- 🎨 **默认主题**：简洁的卡片布局，与 Obsidian 原生主题完美融合
 - 🌊 **液态玻璃主题**：iOS 风格的毛玻璃效果，支持动态背景和光泽动画
-- 📱 瀑布流布局：类似小红书的卡片展示方式
-- ✨ 响应式设计，与 Obsidian 主题完美融合
+- 📱 响应式瀑布流布局：类似 Pinterest 的卡片展示方式
+- ✨ 平滑动画和悬停效果
+
+### 🔒 安全与隐私
+- 🔐 使用 GitHub Personal Access Token 进行安全认证
+- 💾 所有数据本地存储，不上传到任何第三方服务器
+- 🛡️ 符合 Obsidian 插件商店安全标准
+- ✅ 通过 eslint-plugin-obsidianmd 全部规则验证
 
 ## 配置
 
@@ -141,7 +160,16 @@ npm run version
 
 ## 更新日志
 
-### v0.1.0 (当前版本)
+### v0.1.1 (当前版本)
+- 🏷️ 新增 Tag Chips 输入组件，支持快速选择标签
+- ⭐ 添加星标总数显示功能
+- 🎨 增强笔记卡片可见性和 UI 样式
+- 🔧 启用全部 25 个 eslint-plugin-obsidianmd 规则
+- 🐛 修复 token 错误处理和提示信息
+- 🛡️ 通过 Obsidian 插件商店安全审核
+- 🤖 配置 pre-commit hook 和 GitHub Actions CI/CD
+
+### v0.1.0
 - ✨ 初始版本发布
 - 🎯 多账号 GitHub Stars 管理
 - 🎨 液态玻璃主题支持

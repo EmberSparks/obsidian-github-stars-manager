@@ -1,26 +1,45 @@
-[简体中文 README](README.md)
-
 # GitHub Stars Manager
 
 [![GitHub release](https://img.shields.io/github/release/EmberSparks/obsidian-github-stars-manager.svg)](https://github.com/EmberSparks/obsidian-github-stars-manager/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Obsidian Downloads](https://img.shields.io/badge/dynamic/json?logo=obsidian&color=%23483699&label=downloads&query=%24%5B%22github-stars-manager%22%5D.downloads&url=https%3A%2F%2Fraw.githubusercontent.com%2Fobsidianmd%2Fobsidian-releases%2Fmaster%2Fcommunity-plugin-stats.json)](https://obsidian.md/plugins?id=github-stars-manager)
 
-This plugin allows you to manage and view your starred GitHub repositories directly within Obsidian, with multi-account support and custom themes.
+[简体中文 README](README.md) | [Usage Guide](USAGE_GUIDE_EN.md) | [使用指南](USAGE_GUIDE.md)
 
-## Features
+A powerful Obsidian plugin that allows you to manage and view your GitHub starred repositories directly within Obsidian, with multi-account support, custom tags, smart search, and beautiful themes.
 
+## ✨ Core Features
+
+### 📊 Repository Management
 - 📋 View all your starred GitHub repositories within Obsidian
-- 👥 **Multi-account support**: Add multiple GitHub accounts and sync stars from all accounts simultaneously
-- 🏷️ Add custom tags and notes to repositories
-- 🔗 Link repositories to Obsidian notes
-- 🔄 Automatic or manual synchronization of starred repositories
-- 🔍 Search and filter by name, language, tags
-- 📊 Sort by starred time, name, language, and more
-- 🎨 Multiple theme support: Default theme and Liquid Glass theme
+- 👥 **Multi-account support**: Manage stars from multiple GitHub accounts simultaneously
+- ⭐ **Star statistics**: Real-time display of total repository count and stars
+- 🔄 Smart sync: Automatic or manual synchronization of starred repositories
 - 🔄 **Account management**: Enable/disable sync for specific accounts individually
+
+### 🏷️ Personalization
+- 🏷️ **Tag Chips Component**: Intuitive tag chip input with quick selection of existing tags
+- 📝 Add custom tags and notes to repositories
+- 🔗 Link repositories to Obsidian note files
+- 💾 All annotation data stored locally for privacy protection
+
+### 🔍 Smart Search & Filter
+- 🔎 Real-time search by name, description, language, tags
+- 🎯 Support for regular expressions and fuzzy matching
+- 📊 Multi-dimensional sorting: by star time, name, language, star count, etc.
+- 🏷️ Advanced filtering based on tags
+
+### 🎨 Beautiful Themes
+- 🎨 **Default Theme**: Clean card layout that integrates seamlessly with Obsidian's native theme
 - 🌊 **Liquid Glass Theme**: iOS-style frosted glass effect with dynamic backgrounds and shimmer animations
-- 📱 Waterfall layout: Instagram-style card display
-- ✨ Responsive design that integrates seamlessly with Obsidian themes
+- 📱 Responsive waterfall layout: Pinterest-style card display
+- ✨ Smooth animations and hover effects
+
+### 🔒 Security & Privacy
+- 🔐 Secure authentication using GitHub Personal Access Token
+- 💾 All data stored locally, no upload to any third-party servers
+- 🛡️ Compliant with Obsidian plugin store security standards
+- ✅ Passed all eslint-plugin-obsidianmd rule validations
 
 ## Configuration
 
@@ -130,7 +149,16 @@ npm run version
 
 ## Changelog
 
-### v0.1.0 (Current Version)
+### v0.1.1 (Current Version)
+- 🏷️ Added Tag Chips input component with quick tag selection
+- ⭐ Added total stars count display feature
+- 🎨 Enhanced note card visibility and UI styling
+- 🔧 Enabled all 25 eslint-plugin-obsidianmd rules
+- 🐛 Fixed token error handling and error messages
+- 🛡️ Passed Obsidian plugin store security review
+- 🤖 Configured pre-commit hooks and GitHub Actions CI/CD
+
+### v0.1.0
 - ✨ Initial release
 - 🎯 Multi-account GitHub Stars management
 - 🎨 Liquid Glass theme support
