@@ -3,6 +3,7 @@ import GithubStarsPlugin from './main';
 import { GithubRepository, UserRepoEnhancements, GithubAccount } from './types';
 import { EditRepoModal } from './modal';
 import { EmojiUtils } from './emojiUtils';
+import { t } from './i18n';
 
 export const VIEW_TYPE_STARS = 'github-stars-view';
 
@@ -21,6 +22,7 @@ export class GithubStarsView extends ItemView {
     showAllTags: boolean = false; // Add state for showing all tags
     selectedRepos: Set<number> = new Set(); // 选中的仓库ID集合
     isExportMode: boolean = false; // 是否处于导出模式
+    totalStarsNumberEl: HTMLElement | null = null; // star总数显示元素
 
     constructor(leaf: WorkspaceLeaf, plugin: GithubStarsPlugin) {
         super(leaf);
@@ -36,21 +38,21 @@ export class GithubStarsView extends ItemView {
     }
 
     getDisplayText(): string {
-        return 'GitHub Stars';
+        return t('view.title');
     }
 
     getIcon(): string {
         return 'star';
     }
 
-    async onOpen(): Promise<void> {
+    onOpen(): Promise<void> {
         const container = this.containerEl.children[1];
         container.empty();
         container.classList.add('github-stars-container');
 
         // Header (unchanged)
         const headerDiv = container.createDiv('github-stars-header');
-        headerDiv.createEl('h2', { text: 'GitHub 星标仓库' });
+        headerDiv.createEl('h2', { text: t('view.title') });
 
         // Toolbar (unchanged structure, button logic remains)
         const toolbarDiv = container.createDiv('github-stars-toolbar');
@@ -67,6 +69,8 @@ export class GithubStarsView extends ItemView {
 
         // Initial rendering of repositories
         this.renderRepositories();
+
+        return Promise.resolve();
     }
 
     /**
@@ -99,30 +103,30 @@ export class GithubStarsView extends ItemView {
      * 格式化相对时间显示 (如 "2天前", "1个月前")
      */
     private formatRelativeTime(dateString: string): string {
-        if (!dateString) return '未知';
-        
+        if (!dateString) return t('time.unknown');
+
         const now = new Date();
         const date = new Date(dateString);
         const diffMs = now.getTime() - date.getTime();
         const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-        
+
         if (diffDays === 0) {
             const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
             if (diffHours === 0) {
                 const diffMinutes = Math.floor(diffMs / (1000 * 60));
-                return diffMinutes <= 1 ? '刚刚' : `${diffMinutes}分钟前`;
+                return diffMinutes <= 1 ? t('time.justNow') : t('time.minutesAgo', { n: diffMinutes });
             }
-            return `${diffHours}小时前`;
+            return t('time.hoursAgo', { n: diffHours });
         } else if (diffDays === 1) {
-            return '1天前';
+            return t('time.daysAgo', { n: 1 });
         } else if (diffDays < 30) {
-            return `${diffDays}天前`;
+            return t('time.daysAgo', { n: diffDays });
         } else if (diffDays < 365) {
             const diffMonths = Math.floor(diffDays / 30);
-            return `${diffMonths}个月前`;
+            return t('time.monthsAgo', { n: diffMonths });
         } else {
             const diffYears = Math.floor(diffDays / 365);
-            return `${diffYears}年前`;
+            return t('time.yearsAgo', { n: diffYears });
         }
     }
 
@@ -134,7 +138,7 @@ export class GithubStarsView extends ItemView {
 
         const currentTags = this.allTags || [];
         if (currentTags.length === 0) {
-            container.createSpan({ text: '无标签' });
+            container.createSpan({ text: t('view.noTags') });
             return;
         }
 
@@ -192,7 +196,7 @@ export class GithubStarsView extends ItemView {
         if (currentTags.length > maxVisibleTags) {
             const moreButton = container.createEl('span', {
                 cls: 'github-stars-tag-more',
-                text: this.showAllTags ? '收起' : `更多 (+${currentTags.length - maxVisibleTags})`
+                text: this.showAllTags ? t('view.showLess') : t('view.showMore') + ` (+${currentTags.length - maxVisibleTags})`
             });
 
             moreButton.addEventListener('click', (e) => {
@@ -226,7 +230,7 @@ export class GithubStarsView extends ItemView {
         this.repoContainer.empty();
 
         if (!this.githubRepositories || this.githubRepositories.length === 0) {
-            this.repoContainer.createEl('div', { cls: 'github-stars-empty', text: '没有星标仓库。点击同步按钮从GitHub获取。' });
+            this.repoContainer.createEl('div', { cls: 'github-stars-empty', text: t('view.noRepos') });
             return;
         }
 
@@ -316,7 +320,7 @@ export class GithubStarsView extends ItemView {
 
         // 4. Render the sorted and filtered repositories
         if (sortedRepos.length === 0) {
-            this.repoContainer.createEl('div', { cls: 'github-stars-empty', text: '没有匹配的仓库。' });
+            this.repoContainer.createEl('div', { cls: 'github-stars-empty', text: t('view.noMatchingRepos') });
             return;
         }
 
@@ -362,11 +366,21 @@ export class GithubStarsView extends ItemView {
             const titleGroupEl = headerEl.createEl('div', { cls: 'github-stars-repo-title-group' });
             
             const titleEl = titleGroupEl.createEl('div', { cls: 'github-stars-repo-title' });
-            titleEl.createEl('a', {
-                cls: 'github-stars-repo-link',
-                text: repo.full_name || repo.name || 'Unnamed repo',
-                attr: { href: repo.html_url || '#', target: '_blank' }
+
+            // 创建可点击的项目名称链接
+            const linkEl = titleEl.createEl('div', {
+                cls: 'github-stars-repo-link'
             });
+            linkEl.textContent = repo.full_name || repo.name || 'Unnamed repo';
+
+            // 添加点击事件处理，打开外部链接
+            linkEl.onclick = () => {
+                if (repo.html_url) {
+                    // 使用 window.open 打开外部链接（桌面版和移动版都支持）
+                    window.open(repo.html_url, '_blank');
+                }
+                return false;
+            };
 
             // Tags in title group (moved from below description)
             if (Array.isArray(repo.tags) && repo.tags.length > 0) {
@@ -459,7 +473,7 @@ export class GithubStarsView extends ItemView {
             // Edit Button (like "安装" button in the image)
             const editButton = footerEl.createEl('button', {
                 cls: 'github-stars-repo-edit',
-                text: '编辑'
+                text: t('view.editRepo')
             });
             editButton.addEventListener('click', () => {
                 const originalGithubRepo = this.githubRepositories.find(r => r.id === repo.id);
@@ -467,14 +481,23 @@ export class GithubStarsView extends ItemView {
                     this.openEditModal(originalGithubRepo);
                 } else {
                     console.error("Could not find original GitHub repo data for ID:", repo.id);
-                    new Notice("无法编辑此仓库信息");
+                    new Notice(t('view.cannotEditRepo'));
                 }
             });
 
             // Notes (from enhancement) - show below footer if exists
             if (repo.notes) {
-                const notesEl = repoEl.createEl('div', { cls: 'github-stars-repo-notes' });
-                EmojiUtils.setEmojiText(notesEl, repo.notes); // 使用 EmojiUtils 渲染用户笔记中的 emoji
+                const notesContainer = repoEl.createEl('div', { cls: 'github-stars-repo-notes' });
+
+                // 添加笔记图标
+                notesContainer.createEl('span', {
+                    cls: 'github-stars-repo-notes-icon',
+                    text: '📝'
+                });
+
+                // 添加笔记内容
+                const contentEl = notesContainer.createEl('div', { cls: 'github-stars-repo-notes-content' });
+                EmojiUtils.setEmojiText(contentEl, repo.notes); // 使用 EmojiUtils 渲染用户笔记中的 emoji
             }
 
             // Linked Note (from enhancement)
@@ -488,10 +511,15 @@ export class GithubStarsView extends ItemView {
                 });
                 link.addEventListener('click', (ev) => {
                     ev.preventDefault();
-                    this.app.workspace.openLinkText(repo.linked_note!, '', false);
+                    this.app.workspace.openLinkText(repo.linked_note!, '', false).catch(err =>
+                        console.error('Failed to open linked note:', err)
+                    );
                 });
             }
         });
+
+        // 更新star总数显示
+        this.updateTotalStarsCount();
     }
 
     /**
@@ -501,7 +529,7 @@ export class GithubStarsView extends ItemView {
         // Sync Button (logic unchanged)
         const syncButton = toolbarDiv.createEl('button', { cls: 'github-stars-sync-button' });
         setIcon(syncButton, 'refresh-cw');
-        syncButton.setAttribute('aria-label', '同步仓库');
+        syncButton.setAttribute('aria-label', t('view.syncButton'));
         syncButton.addEventListener('click', () => {
             void (async () => {
                 syncButton.setAttribute('disabled', 'true');
@@ -510,7 +538,7 @@ export class GithubStarsView extends ItemView {
                     await this.plugin.syncStars(); // Sync logic is now in main.ts
                     // 移除了重复的成功通知，githubService已经会显示详细的同步结果
                 } catch (error) {
-                    new Notice('同步失败，请检查设置和网络连接');
+                    new Notice(t('sync.error'));
                     console.error('同步失败:', error);
                 } finally {
                     syncButton.removeAttribute('disabled');
@@ -524,14 +552,14 @@ export class GithubStarsView extends ItemView {
         
         this.searchInput = searchContainer.createEl('input', {
             cls: 'github-stars-search',
-            attr: { type: 'text', placeholder: '搜索仓库...' }
+            attr: { type: 'text', placeholder: t('view.searchPlaceholder') }
         });
-        
+
         const clearButton = searchContainer.createEl('button', {
             cls: 'github-stars-search-clear'
         });
-        clearButton.setAttribute('aria-label', '清除搜索');
-        clearButton.setAttribute('title', '清除搜索内容');
+        clearButton.setAttribute('aria-label', t('view.clearSearch'));
+        clearButton.setAttribute('title', t('view.clearSearch'));
         
         // 初始状态隐藏清除按钮
         clearButton.addClass('hidden');
@@ -573,12 +601,12 @@ export class GithubStarsView extends ItemView {
 
         // Sort Button Group - Four individual radio-style buttons
         const sortButtonGroup = toolbarDiv.createDiv('github-stars-sort-group');
-        
+
         const sortOptions = [
-            { key: 'starred_at', icon: 'calendar-clock', title: '最近添加' },
-            { key: 'stars', icon: 'star', title: 'Star数量' },
-            { key: 'forks', icon: 'git-fork', title: 'Fork数量' },
-            { key: 'updated', icon: 'clock', title: '最近更新' }
+            { key: 'starred_at', icon: 'calendar-clock', title: t('view.sortBy.starred') },
+            { key: 'stars', icon: 'star', title: t('view.sortBy.stars') },
+            { key: 'forks', icon: 'git-fork', title: t('view.sortBy.forks') },
+            { key: 'updated', icon: 'clock', title: t('view.sortBy.updated') }
         ] as const;
         
         sortOptions.forEach(option => {
@@ -592,15 +620,15 @@ export class GithubStarsView extends ItemView {
             const iconSpan = buttonContent.createSpan('sort-icon');
             setIcon(iconSpan, option.icon);
             
-            // 添加排序方向指示器
+            // 添加��序方向指示器
             const directionSpan = buttonContent.createSpan('sort-direction');
             if (isActive) {
                 setIcon(directionSpan, this.sortOrder === 'desc' ? 'chevron-down' : 'chevron-up');
             }
-            
-            const orderText = this.sortOrder === 'desc' ? '降序' : '升序';
-            sortButton.setAttribute('aria-label', `按${option.title}${orderText}排序`);
-            sortButton.setAttribute('title', `按${option.title}${orderText}排序`);
+
+            const orderText = this.sortOrder === 'desc' ? t('view.sortBy.desc') : t('view.sortBy.asc');
+            sortButton.setAttribute('aria-label', `${option.title} ${orderText}`);
+            sortButton.setAttribute('title', `${option.title} ${orderText}`);
             
             sortButton.addEventListener('click', () => {
                 if (this.sortBy === option.key) {
@@ -628,7 +656,7 @@ export class GithubStarsView extends ItemView {
                         dirSpan.empty();
                         setIcon(dirSpan, this.sortOrder === 'desc' ? 'chevron-down' : 'chevron-up');
                         btn.addClass('active');
-                        btn.setAttribute('title', `按${opt.title}${this.sortOrder === 'desc' ? '降序' : '升序'}排序`);
+                        btn.setAttribute('title', `按${opt.title}${this.sortOrder === 'desc' ? t('view.sortBy.desc') : t('view.sortBy.asc')}排序`);
                     } else {
                         dirSpan.empty();
                         btn.removeClass('active');
@@ -636,8 +664,8 @@ export class GithubStarsView extends ItemView {
                     }
                 });
                 
-                const orderText = this.sortOrder === 'desc' ? '降序' : '升序';
-                new Notice(`按${option.title}${orderText}排序`);
+                const orderText = this.sortOrder === 'desc' ? t('view.sortBy.desc') : t('view.sortBy.asc');
+                new Notice(t('notices.sortByNotice', { sortBy: option.title, order: orderText }));
                 this.renderRepositories();
             });
         });
@@ -645,15 +673,16 @@ export class GithubStarsView extends ItemView {
         // Theme Toggle Button
         const themeButton = toolbarDiv.createEl('button', { cls: 'github-stars-theme-button' });
         this.updateThemeButton(themeButton);
-        themeButton.setAttribute('aria-label', '切换主题');
+        themeButton.setAttribute('aria-label', t('view.theme.toggle'));
         themeButton.addEventListener('click', () => {
             const currentTheme = this.plugin.settings.theme;
             const newTheme = currentTheme === 'default' ? 'ios-glass' : 'default';
             this.plugin.settings.theme = newTheme;
-            void this.plugin.saveSettings();
+            this.plugin.saveSettings().catch(err => console.error('Failed to save theme settings:', err));
             this.plugin.applyTheme(newTheme);
             this.updateThemeButton(themeButton);
-            new Notice(`已切换到${newTheme === 'ios-glass' ? 'iOS液态玻璃' : '默认'}主题`);
+            const themeName = newTheme === 'ios-glass' ? t('view.theme.iosGlass') : t('view.theme.default');
+            new Notice(t('notices.themeSwitch', { theme: themeName }));
         });
 
         // 在工具栏中添加账户选择器
@@ -668,24 +697,24 @@ export class GithubStarsView extends ItemView {
                 // 导出模式下显示全选/反选和确认导出按钮
                 const selectAllButton = rightButtonsContainer.createEl('button', { cls: 'github-stars-select-all-button' });
                 setIcon(selectAllButton, 'check-square');
-                selectAllButton.setAttribute('aria-label', '全选/反选');
-                selectAllButton.setAttribute('title', '全选或反选所有仓库');
+                selectAllButton.setAttribute('aria-label', t('common.selectAll'));
+                selectAllButton.setAttribute('title', t('common.selectAll'));
                 selectAllButton.addEventListener('click', () => {
                     this.toggleSelectAll();
                 });
 
                 const exportConfirmButton = rightButtonsContainer.createEl('button', { cls: 'github-stars-export-confirm-button' });
                 setIcon(exportConfirmButton, 'download');
-                exportConfirmButton.setAttribute('aria-label', '确认导出');
-                exportConfirmButton.setAttribute('title', '导出选中的仓库');
+                exportConfirmButton.setAttribute('aria-label', t('view.confirmExport'));
+                exportConfirmButton.setAttribute('title', t('view.exportSelected'));
                 exportConfirmButton.addEventListener('click', () => {
-                    void this.exportSelectedRepos();
+                    this.exportSelectedRepos().catch(err => console.error('Failed to export selected repos:', err));
                 });
 
                 const cancelButton = rightButtonsContainer.createEl('button', { cls: 'github-stars-cancel-button' });
                 setIcon(cancelButton, 'x');
-                cancelButton.setAttribute('aria-label', '取消导出');
-                cancelButton.setAttribute('title', '退出导出模式');
+                cancelButton.setAttribute('aria-label', t('view.cancelExport'));
+                cancelButton.setAttribute('title', t('view.exitExportMode'));
                 cancelButton.addEventListener('click', () => {
                     this.exitExportMode();
                 });
@@ -698,8 +727,8 @@ export class GithubStarsView extends ItemView {
                 if (this.plugin.settings.enableExport) {
                     const exportButton = rightButtonsContainer.createEl('button', { cls: 'github-stars-export-button' });
                     setIcon(exportButton, 'share');
-                    exportButton.setAttribute('aria-label', '批量导出');
-                    exportButton.setAttribute('title', '批量导出仓库为Markdown文件');
+                    exportButton.setAttribute('aria-label', t('view.exportMode'));
+                    exportButton.setAttribute('title', t('view.exportMode'));
                     exportButton.addEventListener('click', () => {
                         this.enterExportMode();
                     });
@@ -746,16 +775,16 @@ export class GithubStarsView extends ItemView {
     updateThemeButton(button: HTMLElement) {
         const currentTheme = this.plugin.settings.theme;
         button.empty();
-        
+
         if (currentTheme === 'ios-glass') {
             // iOS液态玻璃主题图标
             setIcon(button, 'sparkles');
-            button.setAttribute('aria-label', '切换到默认主题');
+            button.setAttribute('aria-label', t('view.theme.switchToDefault'));
             button.addClass('active');
         } else {
             // 默认主题图标
             setIcon(button, 'palette');
-            button.setAttribute('aria-label', '切换到iOS液态玻璃主题');
+            button.setAttribute('aria-label', t('view.theme.switchToIosGlass'));
             button.removeClass('active');
         }
     }
@@ -773,7 +802,7 @@ export class GithubStarsView extends ItemView {
             // 没有配置账号时显示添加按钮
             const addAccountBtn = accountSelectorContainer.createEl('button', {
                 cls: 'github-account-add-btn',
-                text: '+ 添加账号'
+                text: t('view.addAccount')
             });
             
             addAccountBtn.addEventListener('click', () => {
@@ -790,7 +819,7 @@ export class GithubStarsView extends ItemView {
         // 创建折叠按钮
         const toggleBtn = accountSelectorContainer.createEl('button', {
             cls: 'github-account-toggle-btn',
-            text: `账号 (${accounts.filter((a: GithubAccount) => a.enabled).length})`
+            text: `${t('view.accountsLabel')} (${accounts.filter((a: GithubAccount) => a.enabled).length})`
         });
 
         // 创建star总数显示元素
@@ -799,10 +828,13 @@ export class GithubStarsView extends ItemView {
             cls: 'total-stars-icon',
             text: '⭐'
         });
-        const totalStarsCount = totalStarsEl.createEl('span', {
+        const totalStarsNumber = totalStarsEl.createEl('span', {
             cls: 'total-stars-number',
-            text: `${this.githubRepositories.length}`
+            text: `${this.getVisibleRepoCount()}`
         });
+
+        // 保存引用以便更新
+        this.totalStarsNumberEl = totalStarsNumber;
 
         // 创建折叠内容容器
         const collapsibleContent = accountSelectorContainer.createDiv('github-account-collapsible');
@@ -918,10 +950,11 @@ export class GithubStarsView extends ItemView {
                     accountEl.toggleClass('disabled', !account.enabled);
 
                     // 更新按钮文本
-                    toggleBtn.textContent = `账号 (${accounts.filter((a: GithubAccount) => a.enabled).length})`;
+                    toggleBtn.textContent = `${t('view.accountsLabel')} (${accounts.filter((a: GithubAccount) => a.enabled).length})`;
 
                     // 显示通知
-                    new Notice(`账号 ${account.username} ${account.enabled ? '已启用' : '已禁用'}`);
+                    const noticeKey = account.enabled ? 'notices.accountEnabled' : 'notices.accountDisabled';
+                    new Notice(t(noticeKey, { username: account.username }));
 
                     // 重新渲染仓库列表以应用账户过滤
                     this.renderRepositories();
@@ -1158,16 +1191,32 @@ githubRepo.id] || {};
     clearInvisibleSelections() {
         const visibleRepoIds = this.getFilteredRepositories().map(repo => repo.id);
         const invisibleSelections = Array.from(this.selectedRepos).filter(repoId => !visibleRepoIds.includes(repoId));
-        
+
         // 移除不可见仓库的选择状态
         invisibleSelections.forEach(repoId => {
             this.selectedRepos.delete(repoId);
         });
-        
+
         // 更新按钮状态
         if (invisibleSelections.length > 0) {
             this.updateExportConfirmButton();
             this.updateSelectAllButton();
+        }
+    }
+
+    /**
+     * 获取当前可见的仓库数量（考虑过滤）
+     */
+    getVisibleRepoCount(): number {
+        return this.getFilteredRepositories().length;
+    }
+
+    /**
+     * 更新star总数显示
+     */
+    updateTotalStarsCount() {
+        if (this.totalStarsNumberEl) {
+            this.totalStarsNumberEl.textContent = `${this.getVisibleRepoCount()}`;
         }
     }
 } // End of GithubStarsView class

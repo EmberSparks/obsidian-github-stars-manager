@@ -4,6 +4,7 @@ import { DEFAULT_SETTINGS, GithubStarsSettingTab } from './settings';
 import { GithubService } from './githubService';
 import { GithubStarsView, VIEW_TYPE_STARS } from './view';
 import { ExportService } from './exportService';
+import { I18n, t } from './i18n';
 
 // GitHub星标图标 (不变)
 const GITHUB_STAR_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-star"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>`;
@@ -37,6 +38,9 @@ export default class GithubStarsPlugin extends Plugin {
         // 加载合并后的数据
         await this.loadCombinedData();
 
+        // 初始化i18n系统
+        I18n.setLanguage(this.settings.language || 'en');
+
         // 初始化GitHub服务 (支持多账号)
         this.githubService = new GithubService(this.settings.accounts || []);
         
@@ -51,8 +55,8 @@ export default class GithubStarsPlugin extends Plugin {
             (leaf) => new GithubStarsView(leaf, this)
         );
         // 添加功能区图标 (不变)
-        this.addRibbonIcon('github-star', 'GitHub Stars', () => {
-            this.activateView();
+        this.addRibbonIcon('github-star', 'GitHub stars', () => {
+            this.activateView().catch(err => console.error('Failed to activate view:', err));
         });
 
         // 添加插件命令 (不变)
@@ -63,12 +67,11 @@ export default class GithubStarsPlugin extends Plugin {
         // 应用主题
         this.applyTheme(this.settings.theme);
 
-        new Notice('GitHub Stars Manager 已加载');
+        new Notice(t('plugin.loaded'));
     }
 
     onunload() {
         this.clearSyncInterval();
-        this.app.workspace.detachLeavesOfType(VIEW_TYPE_STARS);
     }
 
     // --- 数据加载/保存 ---
@@ -161,7 +164,7 @@ export default class GithubStarsPlugin extends Plugin {
         if (this.settings.autoSync && this.settings.syncInterval > 0) {
             const intervalMillis = this.settings.syncInterval * 60 * 1000;
             this.syncIntervalId = window.setInterval(() => {
-                this.syncStars();
+                this.syncStars().catch(err => console.error('Auto sync failed:', err));
             }, intervalMillis);
             this.registerInterval(this.syncIntervalId);
         }
@@ -178,24 +181,24 @@ export default class GithubStarsPlugin extends Plugin {
     addCommands() {
         this.addCommand({
             id: 'sync-github-stars',
-            name: '同步 GitHub 星标',
+            name: t('plugin.syncCommandName'),
             callback: () => {
-                this.syncStars();
+                this.syncStars().catch(err => console.error('Sync command failed:', err));
             }
         });
         this.addCommand({
             id: 'open-github-stars-view',
-            name: '打开 GitHub Stars 视图',
+            name: t('plugin.openViewCommandName'),
             callback: () => {
-                this.activateView();
+                this.activateView().catch(err => console.error('Open view command failed:', err));
             }
         });
 
         this.addCommand({
             id: 'export-all-stars',
-            name: '导出所有星标仓库',
+            name: t('plugin.exportAllCommandName'),
             callback: () => {
-                this.exportAllStars();
+                this.exportAllStars().catch(err => console.error('Export command failed:', err));
             }
         });
     }
@@ -212,14 +215,14 @@ export default class GithubStarsPlugin extends Plugin {
         if (enabledAccounts.length === 0) {
             // 向后兼容：如果没有多账号配置，使用单一令牌
             if (!this.settings.githubToken) {
-                new Notice('请先在设置中配置GitHub账号或个人访问令牌');
+                new Notice(t('plugin.configureAccount'));
                 return;
             }
             console.debug('使用向后兼容模式，创建临时账号');
             // 创建临时账号进行同步
             const tempAccount = {
                 id: 'legacy',
-                name: '默认账号',
+                name: t('plugin.defaultAccount'),
                 username: 'unknown',
                 token: this.settings.githubToken,
                 enabled: true
@@ -232,13 +235,13 @@ export default class GithubStarsPlugin extends Plugin {
             this.githubService.updateAccounts(this.settings.accounts);
         }
 
-        new Notice('正在同步GitHub星标...');
+        new Notice(t('plugin.syncing'));
         try {
             const syncResult = await this.githubService.fetchAllStarredRepositories();
             await this._handleSyncSuccess(syncResult);
         } catch (error) {
             console.error('同步GitHub星标失败:', error);
-            new Notice('同步GitHub星标失败，请查看控制台了解详情');
+            new Notice(t('plugin.syncFailed'));
         }
     }
 
@@ -258,9 +261,9 @@ export default class GithubStarsPlugin extends Plugin {
             const errorCount = Object.keys(syncResult.errors).length;
             if (errorCount > 0) {
                 console.error('同步错误详情:', syncResult.errors);
-                new Notice(`同步失败：${Object.values(syncResult.errors).join(', ')}`);
+                new Notice(t('plugin.syncFailedWithErrors', { errors: Object.values(syncResult.errors).join(', ') }));
             } else {
-                new Notice('同步完成，但没有找到星标仓库');
+                new Notice(t('plugin.syncCompleteNoRepos'));
             }
             return;
         }
@@ -306,7 +309,7 @@ export default class GithubStarsPlugin extends Plugin {
             });
         }
         if (leaf) {
-             workspace.revealLeaf(leaf);
+            await workspace.revealLeaf(leaf);
         }
     }
 
@@ -364,12 +367,12 @@ export default class GithubStarsPlugin extends Plugin {
      */
     async exportAllStars(options?: Partial<ExportOptions>): Promise<void> {
         if (this.data.githubRepositories.length === 0) {
-            new Notice('没有星标仓库可导出，请先同步数据');
+            new Notice(t('plugin.noReposToExport'));
             return;
         }
 
-        new Notice('开始导出星标仓库...');
-        
+        new Notice(t('plugin.exportingAll'));
+
         try {
             // 使用插件数据中的导出选项，如果没有则使用默认选项
             const exportOptions = options ? { ...this.data.exportOptions, ...options } : this.data.exportOptions;
@@ -380,14 +383,14 @@ export default class GithubStarsPlugin extends Plugin {
             );
 
             if (result.success) {
-                new Notice(`导出完成！成功导出 ${result.exportedCount} 个仓库，跳过 ${result.skippedCount} 个`);
+                new Notice(t('plugin.exportAllSuccess', { count: String(result.exportedCount), skipped: String(result.skippedCount) }));
             } else {
-                new Notice(`导出完成，但有错误。成功导出 ${result.exportedCount} 个仓库，失败 ${result.errors.length} 个`);
+                new Notice(t('plugin.exportAllPartial', { count: String(result.exportedCount), failed: String(result.errors.length) }));
                 console.error('导出错误:', result.errors);
             }
         } catch (error) {
             console.error('导出失败:', error);
-            new Notice('导出失败，请查看控制台了解详情');
+            new Notice(t('plugin.exportAllFailed'));
         }
     }
 
@@ -395,8 +398,8 @@ export default class GithubStarsPlugin extends Plugin {
      * 导出单个仓库
      */
     async exportSingleRepository(repository: GithubRepository, options?: Partial<ExportOptions>): Promise<void> {
-        new Notice(`正在导出 ${repository.full_name}...`);
-        
+        new Notice(t('plugin.exportingSingle', { name: repository.full_name }));
+
         try {
             // 使用插件数据中的导出选项，如果没有则使用默认选项
             const exportOptions = options ? { ...this.data.exportOptions, ...options } : this.data.exportOptions;
@@ -407,13 +410,13 @@ export default class GithubStarsPlugin extends Plugin {
             );
 
             if (success) {
-                new Notice(`${repository.full_name} 导出成功`);
+                new Notice(t('plugin.exportSingleSuccess', { name: repository.full_name }));
             } else {
-                new Notice(`${repository.full_name} 导出跳过（文件已存在）`);
+                new Notice(t('plugin.exportSingleSkipped', { name: repository.full_name }));
             }
         } catch (error) {
             console.error(`导出 ${repository.full_name} 失败:`, error);
-            new Notice(`导出 ${repository.full_name} 失败`);
+            new Notice(t('plugin.exportSingleFailed', { name: repository.full_name }));
         }
     }
 }

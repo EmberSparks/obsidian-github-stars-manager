@@ -19,6 +19,7 @@ export interface GithubStarsSettings {
     autoSync: boolean;
     syncInterval: number; // 单位：分钟
     theme: 'default' | 'ios-glass'; // 新增主题设置
+    language: 'en' | 'zh'; // 语言设置
     enableExport: boolean; // 导出功能开关
     includeProperties: boolean; // 是否包含Properties
     propertiesTemplate: PropertyTemplate[]; // Properties模板配置

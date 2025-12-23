@@ -1,6 +1,7 @@
 import { App, PluginSettingTab, Setting, Notice, Modal, requestUrl } from 'obsidian';
 import GithubStarsPlugin from './main';
 import { GithubStarsSettings, GithubAccount, PropertyTemplate, DEFAULT_PROPERTIES_TEMPLATE } from './types';
+import { t } from './i18n';
 
 /**
  * 通用确认对话框
@@ -11,7 +12,7 @@ class ConfirmModal extends Modal {
     private confirmText: string;
     private cancelText: string;
 
-    constructor(app: App, message: string, onConfirm: () => void, confirmText = '确定', cancelText = '取消') {
+    constructor(app: App, message: string, onConfirm: () => void, confirmText = t('common.confirm'), cancelText = t('common.cancel')) {
         super(app);
         this.message = message;
         this.onConfirm = onConfirm;
@@ -23,7 +24,7 @@ class ConfirmModal extends Modal {
         const { contentEl } = this;
         contentEl.empty();
 
-        contentEl.createEl('h2', { text: '确认操作' });
+        contentEl.createEl('h2', { text: t('settings.confirmActionTitle') });
         contentEl.createEl('p', { text: this.message });
 
         const buttonContainer = contentEl.createDiv('modal-button-container');
@@ -54,6 +55,7 @@ export const DEFAULT_SETTINGS: GithubStarsSettings = {
     autoSync: true,
     syncInterval: 60, // 默认60分钟
     theme: 'default', // 默认主题
+    language: 'en', // 默认语言
     enableExport: true, // 默认启用导出功能
     includeProperties: true, // 默认启用Properties
     propertiesTemplate: DEFAULT_PROPERTIES_TEMPLATE, // 默认Properties模板
@@ -72,20 +74,16 @@ export class GithubStarsSettingTab extends PluginSettingTab {
 
         containerEl.empty();
 
-        new Setting(containerEl)
-            .setName('GitHub Stars Manager 设置')
-            .setHeading();
-
         // 多账号管理区域
         this.displayAccountsSection(containerEl);
 
         // 向后兼容的单一令牌设置（如果没有配置多账号）
         if (this.plugin.settings.accounts.length === 0) {
             new Setting(containerEl)
-                .setName('GitHub 个人访问令牌 (PAT)')
-                .setDesc('用于访问你的GitHub星标仓库的令牌。需要repo范围权限。建议使用上方的多账号管理功能。')
+                .setName(t('settings.githubToken'))
+                .setDesc(t('settings.githubTokenDesc'))
                 .addText(text => text
-                    .setPlaceholder('输入你的GitHub PAT')
+                    .setPlaceholder(t('settings.githubTokenPlaceholder'))
                     .setValue(this.plugin.settings.githubToken)
                     .onChange(async (value) => {
                         this.plugin.settings.githubToken = value;
@@ -96,22 +94,22 @@ export class GithubStarsSettingTab extends PluginSettingTab {
 
         // 自动同步设置
         new Setting(containerEl)
-            .setName('启用自动同步')
-            .setDesc('定期自动同步你的GitHub星标')
+            .setName(t('settings.enableAutoSync'))
+            .setDesc(t('settings.enableAutoSyncDesc'))
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.autoSync)
                 .onChange(async (value) => {
                     this.plugin.settings.autoSync = value;
                     await this.plugin.saveSettings();
-                    
+
                     // saveSettings() 会自动处理同步间隔的更新
                 })
             );
 
         // 同步间隔设置
         new Setting(containerEl)
-            .setName('同步间隔（分钟）')
-            .setDesc('设置自动同步的时间间隔')
+            .setName(t('settings.syncIntervalName'))
+            .setDesc(t('settings.syncIntervalDesc'))
             .addSlider(slider => slider
                 .setLimits(15, 1440, 15)
                 .setValue(this.plugin.settings.syncInterval)
@@ -119,18 +117,18 @@ export class GithubStarsSettingTab extends PluginSettingTab {
                 .onChange(async (value) => {
                     this.plugin.settings.syncInterval = value;
                     await this.plugin.saveSettings();
-                    
+
                     // saveSettings() 会自动处理同步间隔的更新
                 })
             );
 
         // 主题设置
         new Setting(containerEl)
-            .setName('主题')
-            .setDesc('选择插件界面主题')
+            .setName(t('settings.theme'))
+            .setDesc(t('settings.themeDesc'))
             .addDropdown(dropdown => dropdown
-                .addOption('default', '默认主题')
-                .addOption('ios-glass', 'iOS液态玻璃')
+                .addOption('default', t('settings.themeDefaultOption'))
+                .addOption('ios-glass', t('settings.themeIosGlassOption'))
                 .setValue(this.plugin.settings.theme)
                 .onChange(async (value: 'default' | 'ios-glass') => {
                     this.plugin.settings.theme = value;
@@ -140,10 +138,25 @@ export class GithubStarsSettingTab extends PluginSettingTab {
                 })
             );
 
+        // 语言设置
+        new Setting(containerEl)
+            .setName(t('settings.language'))
+            .setDesc(t('settings.languageDesc'))
+            .addDropdown(dropdown => dropdown
+                .addOption('en', t('settings.languageEn'))
+                .addOption('zh', t('settings.languageZh'))
+                .setValue(this.plugin.settings.language)
+                .onChange(async (value: 'en' | 'zh') => {
+                    this.plugin.settings.language = value;
+                    await this.plugin.saveSettings();
+                    new Notice(t('settings.languageReloadNotice'));
+                })
+            );
+
         // 导出功能开关
         new Setting(containerEl)
-            .setName('启用导出功能')
-            .setDesc('启用后可以将星标仓库导出为Markdown文件')
+            .setName(t('settings.enableExport'))
+            .setDesc(t('settings.enableExportDesc'))
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.enableExport)
                 .onChange(async (value) => {
@@ -161,27 +174,28 @@ export class GithubStarsSettingTab extends PluginSettingTab {
 
         // 立即同步按钮
         new Setting(containerEl)
-            .setName('立即同步')
-            .setDesc('立即从GitHub获取你的星标仓库')
+            .setName(t('settings.syncNow'))
+            .setDesc(t('settings.syncNowDesc'))
             .addButton(button => button
-                .setButtonText('同步')
+                .setButtonText(t('settings.syncButton'))
                 .setCta()
                 .onClick(async () => {
                     button.setDisabled(true);
-                    button.setButtonText('同步中...');
-                    
+                    button.setButtonText(t('settings.syncing'));
+
                     try {
                         await this.plugin.syncStars();
-                        button.setButtonText('同步成功');
+                        button.setButtonText(t('settings.syncSuccess'));
                         setTimeout(() => {
-                            button.setButtonText('同步');
+                            button.setButtonText(t('settings.syncButton'));
                             button.setDisabled(false);
                         }, 2000);
-                    } catch (_error) {
-                        button.setButtonText('同步失败');
-                        new Notice('同步失败，请检查网络连接或令牌设置', 5000);
+                    } catch (error) {
+                        console.error('Sync failed:', error);
+                        button.setButtonText(t('settings.syncFailed'));
+                        new Notice(t('settings.syncFailedNotice'), 5000);
                         setTimeout(() => {
-                            button.setButtonText('同步');
+                            button.setButtonText(t('settings.syncButton'));
                             button.setDisabled(false);
                         }, 2000);
                     }
@@ -195,18 +209,18 @@ export class GithubStarsSettingTab extends PluginSettingTab {
     private displayAccountsSection(containerEl: HTMLElement): void {
         // 账号管理标题
         new Setting(containerEl)
-            .setName('GitHub 账号管理')
+            .setName(t('settings.accountsHeading'))
             .setHeading();
-        
+
         // 添加账号按钮
         new Setting(containerEl)
-            .setName('添加 GitHub 账号')
-            .setDesc('添加新的 GitHub 账号以同步多个账号的星标仓库')
+            .setName(t('settings.addAccountButton'))
+            .setDesc(t('settings.addAccountDesc'))
             .addButton(button => button
-                .setButtonText('添加账号')
+                .setButtonText(t('settings.addAccountButton'))
                 .setCta()
                 .onClick(() => {
-                    this.showAddAccountModal();
+                    this.showAddAccountModal().catch(err => console.error('Failed to show add account modal:', err));
                 })
             );
 
@@ -222,8 +236,8 @@ export class GithubStarsSettingTab extends PluginSettingTab {
         container.empty();
 
         if (this.plugin.settings.accounts.length === 0) {
-            container.createEl('p', { 
-                text: '暂无配置的 GitHub 账号。点击上方按钮添加账号。',
+            container.createEl('p', {
+                text: t('settings.noAccountsMessage'),
                 cls: 'github-accounts-empty'
             });
             return;
@@ -231,15 +245,15 @@ export class GithubStarsSettingTab extends PluginSettingTab {
 
         this.plugin.settings.accounts.forEach((account, index) => {
             const accountEl = container.createDiv('github-account-item');
-            
+
             // 账号信息区域
             const infoEl = accountEl.createDiv('github-account-info');
-            
+
             // 头像
             if (account.avatar_url) {
                 const avatarEl = infoEl.createEl('img', {
                     cls: 'github-account-avatar',
-                    attr: { 
+                    attr: {
                         src: account.avatar_url,
                         alt: `${account.username} avatar`,
                         loading: 'lazy'
@@ -249,18 +263,18 @@ export class GithubStarsSettingTab extends PluginSettingTab {
                     avatarEl.addClass('display-none');
                 });
             }
-            
+
             // 账号详情
             const detailsEl = infoEl.createDiv('github-account-details');
-            detailsEl.createEl('div', { 
+            detailsEl.createEl('div', {
                 text: account.name || account.username,
                 cls: 'github-account-name'
             });
-            detailsEl.createEl('div', { 
+            detailsEl.createEl('div', {
                 text: `@${account.username}`,
                 cls: 'github-account-username'
             });
-            
+
             // 启用状态
             const statusEl = infoEl.createDiv('github-account-status');
             const toggle = statusEl.createEl('input', {
@@ -272,44 +286,126 @@ export class GithubStarsSettingTab extends PluginSettingTab {
                 void (async () => {
                     account.enabled = toggle.checked;
                     await this.plugin.saveSettings();
-                    new Notice(`账号 ${account.username} ${account.enabled ? '已启用' : '已禁用'}`);
+                    const status = account.enabled ? t('settings.enabled') : t('settings.disabled');
+                    new Notice(t('settings.accountToggled', { username: account.username, status }));
                 })();
             });
-            statusEl.createEl('label', { 
-                text: account.enabled ? '已启用' : '已禁用',
+            statusEl.createEl('label', {
+                text: account.enabled ? t('settings.accountEnabled') : t('settings.accountDisabled'),
                 cls: account.enabled ? 'enabled' : 'disabled'
             });
-            
+
             // 操作按钮
             const actionsEl = accountEl.createDiv('github-account-actions');
-            
+
+            // 测试令牌按钮
+            const testBtn = actionsEl.createEl('button', {
+                text: '测试',
+                cls: 'github-account-btn test'
+            });
+            testBtn.addEventListener('click', () => {
+                void (async () => {
+                    testBtn.textContent = '测试中...';
+                    testBtn.disabled = true;
+
+                    try {
+                        const response = await requestUrl({
+                            url: 'https://api.github.com/user',
+                            method: 'GET',
+                            headers: {
+                                'Authorization': `token ${account.token}`,
+                                'User-Agent': 'Obsidian-GitHub-Stars-Manager'
+                            }
+                        });
+
+                        if (response.status === 200) {
+                            // 检查令牌过期时间
+                            const rateResponse = await requestUrl({
+                                url: 'https://api.github.com/rate_limit',
+                                method: 'GET',
+                                headers: {
+                                    'Authorization': `token ${account.token}`,
+                                    'User-Agent': 'Obsidian-GitHub-Stars-Manager'
+                                }
+                            });
+
+                            let expiryInfo = '';
+                            const expiresHeader = response.headers['github-authentication-token-expiration'];
+                            if (expiresHeader) {
+                                const expiryDate = new Date(expiresHeader);
+                                const now = new Date();
+                                const daysLeft = Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+
+                                if (daysLeft > 0) {
+                                    expiryInfo = `\n过期时间: ${expiryDate.toLocaleDateString()} (剩余${daysLeft}天)`;
+                                } else {
+                                    expiryInfo = '\n令牌已过期';
+                                }
+                            } else {
+                                expiryInfo = '\n无过期时间 (经典令牌)';
+                            }
+
+                            const rateData = rateResponse.json;
+                            const rateLimitInfo = `\nAPI限额: ${rateData.rate.remaining}/${rateData.rate.limit}`;
+
+                            new Notice(`✅ 令牌有效${expiryInfo}${rateLimitInfo}`, 8000);
+                            testBtn.textContent = '✓ 有效';
+                            testBtn.addClass('test-success');
+                            setTimeout(() => {
+                                testBtn.textContent = '测试';
+                                testBtn.removeClass('test-success');
+                            }, 3000);
+                        } else {
+                            new Notice('❌ 令牌无效或已过期', 5000);
+                            testBtn.textContent = '✗ 无效';
+                            testBtn.addClass('test-error');
+                            setTimeout(() => {
+                                testBtn.textContent = '测试';
+                                testBtn.removeClass('test-error');
+                            }, 3000);
+                        }
+                    } catch (error) {
+                        console.error('Token test failed:', error);
+                        new Notice('❌ 令牌测试失败: ' + (error instanceof Error ? error.message : '未知错误'), 5000);
+                        testBtn.textContent = '✗ 错误';
+                        testBtn.addClass('test-error');
+                        setTimeout(() => {
+                            testBtn.textContent = '测试';
+                            testBtn.removeClass('test-error');
+                        }, 3000);
+                    } finally {
+                        testBtn.disabled = false;
+                    }
+                })();
+            });
+
             // 编辑按钮
             const editBtn = actionsEl.createEl('button', {
-                text: '编辑',
+                text: t('common.edit'),
                 cls: 'github-account-btn edit'
             });
             editBtn.addEventListener('click', () => {
-                this.showEditAccountModal(account, index);
+                this.showEditAccountModal(account, index).catch(err => console.error('Failed to show edit account modal:', err));
             });
-            
+
             // 删除按钮
             const deleteBtn = actionsEl.createEl('button', {
-                text: '删除',
+                text: t('common.delete'),
                 cls: 'github-account-btn delete'
             });
             deleteBtn.addEventListener('click', () => {
                 new ConfirmModal(
                     this.app,
-                    `确定要删除账号 ${account.username} 吗？`,
+                    t('settings.confirmDeleteAccount', { username: account.username }),
                     () => {
                         void (async () => {
                             this.plugin.settings.accounts.splice(index, 1);
                             await this.plugin.saveSettings();
                             this.displayAccountsList(container);
-                            new Notice(`已删除账号 ${account.username}`);
+                            new Notice(t('settings.accountDeleted', { username: account.username }));
                         })();
                     },
-                    '删除'
+                    t('common.delete')
                 ).open();
             });
         });
@@ -326,7 +422,7 @@ export class GithubStarsSettingTab extends PluginSettingTab {
             enabled: true
         };
 
-        const result = await this.showAccountModal('添加 GitHub 账号', account);
+        const result = await this.showAccountModal(t('settings.addAccountTitle'), account);
         if (result) {
             // 生成唯一ID
             const id = Date.now().toString() + Math.random().toString(36).substring(2, 11);
@@ -342,7 +438,7 @@ export class GithubStarsSettingTab extends PluginSettingTab {
             this.plugin.settings.accounts.push(newAccount);
             await this.plugin.saveSettings();
             this.display(); // 重新渲染设置页面
-            new Notice(`已添加账号 ${newAccount.username}`);
+            new Notice(t('settings.accountAdded', { username: newAccount.username }));
         }
     }
 
@@ -350,7 +446,7 @@ export class GithubStarsSettingTab extends PluginSettingTab {
      * 显示编辑账号模态框
      */
     private async showEditAccountModal(account: GithubAccount, index: number): Promise<void> {
-        const result = await this.showAccountModal('编辑 GitHub 账号', account);
+        const result = await this.showAccountModal(t('settings.editAccountTitle'), account);
         if (result) {
             // 更新账号信息
             this.plugin.settings.accounts[index] = {
@@ -364,7 +460,7 @@ export class GithubStarsSettingTab extends PluginSettingTab {
 
             await this.plugin.saveSettings();
             this.display(); // 重新渲染设置页面
-            new Notice(`已更新账号 ${result.username}`);
+            new Notice(t('settings.accountUpdated', { username: result.username }));
         }
     }
 
@@ -438,29 +534,29 @@ export class GithubStarsSettingTab extends PluginSettingTab {
     private displayPropertiesSection(containerEl: HTMLElement): void {
         // Properties配置标题
         new Setting(containerEl)
-            .setName('Properties 模板配置')
+            .setName(t('settings.propertiesConfigHeading'))
             .setHeading();
-        
+
         // 说明文字
         const descEl = containerEl.createDiv('setting-item-description description-margin');
         const p = descEl.createEl('p');
-        p.textContent = '配置导出Markdown文件时的Properties（笔记属性）模板。支持以下变量：';
-        
+        p.textContent = t('settings.propertiesDescription');
+
         const ul = descEl.createEl('ul', { cls: 'setting-item-description-list' });
-        
+
         const variables = [
-            { code: '{{full_name}}', desc: '仓库完整名称' },
-            { code: '{{name}}', desc: '仓库名称' },
-            { code: '{{owner.login}}', desc: '仓库作者' },
-            { code: '{{html_url}}', desc: '仓库链接' },
-            { code: '{{description}}', desc: '仓库描述' },
-            { code: '{{created_at}}', desc: '创建时间' },
-            { code: '{{starred_at}}', desc: '加星时间' },
-            { code: '{{topics}}', desc: '主题标签' },
-            { code: '{{stargazers_count}}', desc: 'Star数量' },
-            { code: '{{language}}', desc: '主要语言' }
+            { code: '{{full_name}}', desc: t('settings.variableFullName') },
+            { code: '{{name}}', desc: t('settings.variableName') },
+            { code: '{{owner.login}}', desc: t('settings.variableOwner') },
+            { code: '{{html_url}}', desc: t('settings.variableUrl') },
+            { code: '{{description}}', desc: t('settings.variableDescription') },
+            { code: '{{created_at}}', desc: t('settings.variableCreatedAt') },
+            { code: '{{starred_at}}', desc: t('settings.variableStarredAt') },
+            { code: '{{topics}}', desc: t('settings.variableTopics') },
+            { code: '{{stargazers_count}}', desc: t('settings.variableStargazersCount') },
+            { code: '{{language}}', desc: t('settings.variableLanguage') }
         ];
-        
+
         variables.forEach(variable => {
             const li = ul.createEl('li');
             const code = li.createEl('code');
@@ -470,8 +566,8 @@ export class GithubStarsSettingTab extends PluginSettingTab {
 
         // 启用Properties开关
         new Setting(containerEl)
-            .setName('启用 Properties')
-            .setDesc('在导出的Markdown文件开头添加Properties（YAML前置内容）')
+            .setName(t('settings.enableProperties'))
+            .setDesc(t('settings.enablePropertiesDesc'))
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.includeProperties ?? true) // 默认启用Properties
                 .onChange(async (value) => {
@@ -490,10 +586,10 @@ export class GithubStarsSettingTab extends PluginSettingTab {
 
             // 添加新属性按钮
             new Setting(containerEl)
-                .setName('添加新属性')
-                .setDesc('添加自定义的Properties属性')
+                .setName(t('settings.addNewProperty'))
+                .setDesc(t('settings.addNewPropertyDesc'))
                 .addButton(button => button
-                    .setButtonText('添加属性')
+                    .setButtonText(t('settings.addPropertyButton'))
                     .setCta()
                     .onClick(() => {
                         this.addNewProperty();
@@ -502,17 +598,17 @@ export class GithubStarsSettingTab extends PluginSettingTab {
 
             // 重置为默认模板按钮
             new Setting(containerEl)
-                .setName('重置模板')
-                .setDesc('恢复为默认的Properties模板配置')
+                .setName(t('settings.resetTemplate'))
+                .setDesc(t('settings.resetTemplateDesc'))
                 .addButton(button => button
-                    .setButtonText('重置为默认')
+                    .setButtonText(t('settings.resetButton'))
                     .setWarning()
                     .onClick(() => {
                         void (async () => {
                             this.plugin.settings.propertiesTemplate = [...DEFAULT_PROPERTIES_TEMPLATE];
                             await this.plugin.saveSettings();
                             this.display();
-                            new Notice('已重置为默认Properties模板');
+                            new Notice(t('settings.resetSuccess'));
                         })();
                     })
                 );
@@ -525,38 +621,39 @@ export class GithubStarsSettingTab extends PluginSettingTab {
     private createPropertySetting(containerEl: HTMLElement, property: PropertyTemplate, index: number): void {
         new Setting(containerEl)
             .setName(`${property.key} (${property.description})`)
-            .setDesc(`类型: ${property.type} | 值: ${property.value}`)
+            .setDesc(`Type: ${property.type} | Value: ${property.value}`)
             .addToggle(toggle => toggle
                 .setValue(property.enabled)
                 .onChange(async (value) => {
                     // 更新属性的启用状态
                     this.plugin.settings.propertiesTemplate[index].enabled = value;
                     await this.plugin.saveSettings();
-                    new Notice(`属性 ${property.key} ${value ? '已启用' : '已禁用'}`);
+                    const status = value ? t('settings.enabled') : t('settings.disabled');
+                    new Notice(t('settings.propertyToggled', { key: property.key, status }));
                 })
             )
             .addButton(button => button
-                .setButtonText('编辑')
+                .setButtonText(t('settings.editProperty'))
                 .onClick(() => {
                     this.editProperty(index);
                 })
             )
             .addButton(button => button
-                .setButtonText('删除')
+                .setButtonText(t('settings.deleteProperty'))
                 .setWarning()
                 .onClick(() => {
                     new ConfirmModal(
                         this.app,
-                        `确定要删除属性 ${property.key} 吗？`,
+                        t('settings.confirmDeleteProperty', { key: property.key }),
                         () => {
                             void (async () => {
                                 this.plugin.settings.propertiesTemplate.splice(index, 1);
                                 await this.plugin.saveSettings();
                                 this.display();
-                                new Notice(`已删除属性 ${property.key}`);
+                                new Notice(t('settings.propertyDeleted', { key: property.key }));
                             })();
                         },
-                        '删除'
+                        t('common.delete')
                     ).open();
                 })
             );
@@ -566,14 +663,14 @@ export class GithubStarsSettingTab extends PluginSettingTab {
      * 添加新属性（暂时禁用）
      */
     private addNewProperty(): void {
-        new Notice('Properties模板编辑功能即将推出');
+        new Notice(t('settings.comingSoon'));
     }
 
     /**
      * 编辑属性（暂时禁用）
      */
     private editProperty(_index: number): void {
-        new Notice('Properties模板编辑功能即将推出');
+        new Notice(t('settings.comingSoon'));
     }
 }
 
@@ -607,38 +704,38 @@ class AccountModal extends Modal {
 
         // 账号名称字段
         const nameContainer = form.createDiv('form-field');
-        nameContainer.createEl('label', { text: '账号名称' });
-        nameContainer.createEl('div', { text: '为此账号设置一个显示名称', cls: 'form-field-desc' });
+        nameContainer.createEl('label', { text: t('settings.accountName') });
+        nameContainer.createEl('div', { text: t('settings.accountNameDesc'), cls: 'form-field-desc' });
         this.nameInput = nameContainer.createEl('input', {
             type: 'text',
             value: this.account.name || '',
-            placeholder: '输入账号名称'
+            placeholder: t('settings.accountNamePlaceholder')
         });
 
         // GitHub用户名字段
         const usernameContainer = form.createDiv('form-field');
-        usernameContainer.createEl('label', { text: 'GitHub 用户名' });
-        usernameContainer.createEl('div', { text: 'GitHub 用户名（输入令牌后自动获取）', cls: 'form-field-desc' });
+        usernameContainer.createEl('label', { text: t('settings.githubUsername') });
+        usernameContainer.createEl('div', { text: t('settings.githubUsernameDesc'), cls: 'form-field-desc' });
         this.usernameInput = usernameContainer.createEl('input', {
             type: 'text',
             value: this.account.username || '',
-            placeholder: '自动获取',
+            placeholder: t('settings.autoFetch'),
             attr: { readonly: 'true' }
         });
         this.usernameInput.addClass('form-input-disabled');
 
         // 个人访问令牌字段
         const tokenContainer = form.createDiv('form-field');
-        tokenContainer.createEl('label', { text: '个人访问令牌 (PAT)' });
-        tokenContainer.createEl('div', { text: '需要 repo 范围权限的 GitHub PAT', cls: 'form-field-desc' });
+        tokenContainer.createEl('label', { text: t('settings.tokenLabel') });
+        tokenContainer.createEl('div', { text: t('settings.tokenDescShort'), cls: 'form-field-desc' });
         this.tokenInput = tokenContainer.createEl('input', {
             type: 'password',
             value: this.account.token || '',
-            placeholder: '输入你的GitHub PAT'
+            placeholder: t('settings.tokenInputPlaceholder')
         });
 
         // 添加令牌验证功能
-        let validationTimeout: NodeJS.Timeout;
+        let validationTimeout: ReturnType<typeof setTimeout>;
         this.tokenInput.addEventListener('input', () => {
             clearTimeout(validationTimeout);
             const token = this.tokenInput.value.trim();
@@ -686,9 +783,9 @@ class AccountModal extends Modal {
         // 按钮区域
         const buttonContainer = contentEl.createDiv('modal-button-container button-flex-container');
 
-        const cancelBtn = buttonContainer.createEl('button', { text: '取消' });
-        const saveBtn = buttonContainer.createEl('button', { 
-            text: '保存',
+        const cancelBtn = buttonContainer.createEl('button', { text: t('common.cancel') });
+        const saveBtn = buttonContainer.createEl('button', {
+            text: t('common.save'),
             cls: 'mod-cta'
         });
 
@@ -699,7 +796,7 @@ class AccountModal extends Modal {
         });
 
         saveBtn.addEventListener('click', () => {
-            void this.saveAccount(saveBtn);
+            this.saveAccount(saveBtn).catch(err => console.error('Failed to save account:', err));
         });
 
         // 设置焦点
@@ -714,17 +811,17 @@ class AccountModal extends Modal {
         const token = this.tokenInput.value.trim();
 
         if (!token) {
-            new Notice('请填写个人访问令牌');
+            new Notice(t('settings.tokenRequired'));
             return;
         }
 
         if (!username) {
-            new Notice('用户名未自动获取，请检查令牌是否正确');
+            new Notice(t('settings.usernameNotFetched'));
             return;
         }
 
         try {
-            saveBtn.textContent = '保存中...';
+            saveBtn.textContent = t('settings.saving');
             saveBtn.disabled = true;
 
             const response = await requestUrl({
@@ -737,11 +834,11 @@ class AccountModal extends Modal {
             });
 
             if (response.status !== 200) {
-                throw new Error('令牌验证失败');
+                throw new Error('Token validation failed');
             }
 
             const userData = response.json;
-            
+
             this.close();
             this.resolve({
                 id: this.account.id || '',
@@ -751,9 +848,10 @@ class AccountModal extends Modal {
                 enabled: this.account.enabled !== false,
                 avatar_url: userData.avatar_url
             });
-        } catch (_error) {
-            new Notice('令牌验证失败，请检查令牌是否正确');
-            saveBtn.textContent = '保存';
+        } catch (error) {
+            console.error('Token validation failed:', error);
+            new Notice(t('settings.validationFailed'));
+            saveBtn.textContent = t('common.save');
             saveBtn.disabled = false;
         }
     }
