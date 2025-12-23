@@ -52,7 +52,7 @@ this.modalEl.addClass('github-stars-edit-modal'); // Add specific class for styl
         // --- User Editable Fields ---
 
         // Tags Setting
-        const tagSetting = new Setting(contentEl)
+        new Setting(contentEl)
             .setName(t('modal.tags'))
             .setDesc(t('modal.tagsDesc'));
 
@@ -69,7 +69,7 @@ this.modalEl.addClass('github-stars-edit-modal'); // Add specific class for styl
         const allTags = this.plugin.getAllTags();
 
         // 创建标签芯片输入组件
-        const tagChipsInput = new TagChipsInput(
+        new TagChipsInput(
             tagChipsContainer,
             initialTags,
             allTags,

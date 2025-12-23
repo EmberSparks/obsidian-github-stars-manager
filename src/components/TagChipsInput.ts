@@ -66,7 +66,7 @@ export class TagChipsInput {
         this.tags.forEach(tag => {
             const chipEl = this.chipsContainer.createDiv('tag-chip');
 
-            const textEl = chipEl.createSpan({ text: tag });
+            chipEl.createSpan({ text: tag });
 
             const removeBtn = chipEl.createSpan({
                 cls: 'tag-chip-remove',
