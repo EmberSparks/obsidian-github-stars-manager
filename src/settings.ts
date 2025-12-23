@@ -735,7 +735,7 @@ class AccountModal extends Modal {
         });
 
         // 添加令牌验证功能
-        let validationTimeout: NodeJS.Timeout;
+        let validationTimeout: ReturnType<typeof setTimeout>;
         this.tokenInput.addEventListener('input', () => {
             clearTimeout(validationTimeout);
             const token = this.tokenInput.value.trim();

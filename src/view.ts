@@ -376,18 +376,8 @@ export class GithubStarsView extends ItemView {
             // 添加点击事件处理，打开外部链接
             linkEl.onclick = () => {
                 if (repo.html_url) {
-                    // 在桌面版使用 electron.shell，移动版使用 window.open
-                    try {
-                        // @ts-ignore - Electron API
-                        const { shell } = require('electron');
-                        shell.openExternal(repo.html_url).catch(() => {
-                            // 如果 electron 方式失败，尝试 window.open
-                            window.open(repo.html_url, '_blank');
-                        });
-                    } catch {
-                        // 如果不在 Electron 环境，使用 window.open
-                        window.open(repo.html_url, '_blank');
-                    }
+                    // 使用 window.open 打开外部链接（桌面版和移动版都支持）
+                    window.open(repo.html_url, '_blank');
                 }
                 return false;
             };
