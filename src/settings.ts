@@ -54,7 +54,6 @@ export const DEFAULT_SETTINGS: GithubStarsSettings = {
     accounts: [], // 默认无账号
     autoSync: true,
     syncInterval: 60, // 默认60分钟
-    theme: 'default', // 默认主题
     language: 'en', // 默认语言
     enableExport: true, // 默认启用导出功能
     includeProperties: true, // 默认启用Properties
@@ -119,22 +118,6 @@ export class GithubStarsSettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
 
                     // saveSettings() 会自动处理同步间隔的更新
-                })
-            );
-
-        // 主题设置
-        new Setting(containerEl)
-            .setName(t('settings.theme'))
-            .setDesc(t('settings.themeDesc'))
-            .addDropdown(dropdown => dropdown
-                .addOption('default', t('settings.themeDefaultOption'))
-                .addOption('ios-glass', t('settings.themeIosGlassOption'))
-                .setValue(this.plugin.settings.theme)
-                .onChange(async (value: 'default' | 'ios-glass') => {
-                    this.plugin.settings.theme = value;
-                    await this.plugin.saveSettings();
-                    // 应用主题
-                    this.plugin.applyTheme(value);
                 })
             );
 

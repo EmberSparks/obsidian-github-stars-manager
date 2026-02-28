@@ -7,6 +7,27 @@ import { t } from './i18n';
 
 export const VIEW_TYPE_STARS = 'github-stars-view';
 
+const TAG_COLOR_PALETTE = [
+    '#b7dbff', '#c3e4ff', '#c8f0ff', '#c6f4f0', '#c9f7e6', '#d8f7cf',
+    '#e4f8c8', '#f0f7c9', '#fff3c7', '#ffe8c5', '#ffd8c5', '#ffd0d8',
+    '#f7d0e8', '#ead7ff', '#dcd7ff', '#d2ddff', '#cde8ff', '#c8efe8',
+    '#d7f0e6', '#e0efda', '#f2e4cf', '#f6dcd4', '#e8def7', '#d5e2ef'
+];
+
+const FALLBACK_TAG_TEXT_COLOR = '#ffffff';
+const FALLBACK_TAG_DARK_TEXT_COLOR = '#111827';
+
+function hexToRgb(hexColor: string): { r: number; g: number; b: number } | null {
+    const normalized = hexColor.trim().replace('#', '');
+    if (!/^[0-9a-fA-F]{6}$/.test(normalized)) {
+        return null;
+    }
+    const r = parseInt(normalized.slice(0, 2), 16);
+    const g = parseInt(normalized.slice(2, 4), 16);
+    const b = parseInt(normalized.slice(4, 6), 16);
+    return { r, g, b };
+}
+
 export class GithubStarsView extends ItemView {
     plugin: GithubStarsPlugin;
     githubRepositories: GithubRepository[] = []; // Renamed and typed
@@ -20,9 +41,21 @@ export class GithubStarsView extends ItemView {
     sortBy: 'starred_at' | 'stars' | 'forks' | 'updated' = 'starred_at';
     sortOrder: 'asc' | 'desc' = 'desc'; // 新增排序方向状态
     showAllTags: boolean = false; // Add state for showing all tags
+    showAllTagsBeforeManageMode: boolean | null = null;
     selectedRepos: Set<number> = new Set(); // 选中的仓库ID集合
     isExportMode: boolean = false; // 是否处于导出模式
     totalStarsNumberEl: HTMLElement | null = null; // star总数显示元素
+    isTagManageMode: boolean = false; // 标签管理模式
+    tagManageToggleButton: HTMLButtonElement | null = null;
+    tagPopoverEl: HTMLElement | null = null;
+    tagPopoverAnchorEl: HTMLElement | null = null;
+    tagPopoverOutsideClickHandler?: (event: MouseEvent) => void;
+    tagPopoverEscHandler?: (event: KeyboardEvent) => void;
+    editingTagName: string | null = null;
+    editingTagDraft: string = '';
+    editingTagColorDraft: string = '';
+    editingTagColorDirty: boolean = false;
+    pendingMergeTargetTag: string | null = null;
 
     constructor(leaf: WorkspaceLeaf, plugin: GithubStarsPlugin) {
         super(leaf);
@@ -61,7 +94,6 @@ export class GithubStarsView extends ItemView {
         // Tags Filter Area
         const tagsDiv = container.createDiv('github-stars-tags');
         this.tagsContainer = tagsDiv.createDiv('github-stars-tags-container');
-        // Initial population of tags filter
         this.updateTagsFilter(this.tagsContainer);
 
         // Repositories Container
@@ -83,7 +115,43 @@ export class GithubStarsView extends ItemView {
             hash = ((hash << 5) - hash) + char;
             hash = hash & hash; // Convert to 32bit integer
         }
-        return Math.abs(hash) % 12 + 1; // 返回1-12的索引
+        return Math.abs(hash) % TAG_COLOR_PALETTE.length;
+    }
+
+    /**
+     * 获取标签最终颜色（自定义优先，默认哈希色回退）
+     */
+    private getTagColor(tagName: string): string {
+        const customColor = this.plugin.getTagColor(tagName);
+        if (customColor && /^#[0-9a-fA-F]{6}$/.test(customColor)) {
+            return customColor;
+        }
+        return TAG_COLOR_PALETTE[this.getTagColorIndex(tagName)];
+    }
+
+    /**
+     * 根据背景色计算高对比文字颜色
+     */
+    private getTagTextColor(backgroundHexColor: string): string {
+        const rgb = hexToRgb(backgroundHexColor);
+        if (!rgb) return FALLBACK_TAG_TEXT_COLOR;
+        const luminance = (0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b) / 255;
+        return luminance > 0.65 ? FALLBACK_TAG_DARK_TEXT_COLOR : FALLBACK_TAG_TEXT_COLOR;
+    }
+
+    /**
+     * 为标签元素应用颜色样式
+     */
+    private applyTagColorStyle(tagEl: HTMLElement, tagName: string): void {
+        const color = this.getTagColor(tagName);
+        const textColor = this.getTagTextColor(color);
+        const rgb = hexToRgb(color);
+        const shadowColor = rgb ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.35)` : 'rgba(0, 0, 0, 0.2)';
+
+        tagEl.style.backgroundColor = color;
+        tagEl.style.borderColor = color;
+        tagEl.style.color = textColor;
+        tagEl.style.setProperty('--github-tag-shadow-color', shadowColor);
     }
 
     /**
@@ -131,23 +199,515 @@ export class GithubStarsView extends ItemView {
     }
 
     /**
+     * 更新标签管理模式切换按钮状态
+     */
+    private updateTagManageToggleButton() {
+        if (!this.tagManageToggleButton) return;
+
+        this.tagManageToggleButton.textContent = this.isTagManageMode
+            ? t('view.tagManageExit')
+            : t('view.tagManageEnter');
+        this.tagManageToggleButton.toggleClass('active', this.isTagManageMode);
+        this.tagManageToggleButton.setAttribute(
+            'title',
+            this.isTagManageMode ? t('view.tagManageHint') : t('view.tagManageEnter')
+        );
+    }
+
+    /**
+     * 在标签容器前置渲染“管理标签”按钮
+     */
+    private renderTagManageToggleButton(container: HTMLElement): void {
+        const manageButton = container.createEl('button', {
+            cls: 'github-stars-tag-manage-toggle'
+        });
+        manageButton.type = 'button';
+        manageButton.addEventListener('click', () => {
+            this.toggleTagManageMode();
+        });
+        this.tagManageToggleButton = manageButton;
+        this.updateTagManageToggleButton();
+    }
+
+    /**
+     * 切换标签管理模式
+     */
+    private toggleTagManageMode() {
+        if ((this.allTags || []).length === 0) {
+            new Notice(t('view.tagManageNoTags'));
+            return;
+        }
+
+        const nextManageMode = !this.isTagManageMode;
+        if (nextManageMode) {
+            this.showAllTagsBeforeManageMode = this.showAllTags;
+            this.showAllTags = true;
+        } else {
+            this.cancelTagEditing();
+            if (this.showAllTagsBeforeManageMode !== null) {
+                this.showAllTags = this.showAllTagsBeforeManageMode;
+            }
+            this.showAllTagsBeforeManageMode = null;
+        }
+        this.isTagManageMode = nextManageMode;
+
+        this.updateTagManageToggleButton();
+        this.updateTagsFilter(this.tagsContainer);
+        new Notice(this.isTagManageMode ? t('view.tagManageModeOn') : t('view.tagManageModeOff'));
+    }
+
+    /**
+     * 归一化标签名称（用于大小写不敏感匹配）
+     */
+    private normalizeTagName(tag: string): string {
+        return tag.trim().toLowerCase();
+    }
+
+    /**
+     * 获取当前启用账号ID集合
+     */
+    private getEnabledAccountIdSet(): Set<string> {
+        const enabledAccounts = (this.plugin.settings.accounts || []).filter(account => account.enabled);
+        return new Set(enabledAccounts.map(account => account.id));
+    }
+
+    /**
+     * 仓库是否满足账号过滤条件
+     */
+    private isRepoVisibleByAccount(repo: GithubRepository): boolean {
+        const enabledAccountIds = this.getEnabledAccountIdSet();
+        if (enabledAccountIds.size === 0) return false;
+        if (repo.account_id && !enabledAccountIds.has(repo.account_id)) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * 仓库是否满足当前文本过滤条件
+     */
+    private matchesCurrentTextFilter(repo: {
+        name?: string;
+        full_name?: string;
+        description?: string | null;
+        owner?: { login?: string };
+        notes?: string;
+        language?: string | null;
+        tags?: string[];
+    }): boolean {
+        if (!this.currentFilter) return true;
+
+        const normalizedFilter = this.currentFilter.toLowerCase();
+        const name = repo.name || '';
+        const fullName = repo.full_name || '';
+        const description = repo.description || '';
+        const ownerLogin = repo.owner?.login || '';
+        const notes = repo.notes || '';
+        const language = repo.language || '';
+        const tags = Array.isArray(repo.tags) ? repo.tags : [];
+
+        return (
+            name.toLowerCase().includes(normalizedFilter) ||
+            fullName.toLowerCase().includes(normalizedFilter) ||
+            description.toLowerCase().includes(normalizedFilter) ||
+            ownerLogin.toLowerCase().includes(normalizedFilter) ||
+            notes.toLowerCase().includes(normalizedFilter) ||
+            language.toLowerCase().includes(normalizedFilter) ||
+            tags.some(tag => tag.toLowerCase().includes(normalizedFilter))
+        );
+    }
+
+    /**
+     * 开始编辑标签
+     */
+    private startTagEditing(tag: string, anchorEl: HTMLElement) {
+        this.editingTagName = tag;
+        this.editingTagDraft = tag;
+        this.editingTagColorDraft = this.getTagColor(tag);
+        this.editingTagColorDirty = false;
+        this.pendingMergeTargetTag = null;
+        this.tagPopoverAnchorEl = anchorEl;
+        this.openTagEditPopover();
+    }
+
+    /**
+     * 取消编辑标签
+     */
+    private cancelTagEditing() {
+        this.editingTagName = null;
+        this.editingTagDraft = '';
+        this.editingTagColorDraft = '';
+        this.editingTagColorDirty = false;
+        this.pendingMergeTargetTag = null;
+        if (this.tagsContainer) {
+            this.tagsContainer.querySelectorAll('.github-stars-tag.editing').forEach((el) => {
+                el.removeClass('editing');
+            });
+        }
+        this.closeTagEditPopover();
+    }
+
+    /**
+     * 在标签筛选区域查找可用锚点（用于弹出面板定位恢复）
+     */
+    private findTagAnchorElement(tagName: string): HTMLElement | null {
+        if (!this.tagsContainer) return null;
+        const normalizedTag = tagName.toLowerCase();
+        const tagElements = Array.from(this.tagsContainer.querySelectorAll('.github-stars-tag'));
+        const matched = tagElements.find((el) => el.getAttribute('data-tag-name') === normalizedTag);
+        return matched instanceof HTMLElement ? matched : null;
+    }
+
+    /**
+     * 打开标签编辑弹出面板
+     */
+    private openTagEditPopover() {
+        if (!this.isTagManageMode || !this.editingTagName || !this.tagPopoverAnchorEl) {
+            return;
+        }
+
+        if (!this.tagPopoverEl) {
+            this.tagPopoverEl = document.body.createDiv('github-stars-tag-popover');
+            this.tagPopoverEl.addEventListener('mousedown', (event) => {
+                event.stopPropagation();
+            });
+        }
+
+        this.renderTagEditPopoverContent();
+        this.positionTagEditPopover();
+        this.ensureTagPopoverGlobalHandlers();
+
+        window.setTimeout(() => {
+            const inputEl = this.tagPopoverEl?.querySelector('.github-stars-tag-popover-input') as HTMLInputElement | null;
+            if (inputEl) {
+                inputEl.focus();
+                inputEl.select();
+            }
+        }, 0);
+    }
+
+    /**
+     * 渲染弹出面板内容
+     */
+    private renderTagEditPopoverContent() {
+        if (!this.tagPopoverEl || !this.editingTagName) return;
+
+        this.tagPopoverEl.empty();
+        const sourceTag = this.editingTagName;
+
+        this.tagPopoverEl.createEl('div', {
+            cls: 'github-stars-tag-popover-title',
+            text: t('view.tagInlineEditName', { tag: sourceTag })
+        });
+        this.tagPopoverEl.createEl('div', {
+            cls: 'github-stars-tag-popover-desc',
+            text: t('view.tagInlineEditDesc')
+        });
+
+        const inputEl = this.tagPopoverEl.createEl('input', {
+            cls: 'github-stars-tag-popover-input',
+            attr: {
+                type: 'text',
+                placeholder: t('view.tagRenamePlaceholder')
+            }
+        });
+        inputEl.value = this.editingTagDraft;
+        inputEl.addEventListener('input', () => {
+            this.editingTagDraft = inputEl.value;
+            if (this.pendingMergeTargetTag) {
+                this.pendingMergeTargetTag = null;
+                this.renderTagEditPopoverContent();
+                this.positionTagEditPopover();
+            }
+        });
+        inputEl.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                void this.applyTagRename(false);
+            } else if (event.key === 'Escape') {
+                event.preventDefault();
+                this.cancelTagEditing();
+            }
+        });
+
+        const paletteTitle = this.tagPopoverEl.createEl('div', {
+            cls: 'github-stars-tag-popover-palette-title',
+            text: t('view.tagColorLabel')
+        });
+        paletteTitle.setAttribute('title', t('view.tagColorDesc'));
+
+        const palette = this.tagPopoverEl.createDiv('github-stars-tag-popover-palette');
+        TAG_COLOR_PALETTE.forEach((color) => {
+            const swatchButton = palette.createEl('button', {
+                cls: 'github-stars-tag-color-swatch' + (this.editingTagColorDraft.toLowerCase() === color.toLowerCase() ? ' selected' : '')
+            });
+            swatchButton.type = 'button';
+            swatchButton.style.backgroundColor = color;
+            swatchButton.style.borderColor = color;
+            swatchButton.setAttribute('aria-label', `${t('view.tagColorLabel')}: ${color}`);
+            swatchButton.setAttribute('title', color);
+            swatchButton.addEventListener('click', () => {
+                this.editingTagColorDraft = color;
+                this.editingTagColorDirty = true;
+                if (this.pendingMergeTargetTag) {
+                    this.pendingMergeTargetTag = null;
+                }
+                this.renderTagEditPopoverContent();
+                this.positionTagEditPopover();
+            });
+        });
+
+        if (this.pendingMergeTargetTag) {
+            this.tagPopoverEl.createEl('div', {
+                cls: 'github-stars-tag-popover-warning',
+                text: t('view.tagRenameMergeWarning', { newTag: this.pendingMergeTargetTag })
+            });
+        }
+
+        const actions = this.tagPopoverEl.createDiv('github-stars-tag-popover-actions');
+        const saveButton = actions.createEl('button', {
+            text: this.pendingMergeTargetTag ? t('view.tagMergeConfirm') : t('common.save')
+        });
+        saveButton.addClass(this.pendingMergeTargetTag ? 'mod-warning' : 'mod-cta');
+        saveButton.addEventListener('click', () => {
+            void this.applyTagRename(Boolean(this.pendingMergeTargetTag));
+        });
+
+        const cancelButton = actions.createEl('button', { text: t('common.cancel') });
+        cancelButton.addEventListener('click', () => {
+            if (this.pendingMergeTargetTag) {
+                this.pendingMergeTargetTag = null;
+                this.renderTagEditPopoverContent();
+                this.positionTagEditPopover();
+                return;
+            }
+            this.cancelTagEditing();
+        });
+    }
+
+    /**
+     * 定位弹出面板
+     */
+    private positionTagEditPopover() {
+        if (!this.tagPopoverEl || !this.editingTagName) return;
+
+        let anchorEl = this.tagPopoverAnchorEl;
+        if (!anchorEl || !anchorEl.isConnected) {
+            anchorEl = this.findTagAnchorElement(this.editingTagName);
+            if (!anchorEl) {
+                return;
+            }
+            this.tagPopoverAnchorEl = anchorEl;
+        }
+
+        const rect = anchorEl.getBoundingClientRect();
+        if (rect.width === 0 && rect.height === 0) {
+            const recoveredAnchor = this.findTagAnchorElement(this.editingTagName);
+            if (!recoveredAnchor) return;
+            this.tagPopoverAnchorEl = recoveredAnchor;
+            const recoveredRect = recoveredAnchor.getBoundingClientRect();
+            if (recoveredRect.width === 0 && recoveredRect.height === 0) return;
+            anchorEl = recoveredAnchor;
+        }
+
+        const finalRect = anchorEl.getBoundingClientRect();
+        const panelRect = this.tagPopoverEl.getBoundingClientRect();
+
+        const desiredLeft = finalRect.left + (finalRect.width / 2) - (panelRect.width / 2);
+        const maxLeft = window.innerWidth - panelRect.width - 8;
+        const left = Math.max(8, Math.min(desiredLeft, maxLeft));
+        const top = Math.min(finalRect.bottom + 8, window.innerHeight - panelRect.height - 8);
+
+        this.tagPopoverEl.style.left = `${left}px`;
+        this.tagPopoverEl.style.top = `${Math.max(8, top)}px`;
+    }
+
+    /**
+     * 注册弹出面板全局事件
+     */
+    private ensureTagPopoverGlobalHandlers() {
+        if (!this.tagPopoverOutsideClickHandler) {
+            this.tagPopoverOutsideClickHandler = (event: MouseEvent) => {
+                if (!this.tagPopoverEl) return;
+                const target = event.target as Node | null;
+                if (target && this.tagPopoverEl.contains(target)) return;
+                if (target && this.tagPopoverAnchorEl?.contains(target)) return;
+                this.cancelTagEditing();
+            };
+            window.addEventListener('mousedown', this.tagPopoverOutsideClickHandler);
+        }
+
+        if (!this.tagPopoverEscHandler) {
+            this.tagPopoverEscHandler = (event: KeyboardEvent) => {
+                if (event.key === 'Escape') {
+                    this.cancelTagEditing();
+                }
+            };
+            window.addEventListener('keydown', this.tagPopoverEscHandler);
+        }
+    }
+
+    /**
+     * 注销弹出面板全局事件
+     */
+    private teardownTagPopoverGlobalHandlers() {
+        if (this.tagPopoverOutsideClickHandler) {
+            window.removeEventListener('mousedown', this.tagPopoverOutsideClickHandler);
+            this.tagPopoverOutsideClickHandler = undefined;
+        }
+        if (this.tagPopoverEscHandler) {
+            window.removeEventListener('keydown', this.tagPopoverEscHandler);
+            this.tagPopoverEscHandler = undefined;
+        }
+    }
+
+    /**
+     * 关闭标签编辑弹出面板
+     */
+    private closeTagEditPopover() {
+        if (this.tagPopoverEl) {
+            this.tagPopoverEl.remove();
+            this.tagPopoverEl = null;
+        }
+        this.tagPopoverAnchorEl = null;
+        this.teardownTagPopoverGlobalHandlers();
+    }
+
+    /**
+     * 应用标签重命名
+     */
+    private async applyTagRename(forceMerge: boolean) {
+        if (!this.editingTagName) return;
+
+        const sourceTag = this.editingTagName.trim();
+        const targetTag = this.editingTagDraft.trim();
+        const selectedColor = this.editingTagColorDraft || this.getTagColor(sourceTag);
+        const isNameChanged = sourceTag !== targetTag;
+        const isColorChanged = this.editingTagColorDirty;
+
+        if (!targetTag && isNameChanged) {
+            new Notice(t('view.tagRenameEmpty'));
+            return;
+        }
+
+        if (!isNameChanged && !isColorChanged) {
+            new Notice(t('view.tagRenameUnchanged'));
+            this.cancelTagEditing();
+            return;
+        }
+
+        if (!isNameChanged && isColorChanged) {
+            this.plugin.setTagColor(sourceTag, selectedColor);
+            await this.plugin.savePluginData();
+            this.cancelTagEditing();
+            this.updateTagsFilter(this.tagsContainer);
+            this.renderRepositories();
+            new Notice(t('view.tagColorUpdated', { tag: sourceTag }));
+            return;
+        }
+
+        const sourceNormalized = sourceTag.toLowerCase();
+        const targetNormalized = targetTag.toLowerCase();
+        const existingTagSet = new Set((this.allTags || []).map(tag => tag.toLowerCase()));
+        const willMerge = sourceNormalized !== targetNormalized && existingTagSet.has(targetNormalized);
+        if (willMerge && !forceMerge) {
+            this.pendingMergeTargetTag = targetTag;
+            this.renderTagEditPopoverContent();
+            this.positionTagEditPopover();
+            return;
+        }
+
+        const affectedCount = this.plugin.renameTagAcrossEnhancements(sourceTag, targetTag);
+        if (affectedCount === 0) {
+            new Notice(t('view.tagRenameNotFound', { tag: sourceTag }));
+            return;
+        }
+
+        this.migrateTagFilterState(sourceTag, targetTag);
+        this.editingTagName = targetTag;
+        this.editingTagDraft = targetTag;
+        this.editingTagColorDraft = selectedColor;
+        this.editingTagColorDirty = false;
+        this.pendingMergeTargetTag = null;
+
+        if (isColorChanged) {
+            this.plugin.setTagColor(targetTag, selectedColor);
+        }
+
+        await this.plugin.savePluginData();
+        this.cancelTagEditing();
+        this.updateTagsFilter(this.tagsContainer);
+        this.renderRepositories();
+        new Notice(t('view.tagRenameSuccess', {
+            oldTag: sourceTag,
+            newTag: targetTag,
+            count: String(affectedCount)
+        }));
+    }
+
+    /**
+     * 在标签重命名后迁移筛选状态
+     */
+    private migrateTagFilterState(oldTag: string, newTag: string) {
+        const oldNormalized = this.normalizeTagName(oldTag);
+        const newNormalized = this.normalizeTagName(newTag);
+        const oldActive = this.filterByTags.get(oldNormalized) || false;
+        this.filterByTags.delete(oldNormalized);
+        if (!oldActive) return;
+        this.filterByTags.set(newNormalized, true);
+    }
+
+    /**
      * 更新标签筛选区域 (Uses this.allTags)
      */
     updateTagsFilter(container: HTMLElement) {
         container.empty();
+        this.renderTagManageToggleButton(container);
 
         const currentTags = this.allTags || [];
         if (currentTags.length === 0) {
-            container.createSpan({ text: t('view.noTags') });
+            this.editingTagName = null;
+            this.editingTagDraft = '';
+            this.editingTagColorDraft = '';
+            this.editingTagColorDirty = false;
+            this.pendingMergeTargetTag = null;
+            this.closeTagEditPopover();
+            container.createSpan({ cls: 'github-stars-tags-empty', text: t('view.noTags') });
             return;
         }
 
-        // 1. 计算每个标签的数量
+        // 1. 计算每个标签的数量（按当前可见仓库范围：账号过滤 + 文本过滤）
         const tagCounts = new Map<string, number>();
-        Object.values(this.userEnhancements).forEach(enhancement => {
-            if (enhancement.tags) {
-                enhancement.tags.forEach(tag => {
-                    tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
+        const repoById = new Map(this.githubRepositories.map(repo => [repo.id, repo] as const));
+        const visibleRepoIdSet = new Set(
+            this.githubRepositories
+                .filter((repo) => this.isRepoVisibleByAccount(repo))
+                .map((repo) => repo.id)
+        );
+
+        Object.entries(this.userEnhancements).forEach(([repoId, enhancement]) => {
+            const numericRepoId = Number(repoId);
+            if (!visibleRepoIdSet.has(numericRepoId)) {
+                return;
+            }
+
+            const baseRepo = repoById.get(numericRepoId);
+            if (!baseRepo) return;
+
+            const repoForSearch = {
+                ...baseRepo,
+                notes: enhancement.notes || '',
+                tags: enhancement.tags || []
+            };
+
+            if (!this.matchesCurrentTextFilter(repoForSearch)) {
+                return;
+            }
+
+            if (Array.isArray(enhancement.tags)) {
+                enhancement.tags.forEach((tag) => {
+                    const existingTagKey = currentTags.find(existing => this.normalizeTagName(existing) === this.normalizeTagName(tag)) || tag;
+                    tagCounts.set(existingTagKey, (tagCounts.get(existingTagKey) || 0) + 1);
                 });
             }
         });
@@ -159,19 +719,38 @@ export class GithubStarsView extends ItemView {
         // 3. 创建标签按钮
         tagsToShow.forEach(tag => {
             const count = tagCounts.get(tag) || 0;
-            const isActive = this.filterByTags.get(tag) || false;
+            const normalizedTag = this.normalizeTagName(tag);
+            const isActive = this.filterByTags.get(normalizedTag) || false;
             const isHighlighted = this.currentFilter && tag.toLowerCase().includes(this.currentFilter);
+            const isEditing = this.editingTagName?.toLowerCase() === tag.toLowerCase();
             
             const tagEl = container.createEl('span', {
                 cls: 'github-stars-tag' + 
                      (isActive ? ' active' : '') + 
-                     (isHighlighted ? ' highlighted' : ''),
+                     (isHighlighted ? ' highlighted' : '') +
+                     (this.isTagManageMode ? ' managing' : '') +
+                     (isEditing ? ' editing' : ''),
+                attr: { 'data-tag-name': tag.toLowerCase() },
                 text: `${tag} (${count})`
             });
+            this.applyTagColorStyle(tagEl, tag);
+
+            if (this.isTagManageMode) {
+                tagEl.setAttribute('title', t('view.tagManageClickToEdit'));
+            }
 
             tagEl.addEventListener('click', () => {
-                const currentState = this.filterByTags.get(tag) || false;
-                this.filterByTags.set(tag, !currentState);
+                if (this.isTagManageMode) {
+                    container.querySelectorAll('.github-stars-tag.editing').forEach((el) => {
+                        el.removeClass('editing');
+                    });
+                    tagEl.addClass('editing');
+                    this.startTagEditing(tag, tagEl);
+                    return;
+                }
+
+                const currentState = this.filterByTags.get(normalizedTag) || false;
+                this.filterByTags.set(normalizedTag, !currentState);
                 tagEl.toggleClass('active', !currentState);
                 
                 // 清除不可见仓库的选择状态
@@ -193,7 +772,7 @@ export class GithubStarsView extends ItemView {
         });
 
         // 4. 添加"更多"按钮
-        if (currentTags.length > maxVisibleTags) {
+        if (!this.isTagManageMode && currentTags.length > maxVisibleTags) {
             const moreButton = container.createEl('span', {
                 cls: 'github-stars-tag-more',
                 text: this.showAllTags ? t('view.showLess') : t('view.showMore') + ` (+${currentTags.length - maxVisibleTags})`
@@ -243,16 +822,7 @@ export class GithubStarsView extends ItemView {
         // 2. Filter combined data
         const filteredRepos = combinedRepos.filter(repo => {
             // Account filter - only show repos from enabled accounts
-            const enabledAccounts = this.plugin.settings.accounts?.filter(account => account.enabled) || [];
-            const enabledAccountIds = enabledAccounts.map(account => account.id);
-            
-            // If no accounts are enabled, show nothing
-            if (enabledAccountIds.length === 0) {
-                return false;
-            }
-            
-            // If repo has account_id, check if it's from an enabled account
-            if (repo.account_id && !enabledAccountIds.includes(repo.account_id)) {
+            if (!this.isRepoVisibleByAccount(repo)) {
                 return false;
             }
             
@@ -280,7 +850,8 @@ export class GithubStarsView extends ItemView {
 
             if (activeTags.length === 0) return true; // No active tag filter means pass
 
-            return activeTags.some(tag => tags.includes(tag)); // Check if repo has any active tag
+            const normalizedRepoTags = new Set(tags.map(tag => this.normalizeTagName(tag)));
+            return activeTags.some(tag => normalizedRepoTags.has(this.normalizeTagName(tag))); // Check if repo has any active tag
         });
 
         // 3. Sort filtered data
@@ -386,18 +957,18 @@ export class GithubStarsView extends ItemView {
             if (Array.isArray(repo.tags) && repo.tags.length > 0) {
                 const titleTagsEl = titleGroupEl.createEl('div', { cls: 'github-stars-repo-title-tags' });
                 repo.tags.forEach(tag => {
-                    const colorIndex = this.getTagColorIndex(tag);
                     const tagEl = titleTagsEl.createEl('span', {
                         cls: 'github-stars-repo-tag',
-                        text: tag,
-                        attr: { 'data-tag-color': String(colorIndex) }
+                        text: tag
                     });
+                    this.applyTagColorStyle(tagEl, tag);
                     
                     // Add click functionality to repo tags
                     tagEl.addEventListener('click', (e) => {
                         e.stopPropagation();
-                        const currentState = this.filterByTags.get(tag) || false;
-                        this.filterByTags.set(tag, !currentState);
+                        const normalizedTag = this.normalizeTagName(tag);
+                        const currentState = this.filterByTags.get(normalizedTag) || false;
+                        this.filterByTags.set(normalizedTag, !currentState);
                         
                         // Update all tag filter buttons
                         this.updateTagsFilter(this.tagsContainer);
@@ -670,21 +1241,6 @@ export class GithubStarsView extends ItemView {
             });
         });
 
-        // Theme Toggle Button
-        const themeButton = toolbarDiv.createEl('button', { cls: 'github-stars-theme-button' });
-        this.updateThemeButton(themeButton);
-        themeButton.setAttribute('aria-label', t('view.theme.toggle'));
-        themeButton.addEventListener('click', () => {
-            const currentTheme = this.plugin.settings.theme;
-            const newTheme = currentTheme === 'default' ? 'ios-glass' : 'default';
-            this.plugin.settings.theme = newTheme;
-            this.plugin.saveSettings().catch(err => console.error('Failed to save theme settings:', err));
-            this.plugin.applyTheme(newTheme);
-            this.updateThemeButton(themeButton);
-            const themeName = newTheme === 'ios-glass' ? t('view.theme.iosGlass') : t('view.theme.default');
-            new Notice(t('notices.themeSwitch', { theme: themeName }));
-        });
-
         // 在工具栏中添加账户选择器
         this.addAccountSelector(toolbarDiv);
 
@@ -746,6 +1302,35 @@ export class GithubStarsView extends ItemView {
     }
 
     /**
+     * 清理已经失效的标签过滤条件
+     */
+    private pruneInvalidTagFilters(): void {
+        const validTagSet = new Set((this.allTags || []).map(tag => this.normalizeTagName(tag)));
+        const normalizedFilters = new Map<string, boolean>();
+
+        Array.from(this.filterByTags.entries()).forEach(([tag, active]) => {
+            const normalized = this.normalizeTagName(tag);
+            if (!validTagSet.has(normalized)) {
+                return;
+            }
+            normalizedFilters.set(normalized, (normalizedFilters.get(normalized) || false) || active);
+        });
+
+        this.filterByTags = normalizedFilters;
+    }
+
+    /**
+     * 清理已经失效的标签编辑状态
+     */
+    private pruneInvalidTagEditingState(): void {
+        if (!this.editingTagName) return;
+        const validTagSet = new Set((this.allTags || []).map(tag => tag.toLowerCase()));
+        if (!validTagSet.has(this.editingTagName.toLowerCase())) {
+            this.cancelTagEditing();
+        }
+    }
+
+    /**
      * 更新视图数据并重新渲染 (Updated Signature)
      * @param githubRepositories 最新的 GitHub 仓库列表
      * @param userEnhancements 最新的用户增强数据
@@ -755,6 +1340,10 @@ export class GithubStarsView extends ItemView {
         this.githubRepositories = githubRepositories || [];
         this.userEnhancements = userEnhancements || {};
         this.allTags = allTags || [];
+        this.pruneInvalidTagFilters();
+        this.pruneInvalidTagEditingState();
+        this.updateTagManageToggleButton();
+        this.closeTagEditPopover();
 
         // Ensure UI elements exist before updating/rendering
         if (this.tagsContainer) {
@@ -766,26 +1355,6 @@ export class GithubStarsView extends ItemView {
             this.renderRepositories();
         } else {
             console.warn('repoContainer not initialized when updateData called');
-        }
-    }
-
-    /**
-     * 更新主题按钮的图标和样式
-     */
-    updateThemeButton(button: HTMLElement) {
-        const currentTheme = this.plugin.settings.theme;
-        button.empty();
-
-        if (currentTheme === 'ios-glass') {
-            // iOS液态玻璃主题图标
-            setIcon(button, 'sparkles');
-            button.setAttribute('aria-label', t('view.theme.switchToDefault'));
-            button.addClass('active');
-        } else {
-            // 默认主题图标
-            setIcon(button, 'palette');
-            button.setAttribute('aria-label', t('view.theme.switchToIosGlass'));
-            button.removeClass('active');
         }
     }
 
@@ -1154,19 +1723,14 @@ githubRepo.id] || {};
         });
 
         return combinedRepos.filter(repo => {
+            // 账号过滤
+            if (!this.isRepoVisibleByAccount(repo)) {
+                return false;
+            }
+
             // 搜索过滤
-            if (this.currentFilter) {
-                const searchTerm = this.currentFilter.toLowerCase();
-                const matchesSearch =
-                    (repo.name && repo.name.toLowerCase().includes(searchTerm)) ||
-                    (repo.full_name && repo.full_name.toLowerCase().includes(searchTerm)) ||
-                    (repo.description && repo.description.toLowerCase().includes(searchTerm)) ||
-                    (repo.language && repo.language.toLowerCase().includes(searchTerm)) ||
-                    (repo.owner?.login && repo.owner.login.toLowerCase().includes(searchTerm)) ||
-                    (repo.tags && repo.tags.some(tag => tag.toLowerCase().includes(searchTerm))) ||
-                    (repo.notes && repo.notes.toLowerCase().includes(searchTerm));
-                
-                if (!matchesSearch) return false;
+            if (!this.matchesCurrentTextFilter(repo)) {
+                return false;
             }
 
             // 标签过滤
@@ -1175,8 +1739,9 @@ githubRepo.id] || {};
                 .map(([tag, _]) => tag);
 
             if (activeTagFilters.length > 0) {
+                const normalizedRepoTags = new Set((repo.tags || []).map(tag => this.normalizeTagName(tag)));
                 const hasMatchingTag = activeTagFilters.some(filterTag =>
-                    repo.tags.includes(filterTag)
+                    normalizedRepoTags.has(this.normalizeTagName(filterTag))
                 );
                 if (!hasMatchingTag) return false;
             }
@@ -1218,5 +1783,10 @@ githubRepo.id] || {};
         if (this.totalStarsNumberEl) {
             this.totalStarsNumberEl.textContent = `${this.getVisibleRepoCount()}`;
         }
+    }
+
+    onClose(): Promise<void> {
+        this.closeTagEditPopover();
+        return Promise.resolve();
     }
 } // End of GithubStarsView class

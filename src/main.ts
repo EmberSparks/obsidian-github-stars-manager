@@ -14,6 +14,7 @@ const DEFAULT_PLUGIN_DATA: PluginData = {
     githubRepositories: [], // 重命名
     userEnhancements: {},   // 新增
     allTags: [],            // 新增 (替代旧的 tags)
+    tagColors: {},          // 标签颜色映射
     lastSyncTime: '',
     accountSyncTimes: {},   // 新增：每个账号的同步时间
     exportOptions: undefined // 新增：导出选项（可选）
@@ -64,8 +65,9 @@ export default class GithubStarsPlugin extends Plugin {
         // 注册自动同步 (不变)
         this.setupAutoSync();
 
-        // 应用主题
-        this.applyTheme(this.settings.theme);
+        // 兼容旧版本：清理历史主题类，固定使用默认外观
+        document.body.removeClass('github-stars-theme-default');
+        document.body.removeClass('github-stars-theme-ios-glass');
 
         new Notice(t('plugin.loaded'));
     }
@@ -102,6 +104,9 @@ export default class GithubStarsPlugin extends Plugin {
         }
         if (!Array.isArray(this.data.allTags)) {
             this.data.allTags = [];
+        }
+        if (typeof this.data.tagColors !== 'object' || this.data.tagColors === null || Array.isArray(this.data.tagColors)) {
+            this.data.tagColors = {};
         }
         if (typeof this.data.accountSyncTimes !== 'object' || this.data.accountSyncTimes === null || Array.isArray(this.data.accountSyncTimes)) {
             this.data.accountSyncTimes = {};
@@ -343,21 +348,118 @@ export default class GithubStarsPlugin extends Plugin {
             });
         }
         this.data.allTags = Array.from(allTags).sort();
+
+        // 同步清理标签颜色映射：只保留当前仍存在的标签
+        const currentTagColors = this.data.tagColors || {};
+        const normalizedEntries = Object.entries(currentTagColors).map(([key, value]) => [key.toLowerCase(), value] as const);
+        const syncedTagColors: { [tagNameLower: string]: string } = {};
+
+        this.data.allTags.forEach((tag) => {
+            const lowerTag = tag.toLowerCase();
+            const matched = normalizedEntries.find(([key]) => key === lowerTag);
+            if (matched && typeof matched[1] === 'string' && matched[1].trim().length > 0) {
+                syncedTagColors[lowerTag] = matched[1].trim();
+            }
+        });
+
+        this.data.tagColors = syncedTagColors;
     }
 
-    // --- 主题管理 ---
-    applyTheme(theme: 'default' | 'ios-glass') {
-        const body = document.body;
-        
-        // 移除所有主题类
-        body.removeClass('github-stars-theme-default');
-        body.removeClass('github-stars-theme-ios-glass');
-        
-        // 应用新主题类
-        body.addClass(`github-stars-theme-${theme}`);
-        
-        // 更新视图以应用主题
-        this.updateViews();
+    /**
+     * 在所有仓库增强信息中重命名标签。
+     * @returns 受影响的仓库数量
+     */
+    renameTagAcrossEnhancements(oldTag: string, newTag: string): number {
+        const sourceTag = oldTag.trim();
+        const targetTag = newTag.trim();
+        if (!sourceTag || !targetTag) {
+            return 0;
+        }
+
+        const sourceTagNormalized = sourceTag.toLowerCase();
+        let affectedRepositories = 0;
+
+        Object.values(this.data.userEnhancements).forEach((enhancement) => {
+            if (!Array.isArray(enhancement.tags) || enhancement.tags.length === 0) {
+                return;
+            }
+
+            const originalTags = enhancement.tags;
+            let hasMatch = false;
+            const replacedTags = originalTags.map((tag) => {
+                if (tag.toLowerCase() === sourceTagNormalized) {
+                    hasMatch = true;
+                    return targetTag;
+                }
+                return tag;
+            });
+
+            if (!hasMatch) {
+                return;
+            }
+
+            const dedupedTags: string[] = [];
+            const seen = new Set<string>();
+
+            replacedTags.forEach((tag) => {
+                const normalized = tag.toLowerCase();
+                if (seen.has(normalized)) {
+                    return;
+                }
+                seen.add(normalized);
+                dedupedTags.push(tag);
+            });
+
+            enhancement.tags = dedupedTags;
+            affectedRepositories += 1;
+        });
+
+        // 标签颜色映射迁移：重命名后保持颜色配置
+        const sourceTagKey = sourceTag.toLowerCase();
+        const targetTagKey = targetTag.toLowerCase();
+        const sourceColor = this.data.tagColors?.[sourceTagKey];
+
+        if (sourceColor) {
+            if (!this.data.tagColors[targetTagKey]) {
+                this.data.tagColors[targetTagKey] = sourceColor;
+            }
+            if (sourceTagKey !== targetTagKey) {
+                delete this.data.tagColors[sourceTagKey];
+            }
+        }
+
+        return affectedRepositories;
+    }
+
+    /**
+     * 获取标签自定义颜色
+     */
+    getTagColor(tagName: string): string | undefined {
+        const key = tagName.trim().toLowerCase();
+        if (!key) return undefined;
+        return this.data.tagColors?.[key];
+    }
+
+    /**
+     * 设置标签自定义颜色
+     */
+    setTagColor(tagName: string, color: string): void {
+        const key = tagName.trim().toLowerCase();
+        const value = color.trim();
+        if (!key || !value) return;
+        if (!this.data.tagColors) {
+            this.data.tagColors = {};
+        }
+        this.data.tagColors[key] = value;
+    }
+
+    /**
+     * 删除标签自定义颜色
+     */
+    removeTagColor(tagName: string): void {
+        const key = tagName.trim().toLowerCase();
+        if (!key || !this.data.tagColors) return;
+        delete this.data.tagColors[key];
     }
 
     // --- 导出功能 ---

@@ -291,17 +291,132 @@
 /* 标签筛选区 - 应用商店风格 */
 .github-stars-tags {
   margin-bottom: 20px;
+  display: block;
+}
+
+.github-stars-tags-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
-  flex-wrap: wrap;
 }
 
 .github-stars-tags-title {
   font-weight: 500;
   color: var(--text-normal);
   font-size: 0.9em;
-  margin-right: 4px;
+}
+
+.github-stars-tag-manage-toggle {
+  border: 1.5px dashed var(--background-modifier-border);
+  background: var(--background-primary);
+  color: var(--text-muted);
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-size: var(--font-ui-smaller);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.github-stars-tag-manage-toggle:hover {
+  border-color: var(--interactive-accent);
+  color: var(--interactive-accent);
+}
+
+.github-stars-tag-manage-toggle.active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: var(--interactive-accent);
+}
+
+.github-stars-tag-popover {
+  position: fixed;
+  z-index: 1000;
+  min-width: 260px;
+  max-width: 320px;
+  padding: 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  background: var(--background-primary);
+  box-shadow: var(--shadow-l);
+}
+
+.github-stars-tag-popover-title {
+  font-size: var(--font-ui-smaller);
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.github-stars-tag-popover-desc {
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+.github-stars-tag-popover-input {
+  width: 100%;
+  margin-top: 8px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  padding: 6px 10px;
+  font-size: var(--font-ui-small);
+}
+
+.github-stars-tag-popover-input:focus {
+  border-color: var(--interactive-accent);
+  outline: none;
+}
+
+.github-stars-tag-popover-warning {
+  margin-top: 8px;
+  color: var(--text-warning);
+  font-size: var(--font-ui-smaller);
+}
+
+.github-stars-tag-popover-actions {
+  margin-top: 8px;
+  display: flex;
+  gap: 6px;
+}
+
+.github-stars-tag-popover-palette-title {
+  margin-top: 10px;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+}
+
+.github-stars-tag-popover-palette {
+  margin-top: 6px;
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 6px;
+}
+
+.github-stars-tag-color-swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  border: 1.5px solid transparent;
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.16s ease, box-shadow 0.16s ease, filter 0.16s ease;
+}
+
+.github-stars-tag-color-swatch:hover {
+  transform: scale(1.06);
+  filter: brightness(1.04);
+}
+
+.github-stars-tag-color-swatch:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(var(--interactive-accent-rgb), 0.35);
+}
+
+.github-stars-tag-color-swatch.selected {
+  box-shadow: 0 0 0 2px var(--text-on-accent), 0 0 0 4px rgba(var(--interactive-accent-rgb), 0.38);
 }
 
 .github-stars-tags-container {
@@ -311,34 +426,73 @@
   align-items: center;
 }
 
+.github-stars-tags-empty {
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}
+
 .github-stars-tag {
   padding: 6px 12px;
   border-radius: 20px;
   font-size: 0.85em;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease, opacity 0.2s ease;
   background-color: var(--background-secondary);
-  border: 1px solid var(--background-modifier-border);
-  color: var(--text-muted);
+  border: 1px solid transparent;
+  color: var(--text-normal);
   font-weight: 600; /* Make tags bold */
+  box-shadow: 0 1px 2px var(--github-tag-shadow-color, rgba(0, 0, 0, 0.14));
+  position: relative;
 }
 
 .github-stars-tag:hover {
-  border-color: var(--interactive-accent);
-  background-color: var(--background-modifier-hover);
+  transform: translateY(-1px);
+  filter: brightness(1.03);
 }
 
 .github-stars-tag.active {
-  background-color: #22c55e;
-  color: white;
-  border-color: #22c55e;
+  transform: translateY(-1px) scale(1.03);
+  filter: saturate(1.08) brightness(1.03);
+  box-shadow:
+    0 0 0 2px rgba(var(--interactive-accent-rgb), 0.72),
+    0 6px 14px var(--github-tag-shadow-color, rgba(0, 0, 0, 0.24)),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+  padding-right: 26px;
+}
+
+.github-stars-tag.active::after {
+  content: '✓';
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.25);
+  color: currentColor;
 }
 
 .github-stars-tag.highlighted {
-  background-color: #fbbf24;
-  color: white;
-  border-color: #f59e0b;
-  box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.3);
+  box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.55), 0 2px 8px var(--github-tag-shadow-color, rgba(0, 0, 0, 0.18));
+}
+
+.github-stars-tag.managing {
+  border-style: dashed;
+  border-width: 2px;
+  filter: saturate(1.04);
+}
+
+.github-stars-tag.editing {
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 2px rgba(var(--interactive-accent-rgb), 0.2);
 }
 
 .github-stars-tag-more {
@@ -521,17 +675,17 @@
     font-size: 0.75em;
     font-weight: 500;
     cursor: pointer;
-    transition: all 0.2s ease;
-    border: 1px solid var(--background-modifier-border);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+    border: 1px solid transparent;
     background-color: var(--background-secondary);
     color: var(--text-normal);
     white-space: nowrap; /* 防止标签文字换行 */
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 1px 3px var(--github-tag-shadow-color, rgba(0, 0, 0, 0.12));
 }
 
 .github-stars-repo-tag:hover {
     transform: translateY(-1px);
-    background-color: var(--background-modifier-hover);
+    filter: brightness(1.04);
 }
 
 .github-stars-repo-footer {
@@ -606,67 +760,6 @@
     background-color: var(--interactive-accent-hover);
     transform: translateY(-1px);
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-}
-
-/* 仓库标签的颜色系统 (纯色版本) */
-.github-stars-repo-tag[data-tag-color="1"] {
-  background: #6366f1;
-  color: white;
-}
-
-.github-stars-repo-tag[data-tag-color="2"] {
-  background: #ec4899;
-  color: white;
-}
-
-.github-stars-repo-tag[data-tag-color="3"] {
-  background: #06b6d4;
-  color: white;
-}
-
-.github-stars-repo-tag[data-tag-color="4"] {
-  background: #10b981;
-  color: white;
-}
-
-.github-stars-repo-tag[data-tag-color="5"] {
-  background: #f59e0b;
-  color: white;
-}
-
-.github-stars-repo-tag[data-tag-color="6"] {
-  background: #8b5cf6;
-  color: white;
-}
-
-.github-stars-repo-tag[data-tag-color="7"] {
-  background: #ef4444;
-  color: white;
-}
-
-.github-stars-repo-tag[data-tag-color="8"] {
-  background: #f97316;
-  color: white;
-}
-
-.github-stars-repo-tag[data-tag-color="9"] {
-  background: #84cc16;
-  color: white;
-}
-
-.github-stars-repo-tag[data-tag-color="10"] {
-  background: #06b6d4;
-  color: white;
-}
-
-.github-stars-repo-tag[data-tag-color="11"] {
-  background: #8b5cf6;
-  color: white;
-}
-
-.github-stars-repo-tag[data-tag-color="12"] {
-  background: #be185d;
-  color: white;
 }
 
 /* 笔记容器 - 现代卡片风格 */
@@ -1134,12 +1227,12 @@
 }
 
 .github-stars-theme-ios-glass .github-stars-tag.active {
-  background: linear-gradient(135deg, 
-    rgba(52, 199, 89, 0.8) 0%, 
-    rgba(52, 199, 89, 0.6) 100%);
-  border-color: rgba(52, 199, 89, 0.4);
-  color: white;
-  box-shadow: 0 4px 16px rgba(52, 199, 89, 0.3);
+  box-shadow: 0 0 0 2px rgba(52, 199, 89, 0.45), 0 4px 16px rgba(52, 199, 89, 0.25);
+}
+
+.github-stars-theme-ios-glass .github-stars-tag.managing {
+  border-style: dashed;
+  border-width: 2px;
 }
 
 /* 仓库卡片 - 液态玻璃效果 */
@@ -1450,6 +1543,12 @@
     font-style: italic;
     text-align: center;
     padding: 20px;
+}
+
+.github-tags-empty {
+    color: var(--text-muted);
+    font-style: italic;
+    padding: 8px 0 16px;
 }
 
 .github-account-item {

@@ -18,7 +18,6 @@ export interface GithubStarsSettings {
     accounts: GithubAccount[]; // 多个GitHub账号
     autoSync: boolean;
     syncInterval: number; // 单位：分钟
-    theme: 'default' | 'ios-glass'; // 新增主题设置
     language: 'en' | 'zh'; // 语言设置
     enableExport: boolean; // 导出功能开关
     includeProperties: boolean; // 是否包含Properties
@@ -73,6 +72,10 @@ export interface PluginData {
     // 为了简单起见，暂时可以每次渲染时从 userEnhancements 动态生成
     // 或者在保存 userEnhancements 时更新一个单独的 allTags 列表
     allTags: string[]; // 存储所有用户定义的标签
+    // 标签颜色映射，key 为标签名小写
+    tagColors: {
+        [tagNameLower: string]: string;
+    };
     lastSyncTime: string;
     // 每个账号的最后同步时间
     accountSyncTimes: {
