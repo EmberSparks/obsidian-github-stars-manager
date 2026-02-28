@@ -44,3 +44,4 @@ deploy-fixed.bat
 
 # Environment variables
 .env
+.ace-tool/
