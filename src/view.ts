@@ -80,6 +80,7 @@ export class GithubStarsView extends ItemView {
     virtualItemsEl: HTMLElement | null = null;
     virtualBottomSpacerEl: HTMLElement | null = null;
     virtualMeasureFrameId: number | null = null;
+    repoRenderVersion: number = 0;
 
     constructor(leaf: WorkspaceLeaf, plugin: GithubStarsPlugin) {
         super(leaf);
@@ -393,6 +394,26 @@ export class GithubStarsView extends ItemView {
         if (!this.isRepoListVirtualized) return;
         this.renderVirtualizedWindow();
     };
+
+    /**
+     * 等待下一帧，避免一次性大批量 DOM 插入导致主线程长时间阻塞
+     */
+    private waitForNextFrame(): Promise<void> {
+        return new Promise((resolve) => {
+            window.requestAnimationFrame(() => resolve());
+        });
+    }
+
+    /**
+     * 根据仓库数量动态选择分批渲染尺寸
+     */
+    private getRepoRenderBatchSize(totalCount: number): number {
+        if (totalCount > 1400) return 10;
+        if (totalCount > 900) return 14;
+        if (totalCount > 500) return 20;
+        if (totalCount > 220) return 28;
+        return 36;
+    }
 
     /**
      * 开始编辑标签
@@ -958,6 +979,8 @@ export class GithubStarsView extends ItemView {
             console.warn('repoContainer not initialized');
             return;
         }
+        const renderVersion = ++this.repoRenderVersion;
+
         if (!this.githubRepositories || this.githubRepositories.length === 0) {
             this.disableRepoVirtualization();
             this.repoContainer.empty();
@@ -979,11 +1002,11 @@ export class GithubStarsView extends ItemView {
         this.updateTotalStarsCount(sortedRepos.length);
 
         if (sortedRepos.length < REPO_VIRTUALIZATION_THRESHOLD) {
-            this.renderFullRepositories(sortedRepos);
+            void this.renderFullRepositories(sortedRepos, renderVersion);
             return;
         }
 
-        this.renderVirtualizedRepositories(sortedRepos);
+        this.renderVirtualizedRepositories(sortedRepos, renderVersion);
     }
 
     /**
@@ -1071,20 +1094,37 @@ export class GithubStarsView extends ItemView {
     /**
      * 常规渲染（非虚拟化）
      */
-    private renderFullRepositories(repositories: RenderRepository[]): void {
+    private async renderFullRepositories(repositories: RenderRepository[], renderVersion: number): Promise<void> {
         if (!this.repoContainer) return;
         this.disableRepoVirtualization();
         this.repoContainer.empty();
-        repositories.forEach((repo) => {
-            this.renderRepositoryCard(repo, this.repoContainer);
-        });
+        const batchSize = this.getRepoRenderBatchSize(repositories.length);
+
+        for (let start = 0; start < repositories.length; start += batchSize) {
+            if (renderVersion !== this.repoRenderVersion || !this.repoContainer) {
+                return;
+            }
+
+            const end = Math.min(repositories.length, start + batchSize);
+            for (let index = start; index < end; index++) {
+                if (renderVersion !== this.repoRenderVersion || !this.repoContainer) {
+                    return;
+                }
+                this.renderRepositoryCard(repositories[index], this.repoContainer);
+            }
+
+            if (end < repositories.length) {
+                await this.waitForNextFrame();
+            }
+        }
     }
 
     /**
      * 虚拟列表渲染（仅渲染可视区域）
      */
-    private renderVirtualizedRepositories(repositories: RenderRepository[]): void {
+    private renderVirtualizedRepositories(repositories: RenderRepository[], renderVersion: number): void {
         if (!this.repoContainer) return;
+        if (renderVersion !== this.repoRenderVersion) return;
 
         this.virtualizedRepos = repositories;
         if (!this.isRepoListVirtualized || !this.virtualItemsEl || !this.virtualTopSpacerEl || !this.virtualBottomSpacerEl) {
@@ -2010,6 +2050,7 @@ export class GithubStarsView extends ItemView {
     }
 
     onClose(): Promise<void> {
+        this.repoRenderVersion += 1;
         if (this.repoContainer) {
             this.repoContainer.removeEventListener('scroll', this.handleRepoContainerScroll);
         }
