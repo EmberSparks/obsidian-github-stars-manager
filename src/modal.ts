@@ -54,16 +54,25 @@ export class EditRepoModal extends Modal {
         this.tagChipsContainer = contentEl.createDiv('tag-chips-input-wrapper');
         this.renderTagChipsInput();
 
-        new Setting(contentEl)
+        const notesSetting = new Setting(contentEl)
             .setName(t('modal.notes'))
             .addTextArea(text => {
-                text.inputEl.addClass('edit-repo-notes-textarea');
+                const notesTextareaEl = text.inputEl;
+                notesTextareaEl.addClass('edit-repo-notes-textarea');
+                notesTextareaEl.setAttribute('rows', '1');
                 text.setPlaceholder(t('modal.notesPlaceholder'))
                     .setValue(this.notes)
                     .onChange(value => {
                         this.notes = value;
                     });
+                notesTextareaEl.addEventListener('input', () => {
+                    this.resizeNotesTextarea(notesTextareaEl);
+                });
+                window.setTimeout(() => {
+                    this.resizeNotesTextarea(notesTextareaEl);
+                }, 0);
             });
+        notesSetting.settingEl.addClass('edit-repo-notes-setting');
 
         new Setting(contentEl)
             .setName(t('modal.linkedNote'))
@@ -126,6 +135,28 @@ export class EditRepoModal extends Modal {
                 this.tags = tags.join(', ');
             }
         );
+    }
+
+    /**
+     * 自适应调整笔记输入框高度
+     */
+    private resizeNotesTextarea(textareaEl: HTMLTextAreaElement): void {
+        textareaEl.setCssProps({ height: 'auto' });
+        const nextHeight = textareaEl.scrollHeight;
+        const maxHeight = Number.parseFloat(window.getComputedStyle(textareaEl).maxHeight);
+
+        if (!Number.isNaN(maxHeight) && nextHeight > maxHeight) {
+            textareaEl.setCssProps({
+                height: `${maxHeight}px`,
+                overflowY: 'auto'
+            });
+            return;
+        }
+
+        textareaEl.setCssProps({
+            height: `${nextHeight}px`,
+            overflowY: 'hidden'
+        });
     }
 
     /**

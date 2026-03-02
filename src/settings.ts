@@ -3,6 +3,9 @@ import GithubStarsPlugin from './main';
 import { GithubStarsSettings, GithubAccount, PropertyTemplate, DEFAULT_PROPERTIES_TEMPLATE } from './types';
 import { t } from './i18n';
 
+const MIN_SYNC_INTERVAL_DAYS = 1;
+const MAX_SYNC_INTERVAL_DAYS = 30;
+
 /**
  * 通用确认对话框
  */
@@ -53,7 +56,8 @@ export const DEFAULT_SETTINGS: GithubStarsSettings = {
     githubToken: '',
     accounts: [], // 默认无账号
     autoSync: true,
-    syncInterval: 60, // 默认60分钟
+    syncInterval: 1, // 默认1天
+    syncIntervalVersion: 2, // 同步间隔版本（天）
     language: 'en', // 默认语言
     enableExport: true, // 默认启用导出功能
     includeProperties: true, // 默认启用Properties
@@ -62,6 +66,25 @@ export const DEFAULT_SETTINGS: GithubStarsSettings = {
 
 export class GithubStarsSettingTab extends PluginSettingTab {
     plugin: GithubStarsPlugin;
+
+    private normalizeSyncIntervalDays(rawDays: number): number {
+        if (!Number.isFinite(rawDays)) {
+            return MIN_SYNC_INTERVAL_DAYS;
+        }
+        return Math.min(MAX_SYNC_INTERVAL_DAYS, Math.max(MIN_SYNC_INTERVAL_DAYS, Math.round(rawDays)));
+    }
+
+    private async setSyncIntervalDays(days: number, rerender = false): Promise<void> {
+        const normalizedDays = this.normalizeSyncIntervalDays(days);
+        if (normalizedDays === this.plugin.settings.syncInterval) {
+            return;
+        }
+        this.plugin.settings.syncInterval = normalizedDays;
+        await this.plugin.saveSettings();
+        if (rerender) {
+            this.display();
+        }
+    }
 
     constructor(app: App, plugin: GithubStarsPlugin) {
         super(app, plugin);
@@ -72,13 +95,15 @@ export class GithubStarsSettingTab extends PluginSettingTab {
         const { containerEl } = this;
 
         containerEl.empty();
+        containerEl.addClass('github-stars-settings-root');
 
         // 多账号管理区域
-        this.displayAccountsSection(containerEl);
+        const accountsSection = this.createSettingsSection(containerEl);
+        this.displayAccountsSection(accountsSection);
 
         // 向后兼容的单一令牌设置（如果没有配置多账号）
         if (this.plugin.settings.accounts.length === 0) {
-            new Setting(containerEl)
+            new Setting(accountsSection)
                 .setName(t('settings.githubToken'))
                 .setDesc(t('settings.githubTokenDesc'))
                 .addText(text => text
@@ -91,8 +116,10 @@ export class GithubStarsSettingTab extends PluginSettingTab {
                 );
         }
 
+        const syncSection = this.createSettingsSection(containerEl);
+
         // 自动同步设置
-        new Setting(containerEl)
+        new Setting(syncSection)
             .setName(t('settings.enableAutoSync'))
             .setDesc(t('settings.enableAutoSyncDesc'))
             .addToggle(toggle => toggle
@@ -100,63 +127,69 @@ export class GithubStarsSettingTab extends PluginSettingTab {
                 .onChange(async (value) => {
                     this.plugin.settings.autoSync = value;
                     await this.plugin.saveSettings();
-
-                    // saveSettings() 会自动处理同步间隔的更新
-                })
-            );
-
-        // 同步间隔设置
-        new Setting(containerEl)
-            .setName(t('settings.syncIntervalName'))
-            .setDesc(t('settings.syncIntervalDesc'))
-            .addSlider(slider => slider
-                .setLimits(15, 1440, 15)
-                .setValue(this.plugin.settings.syncInterval)
-                .setDynamicTooltip()
-                .onChange(async (value) => {
-                    this.plugin.settings.syncInterval = value;
-                    await this.plugin.saveSettings();
-
-                    // saveSettings() 会自动处理同步间隔的更新
-                })
-            );
-
-        // 语言设置
-        new Setting(containerEl)
-            .setName(t('settings.language'))
-            .setDesc(t('settings.languageDesc'))
-            .addDropdown(dropdown => dropdown
-                .addOption('en', t('settings.languageEn'))
-                .addOption('zh', t('settings.languageZh'))
-                .setValue(this.plugin.settings.language)
-                .onChange(async (value: 'en' | 'zh') => {
-                    this.plugin.settings.language = value;
-                    await this.plugin.saveSettings();
-                    new Notice(t('settings.languageReloadNotice'));
-                })
-            );
-
-        // 导出功能开关
-        new Setting(containerEl)
-            .setName(t('settings.enableExport'))
-            .setDesc(t('settings.enableExportDesc'))
-            .addToggle(toggle => toggle
-                .setValue(this.plugin.settings.enableExport)
-                .onChange(async (value) => {
-                    this.plugin.settings.enableExport = value;
-                    await this.plugin.saveSettings();
-                    // 重新渲染设置页面以显示/隐藏Properties配置
                     this.display();
+
+                    // saveSettings() 会自动处理同步间隔的更新
                 })
             );
 
-        // Properties模板配置（仅在启用导出功能时显示）
-        if (this.plugin.settings.enableExport) {
-            this.displayPropertiesSection(containerEl);
+        // 同步间隔设置（仅在启用自动同步时显示）
+        if (this.plugin.settings.autoSync) {
+            const syncIntervalSetting = new Setting(syncSection)
+                .setName(t('settings.syncIntervalName'))
+                .setDesc(t('settings.syncIntervalDesc'))
+                .addText(text => {
+                    const inputEl = text.inputEl;
+                    inputEl.type = 'number';
+                    inputEl.min = String(MIN_SYNC_INTERVAL_DAYS);
+                    inputEl.max = String(MAX_SYNC_INTERVAL_DAYS);
+                    inputEl.step = '1';
+                    inputEl.addClass('github-stars-sync-days-input');
+                    text.setPlaceholder(String(MIN_SYNC_INTERVAL_DAYS))
+                        .setValue(String(this.normalizeSyncIntervalDays(this.plugin.settings.syncInterval)));
+
+                    const commitInputValue = async () => {
+                        const parsedValue = Number.parseInt(inputEl.value, 10);
+                        if (Number.isNaN(parsedValue)) {
+                            inputEl.value = String(this.normalizeSyncIntervalDays(this.plugin.settings.syncInterval));
+                            return;
+                        }
+                        const normalizedDays = this.normalizeSyncIntervalDays(parsedValue);
+                        inputEl.value = String(normalizedDays);
+                        await this.setSyncIntervalDays(normalizedDays);
+                    };
+
+                    inputEl.addEventListener('change', () => {
+                        void commitInputValue();
+                    });
+                    inputEl.addEventListener('blur', () => {
+                        void commitInputValue();
+                    });
+                    inputEl.addEventListener('keydown', (event) => {
+                        if (event.key === 'Enter') {
+                            event.preventDefault();
+                            void commitInputValue();
+                        }
+                    });
+                })
+                .addButton(button => button
+                    .setButtonText(t('settings.syncIntervalDecreaseDay'))
+                    .onClick(() => {
+                        void this.setSyncIntervalDays(this.plugin.settings.syncInterval - 1, true);
+                    })
+                )
+                .addButton(button => button
+                    .setButtonText(t('settings.syncIntervalIncreaseDay'))
+                    .onClick(() => {
+                        void this.setSyncIntervalDays(this.plugin.settings.syncInterval + 1, true);
+                    })
+                );
+            syncIntervalSetting.settingEl.addClass('github-stars-settings-child-item');
+            syncIntervalSetting.settingEl.addClass('github-stars-sync-interval-setting');
         }
 
-        // 立即同步按钮
-        new Setting(containerEl)
+        // 立即同步按钮（并入同步设置区域）
+        new Setting(syncSection)
             .setName(t('settings.syncNow'))
             .setDesc(t('settings.syncNowDesc'))
             .addButton(button => button
@@ -184,17 +217,55 @@ export class GithubStarsSettingTab extends PluginSettingTab {
                     }
                 })
             );
+
+        // 语言设置
+        new Setting(syncSection)
+            .setName(t('settings.language'))
+            .setDesc(t('settings.languageDesc'))
+            .addDropdown(dropdown => dropdown
+                .addOption('en', t('settings.languageEn'))
+                .addOption('zh', t('settings.languageZh'))
+                .setValue(this.plugin.settings.language)
+                .onChange(async (value: 'en' | 'zh') => {
+                    this.plugin.settings.language = value;
+                    await this.plugin.saveSettings();
+                    new Notice(t('settings.languageReloadNotice'));
+                })
+            );
+
+        const exportSection = this.createSettingsSection(containerEl);
+
+        // 导出功能开关
+        new Setting(exportSection)
+            .setName(t('settings.enableExport'))
+            .setDesc(t('settings.enableExportDesc'))
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.enableExport)
+                .onChange(async (value) => {
+                    this.plugin.settings.enableExport = value;
+                    await this.plugin.saveSettings({ refreshViews: true });
+                    // 重新渲染设置页面以显示/隐藏Properties配置
+                    this.display();
+                })
+            );
+
+        // Properties模板配置（仅在启用导出功能时显示）
+        if (this.plugin.settings.enableExport) {
+            this.displayPropertiesSection(exportSection);
+        }
+    }
+
+    /**
+     * 创建设置分组区域
+     */
+    private createSettingsSection(containerEl: HTMLElement): HTMLElement {
+        return containerEl.createDiv('github-stars-settings-section');
     }
 
     /**
      * 显示多账号管理区域
      */
     private displayAccountsSection(containerEl: HTMLElement): void {
-        // 账号管理标题
-        new Setting(containerEl)
-            .setName(t('settings.accountsHeading'))
-            .setHeading();
-
         // 添加账号按钮
         new Setting(containerEl)
             .setName(t('settings.addAccountButton'))
@@ -268,7 +339,7 @@ export class GithubStarsSettingTab extends PluginSettingTab {
             toggle.addEventListener('change', () => {
                 void (async () => {
                     account.enabled = toggle.checked;
-                    await this.plugin.saveSettings();
+                    await this.plugin.saveSettings({ refreshViews: true });
                     const status = account.enabled ? t('settings.enabled') : t('settings.disabled');
                     new Notice(t('settings.accountToggled', { username: account.username, status }));
                 })();
@@ -383,7 +454,7 @@ export class GithubStarsSettingTab extends PluginSettingTab {
                     () => {
                         void (async () => {
                             this.plugin.settings.accounts.splice(index, 1);
-                            await this.plugin.saveSettings();
+                            await this.plugin.saveSettings({ refreshViews: true });
                             this.displayAccountsList(container);
                             new Notice(t('settings.accountDeleted', { username: account.username }));
                         })();
@@ -419,7 +490,7 @@ export class GithubStarsSettingTab extends PluginSettingTab {
             };
 
             this.plugin.settings.accounts.push(newAccount);
-            await this.plugin.saveSettings();
+            await this.plugin.saveSettings({ refreshViews: true });
             this.display(); // 重新渲染设置页面
             new Notice(t('settings.accountAdded', { username: newAccount.username }));
         }
@@ -441,7 +512,7 @@ export class GithubStarsSettingTab extends PluginSettingTab {
                 avatar_url: result.avatar_url
             };
 
-            await this.plugin.saveSettings();
+            await this.plugin.saveSettings({ refreshViews: true });
             this.display(); // 重新渲染设置页面
             new Notice(t('settings.accountUpdated', { username: result.username }));
         }
@@ -515,40 +586,8 @@ export class GithubStarsSettingTab extends PluginSettingTab {
      * 显示Properties模板配置区域
      */
     private displayPropertiesSection(containerEl: HTMLElement): void {
-        // Properties配置标题
-        new Setting(containerEl)
-            .setName(t('settings.propertiesConfigHeading'))
-            .setHeading();
-
-        // 说明文字
-        const descEl = containerEl.createDiv('setting-item-description description-margin');
-        const p = descEl.createEl('p');
-        p.textContent = t('settings.propertiesDescription');
-
-        const ul = descEl.createEl('ul', { cls: 'setting-item-description-list' });
-
-        const variables = [
-            { code: '{{full_name}}', desc: t('settings.variableFullName') },
-            { code: '{{name}}', desc: t('settings.variableName') },
-            { code: '{{owner.login}}', desc: t('settings.variableOwner') },
-            { code: '{{html_url}}', desc: t('settings.variableUrl') },
-            { code: '{{description}}', desc: t('settings.variableDescription') },
-            { code: '{{created_at}}', desc: t('settings.variableCreatedAt') },
-            { code: '{{starred_at}}', desc: t('settings.variableStarredAt') },
-            { code: '{{topics}}', desc: t('settings.variableTopics') },
-            { code: '{{stargazers_count}}', desc: t('settings.variableStargazersCount') },
-            { code: '{{language}}', desc: t('settings.variableLanguage') }
-        ];
-
-        variables.forEach(variable => {
-            const li = ul.createEl('li');
-            const code = li.createEl('code');
-            code.textContent = variable.code;
-            li.appendText(' - ' + variable.desc);
-        });
-
         // 启用Properties开关
-        new Setting(containerEl)
+        const includePropertiesSetting = new Setting(containerEl)
             .setName(t('settings.enableProperties'))
             .setDesc(t('settings.enablePropertiesDesc'))
             .addToggle(toggle => toggle
@@ -559,6 +598,7 @@ export class GithubStarsSettingTab extends PluginSettingTab {
                     this.display(); // 重新渲染以显示/隐藏模板配置
                 })
             );
+        includePropertiesSetting.settingEl.addClass('github-stars-properties-toggle-setting');
 
         // 只有启用Properties时才显示模板配置
         if (this.plugin.settings.includeProperties) {
@@ -568,7 +608,7 @@ export class GithubStarsSettingTab extends PluginSettingTab {
             });
 
             // 添加新属性按钮
-            new Setting(containerEl)
+            const addPropertySetting = new Setting(containerEl)
                 .setName(t('settings.addNewProperty'))
                 .setDesc(t('settings.addNewPropertyDesc'))
                 .addButton(button => button
@@ -578,9 +618,11 @@ export class GithubStarsSettingTab extends PluginSettingTab {
                         this.addNewProperty();
                     })
                 );
+            addPropertySetting.settingEl.addClass('github-stars-properties-action-setting');
+            addPropertySetting.settingEl.addClass('github-stars-settings-child-item');
 
             // 重置为默认模板按钮
-            new Setting(containerEl)
+            const resetTemplateSetting = new Setting(containerEl)
                 .setName(t('settings.resetTemplate'))
                 .setDesc(t('settings.resetTemplateDesc'))
                 .addButton(button => button
@@ -595,6 +637,8 @@ export class GithubStarsSettingTab extends PluginSettingTab {
                         })();
                     })
                 );
+            resetTemplateSetting.settingEl.addClass('github-stars-properties-action-setting');
+            resetTemplateSetting.settingEl.addClass('github-stars-settings-child-item');
         }
     }
 
@@ -602,7 +646,7 @@ export class GithubStarsSettingTab extends PluginSettingTab {
      * 创建单个属性设置项
      */
     private createPropertySetting(containerEl: HTMLElement, property: PropertyTemplate, index: number): void {
-        new Setting(containerEl)
+        const propertySetting = new Setting(containerEl)
             .setName(`${property.key} (${property.description})`)
             .setDesc(`Type: ${property.type} | Value: ${property.value}`)
             .addToggle(toggle => toggle
@@ -640,6 +684,14 @@ export class GithubStarsSettingTab extends PluginSettingTab {
                     ).open();
                 })
             );
+        propertySetting.settingEl.addClass('github-stars-properties-item');
+        propertySetting.settingEl.addClass('github-stars-settings-child-item');
+        propertySetting.controlEl.querySelectorAll('button').forEach(buttonEl => {
+            buttonEl.addClass('github-stars-properties-action-btn');
+            if (buttonEl.hasClass('mod-warning')) {
+                buttonEl.addClass('github-stars-properties-action-btn-danger');
+            }
+        });
     }
 
     /**

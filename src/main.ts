@@ -26,6 +26,10 @@ const DEFAULT_COMBINED_DATA: CombinedPluginData = {
     pluginData: DEFAULT_PLUGIN_DATA
 };
 
+const SYNC_INTERVAL_SETTINGS_VERSION = 2;
+const MIN_SYNC_INTERVAL_DAYS = 1;
+const MAX_SYNC_INTERVAL_DAYS = 30;
+
 export default class GithubStarsPlugin extends Plugin {
     settings: GithubStarsSettings;
     githubService: GithubService;
@@ -89,7 +93,39 @@ export default class GithubStarsPlugin extends Plugin {
 
         // 运行数据验证和迁移
         this._ensureDataIntegrity();
+        this._migrateSyncIntervalSettings(loaded);
         this._migrateExportOptions();
+    }
+
+    private normalizeSyncIntervalDays(rawDays: number): number {
+        if (!Number.isFinite(rawDays)) {
+            return MIN_SYNC_INTERVAL_DAYS;
+        }
+        return Math.min(MAX_SYNC_INTERVAL_DAYS, Math.max(MIN_SYNC_INTERVAL_DAYS, Math.round(rawDays)));
+    }
+
+    private convertLegacySyncIntervalMinutesToDays(rawMinutes: number): number {
+        if (!Number.isFinite(rawMinutes) || rawMinutes <= 0) {
+            return MIN_SYNC_INTERVAL_DAYS;
+        }
+        const convertedDays = Math.ceil(rawMinutes / (24 * 60));
+        return this.normalizeSyncIntervalDays(convertedDays);
+    }
+
+    private _migrateSyncIntervalSettings(rawLoadedData: unknown): void {
+        const loadedCombinedData = rawLoadedData as Partial<CombinedPluginData> | undefined;
+        const loadedSettings = loadedCombinedData?.settings as Partial<typeof this.settings> | undefined;
+        const loadedVersion = loadedSettings?.syncIntervalVersion;
+
+        if (typeof loadedVersion === 'number' && loadedVersion >= SYNC_INTERVAL_SETTINGS_VERSION) {
+            this.settings.syncInterval = this.normalizeSyncIntervalDays(this.settings.syncInterval);
+            this.settings.syncIntervalVersion = SYNC_INTERVAL_SETTINGS_VERSION;
+            return;
+        }
+
+        // 旧版本按分钟存储，这里迁移为按天存储
+        this.settings.syncInterval = this.convertLegacySyncIntervalMinutesToDays(this.settings.syncInterval);
+        this.settings.syncIntervalVersion = SYNC_INTERVAL_SETTINGS_VERSION;
     }
 
     /**
@@ -143,7 +179,7 @@ export default class GithubStarsPlugin extends Plugin {
     }
 
     // --- 设置相关 (不变) ---
-    async saveSettings() {
+    async saveSettings(options?: { refreshViews?: boolean }) {
         await this.saveCombinedData();
         // 更新GitHub服务的账号列表
         this.githubService.updateAccounts(this.settings.accounts || []);
@@ -152,7 +188,9 @@ export default class GithubStarsPlugin extends Plugin {
         if (this.data.exportOptions) {
             this.data.exportOptions.propertiesTemplate = this.settings.propertiesTemplate;
         }
-        this.updateViews(); // 确保每次保存设置都刷新视图
+        if (options?.refreshViews) {
+            this.updateViews();
+        }
     }
 
     // --- 插件数据相关 (现在通过 saveCombinedData 保存) ---
@@ -167,7 +205,9 @@ export default class GithubStarsPlugin extends Plugin {
     setupAutoSync() {
         this.clearSyncInterval();
         if (this.settings.autoSync && this.settings.syncInterval > 0) {
-            const intervalMillis = this.settings.syncInterval * 60 * 1000;
+            const normalizedDays = this.normalizeSyncIntervalDays(this.settings.syncInterval);
+            this.settings.syncInterval = normalizedDays;
+            const intervalMillis = normalizedDays * 24 * 60 * 60 * 1000;
             this.syncIntervalId = window.setInterval(() => {
                 this.syncStars().catch(err => console.error('Auto sync failed:', err));
             }, intervalMillis);
@@ -294,8 +334,6 @@ export default class GithubStarsPlugin extends Plugin {
             console.error('同步错误:', syncResult.errors);
         }
 
-        // 更新视图
-        this.updateViews();
     }
 
     // --- 视图管理 (activateView 不变, updateViews 更新) ---
@@ -339,15 +377,32 @@ export default class GithubStarsPlugin extends Plugin {
 
     // 新增：从 userEnhancements 更新 allTags 列表
     updateAllTagsFromEnhancements() {
-        const allTags = new Set<string>();
+        const normalizedTagMap = new Map<string, string>();
+        const addTagToMap = (tagName: string) => {
+            const trimmedTagName = tagName.trim();
+            if (!trimmedTagName) return;
+            const normalizedTagName = trimmedTagName.toLowerCase();
+            if (!normalizedTagMap.has(normalizedTagName)) {
+                normalizedTagMap.set(normalizedTagName, trimmedTagName);
+            }
+        };
+
+        (this.data.allTags || []).forEach((tag) => {
+            addTagToMap(tag);
+        });
+
         if (this.data.userEnhancements) {
             Object.values(this.data.userEnhancements).forEach(enhancement => {
                 if (Array.isArray(enhancement.tags)) {
-                    enhancement.tags.forEach(tag => allTags.add(tag));
+                    enhancement.tags.forEach((tag) => {
+                        addTagToMap(tag);
+                    });
                 }
             });
         }
-        this.data.allTags = Array.from(allTags).sort();
+        this.data.allTags = Array.from(normalizedTagMap.values()).sort((left, right) =>
+            left.localeCompare(right, undefined, { sensitivity: 'base' })
+        );
 
         // 同步清理标签颜色映射：只保留当前仍存在的标签
         const currentTagColors = this.data.tagColors || {};
@@ -363,6 +418,81 @@ export default class GithubStarsPlugin extends Plugin {
         });
 
         this.data.tagColors = syncedTagColors;
+    }
+
+    /**
+     * 添加一个全局标签（不绑定具体仓库）
+     * @returns 是否成功添加（存在同名标签时返回 false）
+     */
+    addTag(tagName: string): boolean {
+        const trimmedTagName = tagName.trim();
+        if (!trimmedTagName) return false;
+
+        if (!Array.isArray(this.data.allTags)) {
+            this.data.allTags = [];
+        }
+
+        const normalizedTagName = trimmedTagName.toLowerCase();
+        const alreadyExists = this.data.allTags.some(
+            (existingTag) => existingTag.toLowerCase() === normalizedTagName
+        );
+        if (alreadyExists) {
+            return false;
+        }
+
+        this.data.allTags.push(trimmedTagName);
+        this.data.allTags.sort((left, right) =>
+            left.localeCompare(right, undefined, { sensitivity: 'base' })
+        );
+        return true;
+    }
+
+    /**
+     * 获取标签的关联仓库数量
+     */
+    getTagAssociationCount(tagName: string): number {
+        const normalizedTagName = tagName.trim().toLowerCase();
+        if (!normalizedTagName) return 0;
+
+        let associatedRepositoryCount = 0;
+        Object.values(this.data.userEnhancements || {}).forEach((enhancement) => {
+            if (!Array.isArray(enhancement.tags) || enhancement.tags.length === 0) {
+                return;
+            }
+            const hasAssociatedTag = enhancement.tags.some(
+                (tag) => tag.toLowerCase() === normalizedTagName
+            );
+            if (hasAssociatedTag) {
+                associatedRepositoryCount += 1;
+            }
+        });
+        return associatedRepositoryCount;
+    }
+
+    /**
+     * 删除未关联仓库的全局标签
+     */
+    removeTagIfUnused(tagName: string): { removed: boolean; associatedRepositoryCount: number } {
+        const normalizedTagName = tagName.trim().toLowerCase();
+        if (!normalizedTagName) {
+            return { removed: false, associatedRepositoryCount: 0 };
+        }
+
+        const associatedRepositoryCount = this.getTagAssociationCount(tagName);
+        if (associatedRepositoryCount > 0) {
+            return { removed: false, associatedRepositoryCount };
+        }
+
+        const previousTagCount = (this.data.allTags || []).length;
+        this.data.allTags = (this.data.allTags || []).filter(
+            (existingTag) => existingTag.toLowerCase() !== normalizedTagName
+        );
+        this.removeTagColor(tagName);
+
+        return {
+            removed: this.data.allTags.length < previousTagCount,
+            associatedRepositoryCount: 0
+        };
     }
 
     /**

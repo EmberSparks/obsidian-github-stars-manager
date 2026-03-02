@@ -17,7 +17,8 @@ export interface GithubStarsSettings {
     githubToken: string; // 保留向后兼容
     accounts: GithubAccount[]; // 多个GitHub账号
     autoSync: boolean;
-    syncInterval: number; // 单位：分钟
+    syncInterval: number; // 单位：天
+    syncIntervalVersion: number; // 同步间隔配置版本（用于迁移）
     language: 'en' | 'zh'; // 语言设置
     enableExport: boolean; // 导出功能开关
     includeProperties: boolean; // 是否包含Properties
