@@ -13,6 +13,8 @@ export interface GithubAccount {
 }
 
 // 插件设置接口 (修改为支持多账号)
+export type RepoRenderPerformanceMode = 'visual' | 'balanced' | 'extreme';
+
 export interface GithubStarsSettings {
     githubToken: string; // 保留向后兼容
     accounts: GithubAccount[]; // 多个GitHub账号
@@ -20,6 +22,7 @@ export interface GithubStarsSettings {
     syncInterval: number; // 单位：天
     syncIntervalVersion: number; // 同步间隔配置版本（用于迁移）
     language: 'en' | 'zh'; // 语言设置
+    repoRenderPerformanceMode: RepoRenderPerformanceMode; // 仓库列表渲染性能模式
     enableExport: boolean; // 导出功能开关
     includeProperties: boolean; // 是否包含Properties
     propertiesTemplate: PropertyTemplate[]; // Properties模板配置

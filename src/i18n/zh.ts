@@ -287,6 +287,11 @@ export const zh: TranslationKeys = {
         languageReloadNotice: '语言将在重新加载插件后应用',
         languageEn: 'English',
         languageZh: '简体中文',
+        repoRenderPerformanceMode: '列表性能模式',
+        repoRenderPerformanceModeDesc: '选择列表渲染策略。极致性能模式可能改变布局。',
+        repoRenderPerformanceModeVisual: '样式优先',
+        repoRenderPerformanceModeBalanced: '平衡',
+        repoRenderPerformanceModeExtreme: '极致性能',
 
         // Properties模板
         propertiesHeading: 'Properties 模板',

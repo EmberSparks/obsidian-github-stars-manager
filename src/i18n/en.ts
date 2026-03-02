@@ -285,6 +285,11 @@ export const en = {
         languageReloadNotice: 'Language will be applied after reloading the plugin',
         languageEn: 'English',
         languageZh: '简体中文',
+        repoRenderPerformanceMode: 'List performance mode',
+        repoRenderPerformanceModeDesc: 'Choose the list rendering strategy. Extreme mode may change layout.',
+        repoRenderPerformanceModeVisual: 'Visual first',
+        repoRenderPerformanceModeBalanced: 'Balanced',
+        repoRenderPerformanceModeExtreme: 'Extreme performance',
 
         // Properties template
         propertiesHeading: 'Properties template',

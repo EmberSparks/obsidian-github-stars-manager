@@ -59,6 +59,7 @@ export const DEFAULT_SETTINGS: GithubStarsSettings = {
     syncInterval: 1, // 默认1天
     syncIntervalVersion: 2, // 同步间隔版本（天）
     language: 'en', // 默认语言
+    repoRenderPerformanceMode: 'balanced', // 默认平衡模式
     enableExport: true, // 默认启用导出功能
     includeProperties: true, // 默认启用Properties
     propertiesTemplate: DEFAULT_PROPERTIES_TEMPLATE, // 默认Properties模板
@@ -230,6 +231,21 @@ export class GithubStarsSettingTab extends PluginSettingTab {
                     this.plugin.settings.language = value;
                     await this.plugin.saveSettings();
                     new Notice(t('settings.languageReloadNotice'));
+                })
+            );
+
+        // 仓库列表渲染性能模式
+        new Setting(syncSection)
+            .setName(t('settings.repoRenderPerformanceMode'))
+            .setDesc(t('settings.repoRenderPerformanceModeDesc'))
+            .addDropdown(dropdown => dropdown
+                .addOption('visual', t('settings.repoRenderPerformanceModeVisual'))
+                .addOption('balanced', t('settings.repoRenderPerformanceModeBalanced'))
+                .addOption('extreme', t('settings.repoRenderPerformanceModeExtreme'))
+                .setValue(this.plugin.settings.repoRenderPerformanceMode)
+                .onChange(async (value: 'visual' | 'balanced' | 'extreme') => {
+                    this.plugin.settings.repoRenderPerformanceMode = value;
+                    await this.plugin.saveSettings({ refreshViews: true });
                 })
             );
 

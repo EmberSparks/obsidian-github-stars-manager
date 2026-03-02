@@ -582,6 +582,20 @@
   font-style: italic;
 }
 
+.github-stars-render-status {
+  margin: 0 16px 8px 16px;
+  padding: 4px 10px;
+  border: 1px dashed var(--background-modifier-border);
+  border-radius: 8px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  line-height: 1.4;
+  background: var(--background-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* 仓库卡片 - 应用商店风格 */
 .github-stars-repo {
     padding: 12px;
