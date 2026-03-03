@@ -17,11 +17,6 @@ const TAG_COLOR_PALETTE = [
 
 const FALLBACK_TAG_TEXT_COLOR = '#ffffff';
 const FALLBACK_TAG_DARK_TEXT_COLOR = '#111827';
-const REPO_VIRTUALIZATION_THRESHOLD = 120;
-const REPO_VIRTUALIZATION_OVERSCAN = 8;
-const REPO_ESTIMATED_ITEM_HEIGHT = 250;
-const REPO_VIRTUAL_MIN_CARD_WIDTH = 280;
-const REPO_VIRTUAL_GRID_GAP = 16;
 const REPO_AVATAR_SIZE = 72;
 const ACCOUNT_AVATAR_SIZE = 96;
 
@@ -90,16 +85,6 @@ export class GithubStarsView extends ItemView {
     pendingMergeTargetTag: string | null = null;
     repoRenderFrameId: number | null = null;
     tagsFilterFrameId: number | null = null;
-    virtualizedRepos: RenderRepository[] = [];
-    isRepoListVirtualized: boolean = false;
-    virtualStartIndex: number = 0;
-    virtualEndIndex: number = 0;
-    virtualColumnCount: number = 1;
-    virtualItemEstimate: number = REPO_ESTIMATED_ITEM_HEIGHT;
-    virtualTopSpacerEl: HTMLElement | null = null;
-    virtualItemsEl: HTMLElement | null = null;
-    virtualBottomSpacerEl: HTMLElement | null = null;
-    virtualMeasureFrameId: number | null = null;
     repoRenderVersion: number = 0;
     repoQueryEngine: RepoQueryEngine;
     combinedRepositoriesCache: RenderRepository[] = [];
@@ -170,8 +155,6 @@ export class GithubStarsView extends ItemView {
 
         // Repositories Container
         this.repoContainer = container.createDiv('github-stars-repos');
-        this.repoContainer.removeEventListener('scroll', this.handleRepoContainerScroll);
-        this.repoContainer.addEventListener('scroll', this.handleRepoContainerScroll, { passive: true });
 
         // Initial rendering of repositories
         this.renderRepositories();
@@ -761,14 +744,6 @@ export class GithubStarsView extends ItemView {
     }
 
     /**
-     * 仓库列表滚动事件（虚拟列表模式下更新可视窗口）
-     */
-    private handleRepoContainerScroll = (): void => {
-        if (!this.isRepoListVirtualized) return;
-        this.renderVirtualizedWindow();
-    };
-
-    /**
      * 等待下一帧，避免一次性大批量 DOM 插入导致主线程长时间阻塞
      */
     private waitForNextFrame(): Promise<void> {
@@ -789,13 +764,6 @@ export class GithubStarsView extends ItemView {
             if (totalCount > 220) return 32;
             return 42;
         }
-        if (mode === 'extreme') {
-            if (totalCount > 1400) return 8;
-            if (totalCount > 900) return 12;
-            if (totalCount > 500) return 16;
-            if (totalCount > 220) return 22;
-            return 30;
-        }
 
         if (totalCount > 1400) return 10;
         if (totalCount > 900) return 14;
@@ -810,7 +778,6 @@ export class GithubStarsView extends ItemView {
     private getHighPriorityAvatarCount(): number {
         const mode = this.getRepoRenderPerformanceMode();
         if (mode === 'visual') return 18;
-        if (mode === 'extreme') return 8;
         return 12;
     }
 
@@ -819,13 +786,6 @@ export class GithubStarsView extends ItemView {
      */
     private getRepoRenderPerformanceMode(): RepoRenderPerformanceMode {
         return this.plugin.settings.repoRenderPerformanceMode || 'balanced';
-    }
-
-    /**
-     * 当前模式下是否启用虚拟化
-     */
-    private shouldUseVirtualizedRender(totalCount: number): boolean {
-        return this.getRepoRenderPerformanceMode() === 'extreme' && totalCount >= REPO_VIRTUALIZATION_THRESHOLD;
     }
 
     /**
@@ -1417,7 +1377,6 @@ export class GithubStarsView extends ItemView {
         const renderVersion = ++this.repoRenderVersion;
 
         if (!this.githubRepositories || this.githubRepositories.length === 0) {
-            this.disableRepoVirtualization();
             this.repoContainer.empty();
             this.repoContainer.createEl('div', { cls: 'github-stars-empty', text: t('view.noRepos') });
             this.hideRepoRenderStatus();
@@ -1450,7 +1409,6 @@ export class GithubStarsView extends ItemView {
         if (renderVersion !== this.repoRenderVersion) return;
 
         if (sortedRepos.length === 0) {
-            this.disableRepoVirtualization();
             this.repoContainer.empty();
             this.repoContainer.createEl('div', { cls: 'github-stars-empty', text: t('view.noMatchingRepos') });
             this.hideRepoRenderStatus();
@@ -1466,12 +1424,7 @@ export class GithubStarsView extends ItemView {
         this.hasVisibleRepositoriesSnapshot = true;
         this.updateTotalStarsCount(sortedRepos.length);
 
-        if (!this.shouldUseVirtualizedRender(sortedRepos.length)) {
-            void this.renderFullRepositories(sortedRepos, renderVersion);
-            return;
-        }
-
-        this.renderVirtualizedRepositories(sortedRepos, renderVersion);
+        void this.renderFullRepositories(sortedRepos, renderVersion);
     }
 
     /**
@@ -1611,12 +1564,11 @@ export class GithubStarsView extends ItemView {
     private async renderFullRepositories(repositories: RenderRepository[], renderVersion: number): Promise<void> {
         if (!this.repoContainer) return;
         const renderStartAt = performance.now();
-        this.disableRepoVirtualization();
         this.repoContainer.empty();
         const totalCount = repositories.length;
         const batchSize = this.getRepoRenderBatchSize(totalCount);
         const mode = this.getRepoRenderPerformanceMode();
-        const firstScreenMinimum = mode === 'visual' ? 96 : mode === 'extreme' ? 48 : 64;
+        const firstScreenMinimum = mode === 'visual' ? 96 : 64;
         const firstScreenCount = Math.min(totalCount, Math.max(batchSize * 2, firstScreenMinimum));
         const shouldShowStatus = totalCount > firstScreenCount;
 
@@ -1678,147 +1630,9 @@ export class GithubStarsView extends ItemView {
     }
 
     /**
-     * 虚拟列表渲染（仅渲染可视区域）
-     */
-    private renderVirtualizedRepositories(repositories: RenderRepository[], renderVersion: number): void {
-        if (!this.repoContainer) return;
-        if (renderVersion !== this.repoRenderVersion) return;
-        const renderStartAt = performance.now();
-        this.hideRepoRenderStatus();
-
-        this.virtualizedRepos = repositories;
-        if (!this.isRepoListVirtualized || !this.virtualItemsEl || !this.virtualTopSpacerEl || !this.virtualBottomSpacerEl) {
-            this.enableRepoVirtualization();
-        }
-
-        this.virtualStartIndex = -1;
-        this.virtualEndIndex = -1;
-        this.virtualColumnCount = 1;
-        this.renderVirtualizedWindow(true);
-        this.finalizeInteractionMeasurement();
-        this.recordPerformanceDuration('render', performance.now() - renderStartAt);
-        this.requestPerformancePanelRefresh();
-    }
-
-    /**
-     * 启用仓库列表虚拟化容器
-     */
-    private enableRepoVirtualization(): void {
-        if (!this.repoContainer) return;
-        this.isRepoListVirtualized = true;
-        this.repoContainer.addClass('virtualized');
-        this.repoContainer.empty();
-
-        this.virtualTopSpacerEl = this.repoContainer.createDiv('github-stars-virtual-spacer');
-        this.virtualTopSpacerEl.addClass('github-stars-virtual-spacer-top');
-        this.virtualItemsEl = this.repoContainer.createDiv('github-stars-virtual-items');
-        this.virtualBottomSpacerEl = this.repoContainer.createDiv('github-stars-virtual-spacer');
-        this.virtualBottomSpacerEl.addClass('github-stars-virtual-spacer-bottom');
-    }
-
-    /**
-     * 关闭仓库列表虚拟化状态
-     */
-    private disableRepoVirtualization(): void {
-        if (this.virtualMeasureFrameId !== null) {
-            window.cancelAnimationFrame(this.virtualMeasureFrameId);
-            this.virtualMeasureFrameId = null;
-        }
-        if (this.repoContainer) {
-            this.repoContainer.removeClass('virtualized');
-        }
-        this.isRepoListVirtualized = false;
-        this.virtualizedRepos = [];
-        this.virtualStartIndex = 0;
-        this.virtualEndIndex = 0;
-        this.virtualColumnCount = 1;
-        this.virtualTopSpacerEl = null;
-        this.virtualItemsEl = null;
-        this.virtualBottomSpacerEl = null;
-    }
-
-    /**
-     * 渲染当前可视窗口内的仓库卡片
-     */
-    private renderVirtualizedWindow(force = false): void {
-        if (!this.repoContainer || !this.isRepoListVirtualized || !this.virtualItemsEl || !this.virtualTopSpacerEl || !this.virtualBottomSpacerEl) {
-            return;
-        }
-
-        const total = this.virtualizedRepos.length;
-        if (total === 0) {
-            this.virtualTopSpacerEl.setCssProps({ height: '0px' });
-            this.virtualBottomSpacerEl.setCssProps({ height: '0px' });
-            this.virtualItemsEl.empty();
-            return;
-        }
-
-        const viewportHeight = Math.max(this.repoContainer.clientHeight, this.virtualItemEstimate);
-        const containerWidth = Math.max(this.repoContainer.clientWidth, REPO_VIRTUAL_MIN_CARD_WIDTH);
-        const columns = Math.max(1, Math.floor((containerWidth + REPO_VIRTUAL_GRID_GAP) / (REPO_VIRTUAL_MIN_CARD_WIDTH + REPO_VIRTUAL_GRID_GAP)));
-        const totalRows = Math.max(1, Math.ceil(total / columns));
-        const visibleRows = Math.max(1, Math.ceil(viewportHeight / this.virtualItemEstimate));
-        const startRow = Math.max(0, Math.floor(this.repoContainer.scrollTop / this.virtualItemEstimate) - REPO_VIRTUALIZATION_OVERSCAN);
-        const endRow = Math.min(totalRows, startRow + visibleRows + (REPO_VIRTUALIZATION_OVERSCAN * 2));
-        const start = startRow * columns;
-        const end = Math.min(total, endRow * columns);
-
-        if (!force && columns === this.virtualColumnCount && start === this.virtualStartIndex && end === this.virtualEndIndex) {
-            return;
-        }
-
-        this.virtualColumnCount = columns;
-        this.virtualStartIndex = start;
-        this.virtualEndIndex = end;
-        this.virtualItemsEl.setCssProps({ '--github-virtual-columns': String(columns) });
-        this.virtualTopSpacerEl.setCssProps({ height: `${startRow * this.virtualItemEstimate}px` });
-        this.virtualBottomSpacerEl.setCssProps({ height: `${Math.max(0, (totalRows - endRow) * this.virtualItemEstimate)}px` });
-
-        this.virtualItemsEl.empty();
-        const highPriorityAvatarCount = Math.min(
-            this.getHighPriorityAvatarCount(),
-            Math.max(6, Math.ceil((end - start) * 0.35))
-        );
-        for (let index = start; index < end; index++) {
-            this.renderRepositoryCard(
-                this.virtualizedRepos[index],
-                this.virtualItemsEl,
-                (index - start) < highPriorityAvatarCount
-            );
-        }
-
-        this.scheduleVirtualItemMeasure();
-    }
-
-    /**
-     * 依据可视区已渲染卡片高度修正估算值，降低跳动
-     */
-    private scheduleVirtualItemMeasure(): void {
-        if (!this.virtualItemsEl) return;
-        if (this.virtualMeasureFrameId !== null) return;
-
-        this.virtualMeasureFrameId = window.requestAnimationFrame(() => {
-            this.virtualMeasureFrameId = null;
-            if (!this.virtualItemsEl) return;
-
-            const cards = Array.from(this.virtualItemsEl.querySelectorAll('.github-stars-repo')) as HTMLElement[];
-            if (cards.length === 0) return;
-
-            const averageHeight = cards.reduce((sum, card) => sum + Math.max(160, card.offsetHeight), 0) / cards.length;
-            const nextEstimate = Math.max(180, Math.min(460, Math.round(averageHeight)));
-            const mergedEstimate = Math.round((this.virtualItemEstimate * 3 + nextEstimate) / 4);
-
-            if (Math.abs(mergedEstimate - this.virtualItemEstimate) >= 8) {
-                this.virtualItemEstimate = mergedEstimate;
-                this.renderVirtualizedWindow(true);
-            }
-        });
-    }
-
-    /**
      * 渲染单个仓库卡片
      */
-    private renderRepositoryCard(repo: RenderRepository, parent: HTMLElement, prioritizeAvatarLoad = false): void {
+    private renderRepositoryCard(repo: RenderRepository, parent: HTMLElement, prioritizeAvatarLoad = false): HTMLElement {
         const repoEl = parent.createEl('div', { cls: 'github-stars-repo' });
 
         const headerEl = repoEl.createEl('div', { cls: 'github-stars-repo-header' });
@@ -1984,6 +1798,7 @@ export class GithubStarsView extends ItemView {
                 );
             });
         }
+        return repoEl;
     }
 
     /**
@@ -2677,9 +2492,6 @@ export class GithubStarsView extends ItemView {
     onClose(): Promise<void> {
         this.repoRenderVersion += 1;
         this.hideRepoRenderStatus();
-        if (this.repoContainer) {
-            this.repoContainer.removeEventListener('scroll', this.handleRepoContainerScroll);
-        }
         if (this.repoRenderFrameId !== null) {
             window.cancelAnimationFrame(this.repoRenderFrameId);
             this.repoRenderFrameId = null;
@@ -2696,7 +2508,6 @@ export class GithubStarsView extends ItemView {
         this.pendingInteractionStartAt = null;
         this.performanceToggleButton = null;
         this.removePerformancePanel();
-        this.disableRepoVirtualization();
         this.closeTagEditPopover();
         this.repoQueryEngine.destroy();
         return Promise.resolve();

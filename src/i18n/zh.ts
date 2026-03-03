@@ -313,10 +313,9 @@ export const zh: TranslationKeys = {
         languageEn: 'English',
         languageZh: '简体中文',
         repoRenderPerformanceMode: '列表性能模式',
-        repoRenderPerformanceModeDesc: '选择列表渲染策略。极致性能模式可能改变布局。',
+        repoRenderPerformanceModeDesc: '选择列表渲染策略。',
         repoRenderPerformanceModeVisual: '样式优先',
         repoRenderPerformanceModeBalanced: '平衡',
-        repoRenderPerformanceModeExtreme: '极致性能',
         enablePerformanceMonitor: '启用性能监控',
         enablePerformanceMonitorDesc: '在首页工具栏显示性能面板入口，用于观察查询/渲染耗时',
 

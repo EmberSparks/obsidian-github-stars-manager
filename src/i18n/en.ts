@@ -311,10 +311,9 @@ export const en = {
         languageEn: 'English',
         languageZh: '简体中文',
         repoRenderPerformanceMode: 'List performance mode',
-        repoRenderPerformanceModeDesc: 'Choose the list rendering strategy. Extreme mode may change layout.',
+        repoRenderPerformanceModeDesc: 'Choose the list rendering strategy.',
         repoRenderPerformanceModeVisual: 'Visual first',
         repoRenderPerformanceModeBalanced: 'Balanced',
-        repoRenderPerformanceModeExtreme: 'Extreme performance',
         enablePerformanceMonitor: 'Enable performance monitor',
         enablePerformanceMonitorDesc: 'Show a monitor entry in the home toolbar for query/render timing',
 

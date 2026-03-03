@@ -257,9 +257,8 @@ export class GithubStarsSettingTab extends PluginSettingTab {
             .addDropdown(dropdown => dropdown
                 .addOption('visual', t('settings.repoRenderPerformanceModeVisual'))
                 .addOption('balanced', t('settings.repoRenderPerformanceModeBalanced'))
-                .addOption('extreme', t('settings.repoRenderPerformanceModeExtreme'))
                 .setValue(this.plugin.settings.repoRenderPerformanceMode)
-                .onChange(async (value: 'visual' | 'balanced' | 'extreme') => {
+                .onChange(async (value: 'visual' | 'balanced') => {
                     this.plugin.settings.repoRenderPerformanceMode = value;
                     await this.plugin.saveSettings({ refreshViews: true });
                 })

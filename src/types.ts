@@ -13,7 +13,7 @@ export interface GithubAccount {
 }
 
 // 插件设置接口 (修改为支持多账号)
-export type RepoRenderPerformanceMode = 'visual' | 'balanced' | 'extreme';
+export type RepoRenderPerformanceMode = 'visual' | 'balanced';
 
 export interface GithubStarsSettings {
     githubToken: string; // 保留向后兼容

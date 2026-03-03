@@ -541,39 +541,6 @@
   column-fill: balance;
 }
 
-.github-stars-repos.virtualized {
-  column-count: 1;
-  column-width: auto;
-  column-gap: 0;
-  column-fill: auto;
-  contain: layout style paint;
-  overflow-x: hidden;
-}
-
-.github-stars-repos.virtualized .github-stars-repo {
-  break-inside: auto;
-  page-break-inside: auto;
-  margin-bottom: 0;
-  min-width: 0;
-}
-
-.github-stars-repos.virtualized .github-stars-repo:hover {
-  transform: translateY(-1px);
-}
-
-.github-stars-virtual-spacer {
-  width: 100%;
-  pointer-events: none;
-}
-
-.github-stars-virtual-items {
-  width: 100%;
-  min-width: 0;
-  display: grid;
-  grid-template-columns: repeat(var(--github-virtual-columns, 1), minmax(0, 1fr));
-  gap: 12px 16px;
-}
-
 /* 空状态 */
 .github-stars-empty {
   padding: 20px;

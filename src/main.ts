@@ -32,6 +32,7 @@ const SYNC_INTERVAL_SETTINGS_VERSION = 2;
 const MIN_SYNC_INTERVAL_DAYS = 1;
 const MAX_SYNC_INTERVAL_DAYS = 30;
 const CACHE_PERSIST_DELAY_MS = 600;
+const FALLBACK_REPO_RENDER_MODE = 'balanced';
 
 export default class GithubStarsPlugin extends Plugin {
     settings: GithubStarsSettings;
@@ -111,6 +112,7 @@ export default class GithubStarsPlugin extends Plugin {
         // 运行数据验证和迁移
         this._ensureDataIntegrity();
         this._migrateSyncIntervalSettings(loaded);
+        this._normalizeRepoRenderPerformanceMode();
         this._migrateExportOptions();
     }
 
@@ -143,6 +145,12 @@ export default class GithubStarsPlugin extends Plugin {
         // 旧版本按分钟存储，这里迁移为按天存储
         this.settings.syncInterval = this.convertLegacySyncIntervalMinutesToDays(this.settings.syncInterval);
         this.settings.syncIntervalVersion = SYNC_INTERVAL_SETTINGS_VERSION;
+    }
+
+    private _normalizeRepoRenderPerformanceMode(): void {
+        if (this.settings.repoRenderPerformanceMode !== 'visual' && this.settings.repoRenderPerformanceMode !== 'balanced') {
+            this.settings.repoRenderPerformanceMode = FALLBACK_REPO_RENDER_MODE;
+        }
     }
 
     /**
