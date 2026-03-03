@@ -23,9 +23,20 @@ export interface GithubStarsSettings {
     syncIntervalVersion: number; // 同步间隔配置版本（用于迁移）
     language: 'en' | 'zh'; // 语言设置
     repoRenderPerformanceMode: RepoRenderPerformanceMode; // 仓库列表渲染性能模式
+    enablePerformanceMonitor: boolean; // 是否启用性能监控面板
+    enableReleaseAlerts: boolean; // 是否启用版本更新提醒
     enableExport: boolean; // 导出功能开关
     includeProperties: boolean; // 是否包含Properties
     propertiesTemplate: PropertyTemplate[]; // Properties模板配置
+}
+
+export interface RepoReleaseAlertState {
+    releaseId: number | null;
+    tagName: string;
+    publishedAt: string;
+    releaseUrl: string;
+    unread: boolean;
+    lastCheckedAt: string;
 }
 
 // GitHub仓库接口（来自GitHub API, 包含 starred_at）
@@ -79,6 +90,10 @@ export interface PluginData {
     // 标签颜色映射，key 为标签名小写
     tagColors: {
         [tagNameLower: string]: string;
+    };
+    // 仓库版本更新提醒状态，key 为 repoId
+    repoReleaseAlerts: {
+        [repoId: number]: RepoReleaseAlertState;
     };
     lastSyncTime: string;
     // 每个账号的最后同步时间

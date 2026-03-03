@@ -5,6 +5,7 @@ import { GithubService } from './githubService';
 import { GithubStarsView, VIEW_TYPE_STARS } from './view';
 import { ExportService } from './exportService';
 import { I18n, t } from './i18n';
+import { GithubStarsCacheService } from './cacheService';
 
 // GitHub星标图标 (不变)
 const GITHUB_STAR_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-star"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>`;
@@ -15,6 +16,7 @@ const DEFAULT_PLUGIN_DATA: PluginData = {
     userEnhancements: {},   // 新增
     allTags: [],            // 新增 (替代旧的 tags)
     tagColors: {},          // 标签颜色映射
+    repoReleaseAlerts: {},  // 仓库发布提醒状态
     lastSyncTime: '',
     accountSyncTimes: {},   // 新增：每个账号的同步时间
     exportOptions: undefined // 新增：导出选项（可选）
@@ -29,6 +31,7 @@ const DEFAULT_COMBINED_DATA: CombinedPluginData = {
 const SYNC_INTERVAL_SETTINGS_VERSION = 2;
 const MIN_SYNC_INTERVAL_DAYS = 1;
 const MAX_SYNC_INTERVAL_DAYS = 30;
+const CACHE_PERSIST_DELAY_MS = 600;
 
 export default class GithubStarsPlugin extends Plugin {
     settings: GithubStarsSettings;
@@ -36,12 +39,18 @@ export default class GithubStarsPlugin extends Plugin {
     exportService: ExportService;
     data: PluginData; // 引用 PluginData，其内部结构已改变
     syncIntervalId: number | null = null;
+    cacheService: GithubStarsCacheService | null = null;
+    cachePersistTimerId: number | null = null;
+    cacheSnapshotReadCount: number = 0;
+    cacheSnapshotWriteCount: number = 0;
+    cacheSnapshotRestoreHitCount: number = 0;
 
     async onload() {
         addIcon('github-star', GITHUB_STAR_ICON);
 
         // 加载合并后的数据
         await this.loadCombinedData();
+        await this.initializeCacheLayer();
 
         // 初始化i18n系统
         I18n.setLanguage(this.settings.language || 'en');
@@ -78,6 +87,14 @@ export default class GithubStarsPlugin extends Plugin {
 
     onunload() {
         this.clearSyncInterval();
+        if (this.cachePersistTimerId !== null) {
+            window.clearTimeout(this.cachePersistTimerId);
+            this.cachePersistTimerId = null;
+        }
+        if (this.cacheService) {
+            this.cacheService.close();
+            this.cacheService = null;
+        }
     }
 
     // --- 数据加载/保存 ---
@@ -144,6 +161,9 @@ export default class GithubStarsPlugin extends Plugin {
         if (typeof this.data.tagColors !== 'object' || this.data.tagColors === null || Array.isArray(this.data.tagColors)) {
             this.data.tagColors = {};
         }
+        if (typeof this.data.repoReleaseAlerts !== 'object' || this.data.repoReleaseAlerts === null || Array.isArray(this.data.repoReleaseAlerts)) {
+            this.data.repoReleaseAlerts = {};
+        }
         if (typeof this.data.accountSyncTimes !== 'object' || this.data.accountSyncTimes === null || Array.isArray(this.data.accountSyncTimes)) {
             this.data.accountSyncTimes = {};
         }
@@ -197,8 +217,63 @@ export default class GithubStarsPlugin extends Plugin {
     async savePluginData() {
         // saveCombinedData 内部会调用 updateAllTagsFromEnhancements
         await this.saveCombinedData();
+        this.scheduleCacheSnapshotPersist();
         // 数据保存后，通知视图更新 (如果需要立即反映标签变化等)
         this.updateViews();
+    }
+
+    private async initializeCacheLayer(): Promise<void> {
+        this.cacheService = new GithubStarsCacheService();
+        try {
+            this.cacheSnapshotReadCount += 1;
+            const snapshot = await this.cacheService.loadSnapshot();
+            const shouldHydrateFromCache = this.data.githubRepositories.length === 0;
+            if (snapshot && shouldHydrateFromCache && snapshot.githubRepositories.length > 0) {
+                this.data.githubRepositories = snapshot.githubRepositories;
+                this.data.userEnhancements = snapshot.userEnhancements;
+                this.data.allTags = snapshot.allTags;
+                this.data.tagColors = snapshot.tagColors;
+                this.data.lastSyncTime = snapshot.lastSyncTime;
+                this.data.accountSyncTimes = snapshot.accountSyncTimes;
+                this._ensureDataIntegrity();
+                this.cacheSnapshotRestoreHitCount += 1;
+                console.debug('IndexedDB cache restored repositories snapshot.');
+            }
+            this.scheduleCacheSnapshotPersist();
+        } catch (error) {
+            console.warn('Failed to initialize IndexedDB cache layer:', error);
+            this.cacheService.close();
+            this.cacheService = null;
+        }
+    }
+
+    private scheduleCacheSnapshotPersist(): void {
+        if (!this.cacheService) return;
+        if (this.cachePersistTimerId !== null) {
+            window.clearTimeout(this.cachePersistTimerId);
+        }
+        this.cachePersistTimerId = window.setTimeout(() => {
+            this.cachePersistTimerId = null;
+            void this.persistCacheSnapshot();
+        }, CACHE_PERSIST_DELAY_MS);
+    }
+
+    private async persistCacheSnapshot(): Promise<void> {
+        if (!this.cacheService) return;
+        try {
+            await this.cacheService.saveSnapshot(this.data);
+            this.cacheSnapshotWriteCount += 1;
+        } catch (error) {
+            console.warn('Failed to persist IndexedDB snapshot:', error);
+        }
+    }
+
+    getCacheStats(): { reads: number; writes: number; restoreHits: number } {
+        return {
+            reads: this.cacheSnapshotReadCount,
+            writes: this.cacheSnapshotWriteCount,
+            restoreHits: this.cacheSnapshotRestoreHitCount
+        };
     }
 
     // --- 自动同步 (不变) ---

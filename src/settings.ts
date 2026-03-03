@@ -60,6 +60,8 @@ export const DEFAULT_SETTINGS: GithubStarsSettings = {
     syncIntervalVersion: 2, // 同步间隔版本（天）
     language: 'en', // 默认语言
     repoRenderPerformanceMode: 'balanced', // 默认平衡模式
+    enablePerformanceMonitor: false, // 默认关闭性能监控
+    enableReleaseAlerts: false, // 默认关闭版本提醒（功能后续启用）
     enableExport: true, // 默认启用导出功能
     includeProperties: true, // 默认启用Properties
     propertiesTemplate: DEFAULT_PROPERTIES_TEMPLATE, // 默认Properties模板
@@ -67,6 +69,20 @@ export const DEFAULT_SETTINGS: GithubStarsSettings = {
 
 export class GithubStarsSettingTab extends PluginSettingTab {
     plugin: GithubStarsPlugin;
+
+    private optimizeGithubAvatarUrl(rawUrl: string, size: number): string {
+        if (!rawUrl) return rawUrl;
+        try {
+            const parsedUrl = new URL(rawUrl);
+            if (!parsedUrl.hostname.includes('githubusercontent.com')) {
+                return rawUrl;
+            }
+            parsedUrl.searchParams.set('s', String(size));
+            return parsedUrl.toString();
+        } catch {
+            return rawUrl;
+        }
+    }
 
     private normalizeSyncIntervalDays(rawDays: number): number {
         if (!Number.isFinite(rawDays)) {
@@ -249,6 +265,17 @@ export class GithubStarsSettingTab extends PluginSettingTab {
                 })
             );
 
+        new Setting(syncSection)
+            .setName(t('settings.enablePerformanceMonitor'))
+            .setDesc(t('settings.enablePerformanceMonitorDesc'))
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.enablePerformanceMonitor)
+                .onChange(async (value) => {
+                    this.plugin.settings.enablePerformanceMonitor = value;
+                    await this.plugin.saveSettings({ refreshViews: true });
+                })
+            );
+
         const exportSection = this.createSettingsSection(containerEl);
 
         // 导出功能开关
@@ -321,12 +348,15 @@ export class GithubStarsSettingTab extends PluginSettingTab {
 
             // 头像
             if (account.avatar_url) {
+                const optimizedAvatarUrl = this.optimizeGithubAvatarUrl(account.avatar_url, 96);
                 const avatarEl = infoEl.createEl('img', {
                     cls: 'github-account-avatar',
                     attr: {
-                        src: account.avatar_url,
+                        src: optimizedAvatarUrl,
                         alt: `${account.username} avatar`,
-                        loading: 'lazy'
+                        loading: 'eager',
+                        decoding: 'async',
+                        fetchpriority: 'high'
                     }
                 });
                 avatarEl.addEventListener('error', () => {

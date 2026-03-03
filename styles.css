@@ -644,6 +644,39 @@
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
+.github-stars-repo-avatar-wrapper {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    position: relative;
+    flex-shrink: 0;
+}
+
+.github-stars-repo-avatar-wrapper .github-stars-repo-avatar {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    transition: opacity 0.18s ease;
+}
+
+.github-stars-repo-avatar-wrapper .github-stars-repo-avatar.is-loaded {
+    opacity: 1;
+}
+
+.github-stars-repo-avatar-fallback {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    background: var(--background-modifier-hover);
+    border: 1px solid var(--background-modifier-border);
+}
+
 .github-stars-repo-title-group {
     flex: 1;
     min-width: 0;
@@ -2890,6 +2923,90 @@
 .github-stars-toolbar .github-stars-sync-button,
 .github-stars-toolbar .github-stars-theme-button {
   margin-right: 0;
+}
+
+.github-stars-toolbar .github-stars-perf-button.active {
+  background: var(--interactive-accent);
+  border-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.github-stars-toolbar .github-stars-perf-button.active:hover {
+  background: var(--interactive-accent-hover);
+  border-color: var(--interactive-accent-hover);
+  color: var(--text-on-accent);
+}
+
+.github-stars-performance-panel {
+  margin: 0 16px 10px 16px;
+  padding: 10px 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 12px;
+  background: var(--background-secondary);
+}
+
+.github-stars-performance-panel.hidden {
+  display: none;
+}
+
+.github-stars-performance-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  gap: 8px;
+}
+
+.github-stars-performance-panel-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.github-stars-performance-panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.github-stars-performance-panel-action {
+  min-height: 26px;
+  padding: 0 8px;
+  border-radius: 6px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.github-stars-performance-panel-action:hover {
+  border-color: var(--interactive-accent);
+  color: var(--text-normal);
+}
+
+.github-stars-performance-panel-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
+  gap: 8px;
+}
+
+.github-stars-performance-item {
+  padding: 8px 9px;
+  border-radius: 8px;
+  border: 1px dashed var(--background-modifier-border);
+  background: var(--background-primary);
+}
+
+.github-stars-performance-item-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.github-stars-performance-item-value {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-normal);
 }
 
 /* ===== 动态定位样式 ===== */

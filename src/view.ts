@@ -4,6 +4,7 @@ import { GithubRepository, UserRepoEnhancements, GithubAccount, RepoRenderPerfor
 import { EditRepoModal } from './modal';
 import { EmojiUtils } from './emojiUtils';
 import { t } from './i18n';
+import { RepoQueryEngine, RepoQueryDataItem, RepoQueryInput } from './repoQueryEngine';
 
 export const VIEW_TYPE_STARS = 'github-stars-view';
 
@@ -21,12 +22,30 @@ const REPO_VIRTUALIZATION_OVERSCAN = 8;
 const REPO_ESTIMATED_ITEM_HEIGHT = 250;
 const REPO_VIRTUAL_MIN_CARD_WIDTH = 280;
 const REPO_VIRTUAL_GRID_GAP = 16;
+const REPO_AVATAR_SIZE = 72;
+const ACCOUNT_AVATAR_SIZE = 96;
 
 type RenderRepository = GithubRepository & {
     notes?: string;
     tags?: string[];
     linked_note?: string;
 };
+
+type PerfDurationMetricKey = 'query' | 'render' | 'interaction';
+
+interface PerfDurationMetrics {
+    lastMs: number;
+    avgMs: number;
+    samples: number;
+}
+
+interface ViewPerformanceStats {
+    query: PerfDurationMetrics;
+    render: PerfDurationMetrics;
+    interaction: PerfDurationMetrics;
+    fpsEstimate: number;
+    jankFrames30s: number;
+}
 
 function hexToRgb(hexColor: string): { r: number; g: number; b: number } | null {
     const normalized = hexColor.trim().replace('#', '');
@@ -82,6 +101,23 @@ export class GithubStarsView extends ItemView {
     virtualBottomSpacerEl: HTMLElement | null = null;
     virtualMeasureFrameId: number | null = null;
     repoRenderVersion: number = 0;
+    repoQueryEngine: RepoQueryEngine;
+    combinedRepositoriesCache: RenderRepository[] = [];
+    combinedRepositoriesById: Map<number, RenderRepository> = new Map();
+    combinedDataVersion: number = 0;
+    syncedQueryDataVersion: number = -1;
+    latestVisibleRepositories: RenderRepository[] = [];
+    hasVisibleRepositoriesSnapshot: boolean = false;
+    performancePanelEl: HTMLElement | null = null;
+    performanceToggleButton: HTMLButtonElement | null = null;
+    isPerformancePanelExpanded: boolean = false;
+    performanceStats: ViewPerformanceStats;
+    pendingInteractionStartAt: number | null = null;
+    performancePanelRefreshFrameId: number | null = null;
+    performanceFrameLoopId: number | null = null;
+    performanceLastFrameAt: number = 0;
+    performanceLastFrameUiRefreshAt: number = 0;
+    performanceFrameSamples: Array<{ timestamp: number; delta: number }> = [];
 
     constructor(leaf: WorkspaceLeaf, plugin: GithubStarsPlugin) {
         super(leaf);
@@ -90,6 +126,9 @@ export class GithubStarsView extends ItemView {
         this.githubRepositories = plugin.data.githubRepositories || [];
         this.userEnhancements = plugin.data.userEnhancements || {};
         this.allTags = plugin.data.allTags || [];
+        this.repoQueryEngine = new RepoQueryEngine();
+        this.performanceStats = this.createInitialPerformanceStats();
+        this.rebuildCombinedRepositoriesCache();
     }
 
     getViewType(): string {
@@ -105,7 +144,7 @@ export class GithubStarsView extends ItemView {
     }
 
     onOpen(): Promise<void> {
-        const container = this.containerEl.children[1];
+        const container = this.containerEl.children[1] as HTMLElement;
         container.empty();
         container.classList.add('github-stars-container');
 
@@ -126,6 +165,9 @@ export class GithubStarsView extends ItemView {
         this.repoRenderStatusEl = container.createDiv('github-stars-render-status');
         this.repoRenderStatusEl.addClass('hidden');
 
+        this.ensurePerformancePanelMount(container);
+        this.updatePerformanceToggleButtonState();
+
         // Repositories Container
         this.repoContainer = container.createDiv('github-stars-repos');
         this.repoContainer.removeEventListener('scroll', this.handleRepoContainerScroll);
@@ -135,6 +177,313 @@ export class GithubStarsView extends ItemView {
         this.renderRepositories();
 
         return Promise.resolve();
+    }
+
+    private isPerformanceMonitorEnabled(): boolean {
+        return Boolean(this.plugin.settings.enablePerformanceMonitor);
+    }
+
+    private createInitialDurationMetrics(): PerfDurationMetrics {
+        return {
+            lastMs: 0,
+            avgMs: 0,
+            samples: 0
+        };
+    }
+
+    private createInitialPerformanceStats(): ViewPerformanceStats {
+        return {
+            query: this.createInitialDurationMetrics(),
+            render: this.createInitialDurationMetrics(),
+            interaction: this.createInitialDurationMetrics(),
+            fpsEstimate: 0,
+            jankFrames30s: 0
+        };
+    }
+
+    private formatPerformanceDuration(durationMs: number): string {
+        if (!Number.isFinite(durationMs) || durationMs <= 0) return '--';
+        return `${durationMs.toFixed(1)} ms`;
+    }
+
+    private recordPerformanceDuration(metricKey: PerfDurationMetricKey, durationMs: number): void {
+        if (!this.isPerformanceMonitorEnabled()) return;
+        if (!Number.isFinite(durationMs) || durationMs < 0) return;
+
+        const metric = this.performanceStats[metricKey];
+        const nextSamples = metric.samples + 1;
+        metric.lastMs = durationMs;
+        metric.avgMs = ((metric.avgMs * metric.samples) + durationMs) / nextSamples;
+        metric.samples = nextSamples;
+        this.requestPerformancePanelRefresh();
+    }
+
+    private markInteractionMeasurementStart(): void {
+        if (!this.isPerformanceMonitorEnabled()) return;
+        if (this.pendingInteractionStartAt !== null) return;
+        this.pendingInteractionStartAt = performance.now();
+    }
+
+    private finalizeInteractionMeasurement(): void {
+        if (!this.isPerformanceMonitorEnabled()) return;
+        if (this.pendingInteractionStartAt === null) return;
+
+        const latencyMs = performance.now() - this.pendingInteractionStartAt;
+        this.pendingInteractionStartAt = null;
+        this.recordPerformanceDuration('interaction', latencyMs);
+    }
+
+    private resetPerformanceStats(showNotice = false): void {
+        this.performanceStats = this.createInitialPerformanceStats();
+        this.pendingInteractionStartAt = null;
+        this.performanceLastFrameAt = 0;
+        this.performanceLastFrameUiRefreshAt = 0;
+        this.performanceFrameSamples = [];
+        this.requestPerformancePanelRefresh();
+        if (showNotice) {
+            new Notice(t('view.perfResetDone'));
+        }
+    }
+
+    private requestPerformancePanelRefresh(): void {
+        if (!this.performancePanelEl || !this.isPerformancePanelExpanded) return;
+        if (this.performancePanelRefreshFrameId !== null) return;
+        this.performancePanelRefreshFrameId = window.requestAnimationFrame(() => {
+            this.performancePanelRefreshFrameId = null;
+            this.renderPerformancePanel();
+        });
+    }
+
+    private ensurePerformancePanelMount(container: HTMLElement): void {
+        if (!this.isPerformanceMonitorEnabled()) {
+            this.removePerformancePanel();
+            return;
+        }
+
+        if (!this.performancePanelEl) {
+            this.performancePanelEl = container.createDiv('github-stars-performance-panel');
+            this.performancePanelEl.addClass('hidden');
+        }
+        if (this.repoContainer && this.performancePanelEl.parentElement === container) {
+            container.insertBefore(this.performancePanelEl, this.repoContainer);
+        }
+        this.renderPerformancePanel();
+    }
+
+    private removePerformancePanel(): void {
+        this.stopPerformanceFrameMonitor();
+        if (this.performancePanelRefreshFrameId !== null) {
+            window.cancelAnimationFrame(this.performancePanelRefreshFrameId);
+            this.performancePanelRefreshFrameId = null;
+        }
+        if (this.performancePanelEl) {
+            this.performancePanelEl.remove();
+            this.performancePanelEl = null;
+        }
+        this.isPerformancePanelExpanded = false;
+    }
+
+    private togglePerformancePanel(): void {
+        if (!this.isPerformanceMonitorEnabled()) return;
+        const container = this.containerEl.children[1] as HTMLElement | undefined;
+        if (!container) return;
+
+        this.ensurePerformancePanelMount(container);
+        this.isPerformancePanelExpanded = !this.isPerformancePanelExpanded;
+        this.updatePerformanceToggleButtonState();
+        this.renderPerformancePanel();
+
+        if (this.isPerformancePanelExpanded) {
+            this.startPerformanceFrameMonitor();
+        } else {
+            this.stopPerformanceFrameMonitor();
+        }
+    }
+
+    private updatePerformanceToggleButtonState(): void {
+        if (!this.performanceToggleButton) return;
+        this.performanceToggleButton.toggleClass('active', this.isPerformancePanelExpanded);
+        this.performanceToggleButton.setAttribute(
+            'title',
+            this.isPerformancePanelExpanded ? t('view.perfCollapse') : t('view.perfPanelTitle')
+        );
+        this.performanceToggleButton.setAttribute(
+            'aria-label',
+            this.isPerformancePanelExpanded ? t('view.perfCollapse') : t('view.perfPanelTitle')
+        );
+    }
+
+    private getPerformanceDiagnosticsText(): string {
+        const cacheStats = this.plugin.getCacheStats();
+        const visibleCount = this.hasVisibleRepositoriesSnapshot ? this.latestVisibleRepositories.length : 0;
+        const workerLabel = this.repoQueryEngine.isWorkerEnabled() ? t('view.perfWorkerOn') : t('view.perfWorkerOff');
+        return [
+            `[${t('view.perfPanelTitle')}]`,
+            `${t('view.perfDataTotal')}: ${this.githubRepositories.length}`,
+            `${t('view.perfDataVisible')}: ${visibleCount}`,
+            `${t('view.perfQuerySummary')} - ${t('view.perfLast')}: ${this.formatPerformanceDuration(this.performanceStats.query.lastMs)}, ${t('view.perfAvg')}: ${this.formatPerformanceDuration(this.performanceStats.query.avgMs)}`,
+            `${t('view.perfRenderSummary')} - ${t('view.perfLast')}: ${this.formatPerformanceDuration(this.performanceStats.render.lastMs)}, ${t('view.perfAvg')}: ${this.formatPerformanceDuration(this.performanceStats.render.avgMs)}`,
+            `${t('view.perfInteractionSummary')} - ${t('view.perfLast')}: ${this.formatPerformanceDuration(this.performanceStats.interaction.lastMs)}, ${t('view.perfAvg')}: ${this.formatPerformanceDuration(this.performanceStats.interaction.avgMs)}`,
+            `${t('view.perfWorker')}: ${workerLabel}`,
+            `${t('view.perfFps')}: ${this.performanceStats.fpsEstimate.toFixed(1)}`,
+            `${t('view.perfJank')}: ${this.performanceStats.jankFrames30s}`,
+            `${t('view.perfCacheReads')}: ${cacheStats.reads}`,
+            `${t('view.perfCacheWrites')}: ${cacheStats.writes}`,
+            `${t('view.perfCacheHits')}: ${cacheStats.restoreHits}`
+        ].join('\n');
+    }
+
+    private async copyPerformanceDiagnostics(): Promise<void> {
+        const text = this.getPerformanceDiagnosticsText();
+        try {
+            if (!navigator.clipboard || !navigator.clipboard.writeText) {
+                throw new Error('Clipboard API unavailable');
+            }
+            await navigator.clipboard.writeText(text);
+            new Notice(t('view.perfCopied'));
+        } catch (error) {
+            console.warn('Failed to copy performance diagnostics:', error);
+            new Notice(t('common.error'));
+        }
+    }
+
+    private renderPerformancePanel(): void {
+        if (!this.performancePanelEl) return;
+
+        if (!this.isPerformanceMonitorEnabled() || !this.isPerformancePanelExpanded) {
+            this.performancePanelEl.addClass('hidden');
+            return;
+        }
+
+        this.performancePanelEl.removeClass('hidden');
+        this.performancePanelEl.empty();
+
+        const cacheStats = this.plugin.getCacheStats();
+        const visibleCount = this.hasVisibleRepositoriesSnapshot ? this.latestVisibleRepositories.length : 0;
+        const workerLabel = this.repoQueryEngine.isWorkerEnabled() ? t('view.perfWorkerOn') : t('view.perfWorkerOff');
+
+        const headerEl = this.performancePanelEl.createDiv('github-stars-performance-panel-header');
+        headerEl.createEl('div', {
+            cls: 'github-stars-performance-panel-title',
+            text: t('view.perfPanelTitle')
+        });
+        const headerActions = headerEl.createDiv('github-stars-performance-panel-actions');
+
+        const copyButton = headerActions.createEl('button', {
+            cls: 'github-stars-performance-panel-action',
+            text: t('view.perfCopy')
+        });
+        copyButton.type = 'button';
+        copyButton.addEventListener('click', () => {
+            void this.copyPerformanceDiagnostics();
+        });
+
+        const resetButton = headerActions.createEl('button', {
+            cls: 'github-stars-performance-panel-action',
+            text: t('view.perfReset')
+        });
+        resetButton.type = 'button';
+        resetButton.addEventListener('click', () => {
+            this.resetPerformanceStats(true);
+        });
+
+        const bodyEl = this.performancePanelEl.createDiv('github-stars-performance-panel-grid');
+
+        const appendSection = (title: string, value: string): void => {
+            const sectionEl = bodyEl.createDiv('github-stars-performance-item');
+            sectionEl.createEl('div', { cls: 'github-stars-performance-item-label', text: title });
+            sectionEl.createEl('div', { cls: 'github-stars-performance-item-value', text: value });
+        };
+
+        appendSection(
+            `${t('view.perfDataSummary')} · ${t('view.perfDataTotal')}`,
+            `${this.githubRepositories.length}`
+        );
+        appendSection(
+            `${t('view.perfDataSummary')} · ${t('view.perfDataVisible')}`,
+            `${visibleCount}`
+        );
+        appendSection(
+            `${t('view.perfQuerySummary')} · ${t('view.perfLast')}`,
+            this.formatPerformanceDuration(this.performanceStats.query.lastMs)
+        );
+        appendSection(
+            `${t('view.perfQuerySummary')} · ${t('view.perfAvg')}`,
+            this.formatPerformanceDuration(this.performanceStats.query.avgMs)
+        );
+        appendSection(
+            `${t('view.perfRenderSummary')} · ${t('view.perfLast')}`,
+            this.formatPerformanceDuration(this.performanceStats.render.lastMs)
+        );
+        appendSection(
+            `${t('view.perfRenderSummary')} · ${t('view.perfAvg')}`,
+            this.formatPerformanceDuration(this.performanceStats.render.avgMs)
+        );
+        appendSection(
+            `${t('view.perfInteractionSummary')} · ${t('view.perfLast')}`,
+            this.formatPerformanceDuration(this.performanceStats.interaction.lastMs)
+        );
+        appendSection(
+            `${t('view.perfInteractionSummary')} · ${t('view.perfAvg')}`,
+            this.formatPerformanceDuration(this.performanceStats.interaction.avgMs)
+        );
+        appendSection(`${t('view.perfWorker')}`, workerLabel);
+        appendSection(`${t('view.perfFps')}`, this.performanceStats.fpsEstimate.toFixed(1));
+        appendSection(`${t('view.perfJank')}`, `${this.performanceStats.jankFrames30s}`);
+        appendSection(`${t('view.perfCacheReads')}`, `${cacheStats.reads}`);
+        appendSection(`${t('view.perfCacheWrites')}`, `${cacheStats.writes}`);
+        appendSection(`${t('view.perfCacheHits')}`, `${cacheStats.restoreHits}`);
+    }
+
+    private startPerformanceFrameMonitor(): void {
+        if (!this.isPerformancePanelExpanded) return;
+        if (this.performanceFrameLoopId !== null) return;
+        this.performanceLastFrameAt = 0;
+        this.performanceLastFrameUiRefreshAt = 0;
+        this.performanceFrameLoopId = window.requestAnimationFrame((timestamp) => {
+            this.handlePerformanceFrame(timestamp);
+        });
+    }
+
+    private stopPerformanceFrameMonitor(): void {
+        if (this.performanceFrameLoopId !== null) {
+            window.cancelAnimationFrame(this.performanceFrameLoopId);
+            this.performanceFrameLoopId = null;
+        }
+        this.performanceLastFrameAt = 0;
+        this.performanceLastFrameUiRefreshAt = 0;
+    }
+
+    private handlePerformanceFrame(timestamp: number): void {
+        if (!this.isPerformancePanelExpanded || !this.isPerformanceMonitorEnabled()) {
+            this.stopPerformanceFrameMonitor();
+            return;
+        }
+
+        if (this.performanceLastFrameAt > 0) {
+            const delta = timestamp - this.performanceLastFrameAt;
+            this.performanceFrameSamples.push({ timestamp, delta });
+            const validFrom = timestamp - 30_000;
+            this.performanceFrameSamples = this.performanceFrameSamples.filter((sample) => sample.timestamp >= validFrom);
+
+            if (this.performanceFrameSamples.length > 0) {
+                const totalDelta = this.performanceFrameSamples.reduce((sum, sample) => sum + sample.delta, 0);
+                this.performanceStats.fpsEstimate = totalDelta > 0
+                    ? Math.max(1, Math.min(144, (1000 * this.performanceFrameSamples.length) / totalDelta))
+                    : 0;
+                this.performanceStats.jankFrames30s = this.performanceFrameSamples.filter((sample) => sample.delta > 50).length;
+            }
+
+            if ((timestamp - this.performanceLastFrameUiRefreshAt) >= 900) {
+                this.performanceLastFrameUiRefreshAt = timestamp;
+                this.requestPerformancePanelRefresh();
+            }
+        }
+
+        this.performanceLastFrameAt = timestamp;
+        this.performanceFrameLoopId = window.requestAnimationFrame((nextTimestamp) => {
+            this.handlePerformanceFrame(nextTimestamp);
+        });
     }
 
     /**
@@ -197,6 +546,23 @@ export class GithubStarsView extends ItemView {
             return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
         }
         return num.toString();
+    }
+
+    /**
+     * 对 GitHub 头像 URL 追加尺寸参数，减少图片体积以加快显示
+     */
+    private optimizeGithubAvatarUrl(rawUrl: string, size: number): string {
+        if (!rawUrl) return rawUrl;
+        try {
+            const parsedUrl = new URL(rawUrl);
+            if (!parsedUrl.hostname.includes('githubusercontent.com')) {
+                return rawUrl;
+            }
+            parsedUrl.searchParams.set('s', String(size));
+            return parsedUrl.toString();
+        } catch {
+            return rawUrl;
+        }
     }
 
     /**
@@ -373,6 +739,8 @@ export class GithubStarsView extends ItemView {
      * 合并同一帧内的仓库列表重渲染请求，避免按钮连点导致主线程阻塞
      */
     private requestRepositoriesRender(): void {
+        this.hasVisibleRepositoriesSnapshot = false;
+        this.markInteractionMeasurementStart();
         if (this.repoRenderFrameId !== null) return;
         this.repoRenderFrameId = window.requestAnimationFrame(() => {
             this.repoRenderFrameId = null;
@@ -434,6 +802,16 @@ export class GithubStarsView extends ItemView {
         if (totalCount > 500) return 20;
         if (totalCount > 220) return 28;
         return 36;
+    }
+
+    /**
+     * 控制高优先级头像数量，避免一次性抢占过多网络并发
+     */
+    private getHighPriorityAvatarCount(): number {
+        const mode = this.getRepoRenderPerformanceMode();
+        if (mode === 'visual') return 18;
+        if (mode === 'extreme') return 8;
+        return 12;
     }
 
     /**
@@ -1028,6 +1406,10 @@ export class GithubStarsView extends ItemView {
      * 渲染仓库列表 (Major Refactor)
      */
     renderRepositories() {
+        void this.renderRepositoriesAsync();
+    }
+
+    private async renderRepositoriesAsync(): Promise<void> {
         if (!this.repoContainer) {
             console.warn('repoContainer not initialized');
             return;
@@ -1040,10 +1422,32 @@ export class GithubStarsView extends ItemView {
             this.repoContainer.createEl('div', { cls: 'github-stars-empty', text: t('view.noRepos') });
             this.hideRepoRenderStatus();
             this.updateTotalStarsCount(0);
+            this.latestVisibleRepositories = [];
+            this.hasVisibleRepositoriesSnapshot = true;
+            this.finalizeInteractionMeasurement();
+            this.requestPerformancePanelRefresh();
             return;
         }
+        let sortedRepos: RenderRepository[] = [];
+        try {
+            await this.syncQueryDataIfNeeded();
+            if (renderVersion !== this.repoRenderVersion) return;
 
-        const sortedRepos = this.getSortedFilteredRepositories();
+            const queryStartAt = performance.now();
+            const queryResult = await this.repoQueryEngine.query(this.getCurrentQueryInput());
+            this.recordPerformanceDuration('query', performance.now() - queryStartAt);
+            if (renderVersion !== this.repoRenderVersion) return;
+
+            sortedRepos = queryResult.orderedIds
+                .map((repoId) => this.combinedRepositoriesById.get(repoId))
+                .filter((repo): repo is RenderRepository => Boolean(repo));
+        } catch (error) {
+            console.warn('Worker query failed, fallback to main thread query:', error);
+            const fallbackStartAt = performance.now();
+            sortedRepos = this.getSortedFilteredRepositories();
+            this.recordPerformanceDuration('query', performance.now() - fallbackStartAt);
+        }
+        if (renderVersion !== this.repoRenderVersion) return;
 
         if (sortedRepos.length === 0) {
             this.disableRepoVirtualization();
@@ -1051,9 +1455,15 @@ export class GithubStarsView extends ItemView {
             this.repoContainer.createEl('div', { cls: 'github-stars-empty', text: t('view.noMatchingRepos') });
             this.hideRepoRenderStatus();
             this.updateTotalStarsCount(0);
+            this.latestVisibleRepositories = [];
+            this.hasVisibleRepositoriesSnapshot = true;
+            this.finalizeInteractionMeasurement();
+            this.requestPerformancePanelRefresh();
             return;
         }
 
+        this.latestVisibleRepositories = sortedRepos;
+        this.hasVisibleRepositoriesSnapshot = true;
         this.updateTotalStarsCount(sortedRepos.length);
 
         if (!this.shouldUseVirtualizedRender(sortedRepos.length)) {
@@ -1068,10 +1478,59 @@ export class GithubStarsView extends ItemView {
      * 合并 GitHub 仓库与用户增强字段
      */
     private buildCombinedRepositories(): RenderRepository[] {
-        return this.githubRepositories.map((githubRepo) => {
+        return this.combinedRepositoriesCache;
+    }
+
+    private rebuildCombinedRepositoriesCache(): void {
+        this.combinedRepositoriesCache = this.githubRepositories.map((githubRepo) => {
             const enhancement = this.userEnhancements[githubRepo.id] || { notes: '', tags: [], linked_note: undefined };
             return { ...githubRepo, ...enhancement };
         });
+        this.combinedRepositoriesById = new Map(
+            this.combinedRepositoriesCache.map((repo) => [repo.id, repo] as const)
+        );
+        this.combinedDataVersion += 1;
+        this.syncedQueryDataVersion = -1;
+    }
+
+    private toRepoQueryDataList(): RepoQueryDataItem[] {
+        return this.combinedRepositoriesCache.map((repo) => ({
+            id: repo.id,
+            name: repo.name,
+            full_name: repo.full_name,
+            description: repo.description,
+            owner: repo.owner,
+            notes: repo.notes,
+            language: repo.language,
+            tags: repo.tags || [],
+            account_id: repo.account_id,
+            stargazers_count: repo.stargazers_count,
+            forks_count: repo.forks_count,
+            updated_at: repo.updated_at,
+            starred_at: repo.starred_at
+        }));
+    }
+
+    private async syncQueryDataIfNeeded(): Promise<void> {
+        if (this.syncedQueryDataVersion === this.combinedDataVersion) {
+            return;
+        }
+
+        const targetVersion = this.combinedDataVersion;
+        await this.repoQueryEngine.setData(this.toRepoQueryDataList());
+        if (targetVersion === this.combinedDataVersion) {
+            this.syncedQueryDataVersion = targetVersion;
+        }
+    }
+
+    private getCurrentQueryInput(): RepoQueryInput {
+        return {
+            textFilter: this.currentFilter || '',
+            activeTagFilters: this.getActiveTagFiltersNormalized(),
+            enabledAccountIds: Array.from(this.getEnabledAccountIdSet()),
+            sortBy: this.sortBy,
+            sortOrder: this.sortOrder
+        };
     }
 
     /**
@@ -1151,6 +1610,7 @@ export class GithubStarsView extends ItemView {
      */
     private async renderFullRepositories(repositories: RenderRepository[], renderVersion: number): Promise<void> {
         if (!this.repoContainer) return;
+        const renderStartAt = performance.now();
         this.disableRepoVirtualization();
         this.repoContainer.empty();
         const totalCount = repositories.length;
@@ -1166,16 +1626,21 @@ export class GithubStarsView extends ItemView {
             this.hideRepoRenderStatus();
         }
 
+        const highPriorityAvatarCount = Math.min(firstScreenCount, this.getHighPriorityAvatarCount());
         for (let index = 0; index < firstScreenCount; index++) {
             if (renderVersion !== this.repoRenderVersion || !this.repoContainer) {
                 return;
             }
-            this.renderRepositoryCard(repositories[index], this.repoContainer);
+            this.renderRepositoryCard(repositories[index], this.repoContainer, index < highPriorityAvatarCount);
         }
+        this.finalizeInteractionMeasurement();
+        this.requestPerformancePanelRefresh();
 
         if (firstScreenCount >= totalCount) {
             if (renderVersion === this.repoRenderVersion) {
                 this.hideRepoRenderStatus();
+                this.recordPerformanceDuration('render', performance.now() - renderStartAt);
+                this.requestPerformancePanelRefresh();
             }
             return;
         }
@@ -1192,7 +1657,7 @@ export class GithubStarsView extends ItemView {
                 if (renderVersion !== this.repoRenderVersion || !this.repoContainer) {
                     return;
                 }
-                this.renderRepositoryCard(repositories[index], this.repoContainer);
+                this.renderRepositoryCard(repositories[index], this.repoContainer, false);
             }
 
             if (shouldShowStatus) {
@@ -1207,6 +1672,8 @@ export class GithubStarsView extends ItemView {
 
         if (renderVersion === this.repoRenderVersion) {
             this.hideRepoRenderStatus();
+            this.recordPerformanceDuration('render', performance.now() - renderStartAt);
+            this.requestPerformancePanelRefresh();
         }
     }
 
@@ -1216,6 +1683,7 @@ export class GithubStarsView extends ItemView {
     private renderVirtualizedRepositories(repositories: RenderRepository[], renderVersion: number): void {
         if (!this.repoContainer) return;
         if (renderVersion !== this.repoRenderVersion) return;
+        const renderStartAt = performance.now();
         this.hideRepoRenderStatus();
 
         this.virtualizedRepos = repositories;
@@ -1227,6 +1695,9 @@ export class GithubStarsView extends ItemView {
         this.virtualEndIndex = -1;
         this.virtualColumnCount = 1;
         this.renderVirtualizedWindow(true);
+        this.finalizeInteractionMeasurement();
+        this.recordPerformanceDuration('render', performance.now() - renderStartAt);
+        this.requestPerformancePanelRefresh();
     }
 
     /**
@@ -1304,8 +1775,16 @@ export class GithubStarsView extends ItemView {
         this.virtualBottomSpacerEl.setCssProps({ height: `${Math.max(0, (totalRows - endRow) * this.virtualItemEstimate)}px` });
 
         this.virtualItemsEl.empty();
+        const highPriorityAvatarCount = Math.min(
+            this.getHighPriorityAvatarCount(),
+            Math.max(6, Math.ceil((end - start) * 0.35))
+        );
         for (let index = start; index < end; index++) {
-            this.renderRepositoryCard(this.virtualizedRepos[index], this.virtualItemsEl);
+            this.renderRepositoryCard(
+                this.virtualizedRepos[index],
+                this.virtualItemsEl,
+                (index - start) < highPriorityAvatarCount
+            );
         }
 
         this.scheduleVirtualItemMeasure();
@@ -1339,7 +1818,7 @@ export class GithubStarsView extends ItemView {
     /**
      * 渲染单个仓库卡片
      */
-    private renderRepositoryCard(repo: RenderRepository, parent: HTMLElement): void {
+    private renderRepositoryCard(repo: RenderRepository, parent: HTMLElement, prioritizeAvatarLoad = false): void {
         const repoEl = parent.createEl('div', { cls: 'github-stars-repo' });
 
         const headerEl = repoEl.createEl('div', { cls: 'github-stars-repo-header' });
@@ -1356,19 +1835,37 @@ export class GithubStarsView extends ItemView {
             });
         }
 
-        if (repo.owner && repo.owner.avatar_url) {
-            const avatarImg = headerEl.createEl('img', {
-                cls: 'github-stars-repo-avatar',
-                attr: {
-                    src: repo.owner.avatar_url,
-                    alt: `${repo.owner.login} avatar`,
-                    loading: 'lazy'
-                }
+        if (repo.owner) {
+            const avatarWrapper = headerEl.createDiv('github-stars-repo-avatar-wrapper');
+            const fallbackText = (repo.owner.login || repo.full_name || repo.name || '?').trim().charAt(0).toUpperCase() || '?';
+            const avatarFallback = avatarWrapper.createEl('div', {
+                cls: 'github-stars-repo-avatar-fallback',
+                text: fallbackText
             });
 
-            avatarImg.addEventListener('error', () => {
-                avatarImg.addClass('display-none');
-            });
+            if (repo.owner.avatar_url) {
+                const optimizedAvatarUrl = this.optimizeGithubAvatarUrl(repo.owner.avatar_url, REPO_AVATAR_SIZE);
+                const avatarImg = avatarWrapper.createEl('img', {
+                    cls: 'github-stars-repo-avatar',
+                    attr: {
+                        src: optimizedAvatarUrl,
+                        alt: `${repo.owner.login} avatar`,
+                        loading: prioritizeAvatarLoad ? 'eager' : 'lazy',
+                        decoding: 'async',
+                        fetchpriority: prioritizeAvatarLoad ? 'high' : 'low'
+                    }
+                });
+
+                avatarImg.addEventListener('load', () => {
+                    avatarImg.addClass('is-loaded');
+                    avatarFallback.addClass('hidden');
+                });
+
+                avatarImg.addEventListener('error', () => {
+                    avatarImg.addClass('display-none');
+                    avatarFallback.removeClass('hidden');
+                });
+            }
         }
 
         const titleGroupEl = headerEl.createEl('div', { cls: 'github-stars-repo-title-group' });
@@ -1640,6 +2137,20 @@ export class GithubStarsView extends ItemView {
 
         // 创建右侧按钮容器
         const rightButtonsContainer = toolbarDiv.createDiv('github-stars-toolbar-right');
+        this.performanceToggleButton = null;
+
+        if (this.isPerformanceMonitorEnabled()) {
+            const perfToggleButton = rightButtonsContainer.createEl('button', {
+                cls: 'github-stars-perf-button',
+                text: t('view.perfToggle')
+            });
+            perfToggleButton.type = 'button';
+            perfToggleButton.addEventListener('click', () => {
+                this.togglePerformancePanel();
+            });
+            this.performanceToggleButton = perfToggleButton;
+            this.updatePerformanceToggleButtonState();
+        }
 
         // Export Button - 批量导出按钮（仅在启用导出功能时显示，放在右上角）
         if (this.plugin.settings.enableExport) {
@@ -1734,10 +2245,26 @@ export class GithubStarsView extends ItemView {
         this.githubRepositories = githubRepositories || [];
         this.userEnhancements = userEnhancements || {};
         this.allTags = allTags || [];
+        this.rebuildCombinedRepositoriesCache();
+        this.hasVisibleRepositoriesSnapshot = false;
         this.pruneInvalidTagFilters();
         this.pruneInvalidTagEditingState();
         this.updateTagManageToggleButton();
         this.closeTagEditPopover();
+        const container = this.containerEl.children[1] as HTMLElement | undefined;
+        if (container) {
+            this.ensurePerformancePanelMount(container);
+            const toolbar = container.querySelector('.github-stars-toolbar') as HTMLElement | null;
+            if (toolbar) {
+                const hasPerfButton = Boolean(toolbar.querySelector('.github-stars-perf-button'));
+                if (hasPerfButton !== this.isPerformanceMonitorEnabled()) {
+                    toolbar.empty();
+                    this.createToolbar(toolbar);
+                } else {
+                    this.updatePerformanceToggleButtonState();
+                }
+            }
+        }
 
         // Ensure UI elements exist before updating/rendering
         if (this.tagsContainer) {
@@ -1863,12 +2390,15 @@ export class GithubStarsView extends ItemView {
             
             // 头像
             if (account.avatar_url) {
+                const optimizedAvatarUrl = this.optimizeGithubAvatarUrl(account.avatar_url, ACCOUNT_AVATAR_SIZE);
                 const avatarEl = accountEl.createEl('img', {
                     cls: 'account-avatar-small',
                     attr: {
-                        src: account.avatar_url,
+                        src: optimizedAvatarUrl,
                         alt: `${account.username} avatar`,
-                        loading: 'lazy'
+                        loading: 'eager',
+                        decoding: 'async',
+                        fetchpriority: 'high'
                     }
                 });
                 avatarEl.addEventListener('error', () => {
@@ -2102,6 +2632,9 @@ export class GithubStarsView extends ItemView {
      * 获取过滤后的仓库列表
      */
     getFilteredRepositories() {
+        if (this.hasVisibleRepositoriesSnapshot) {
+            return this.latestVisibleRepositories;
+        }
         return this.filterRepositories(this.buildCombinedRepositories());
     }
 
@@ -2155,8 +2688,17 @@ export class GithubStarsView extends ItemView {
             window.cancelAnimationFrame(this.tagsFilterFrameId);
             this.tagsFilterFrameId = null;
         }
+        if (this.performancePanelRefreshFrameId !== null) {
+            window.cancelAnimationFrame(this.performancePanelRefreshFrameId);
+            this.performancePanelRefreshFrameId = null;
+        }
+        this.stopPerformanceFrameMonitor();
+        this.pendingInteractionStartAt = null;
+        this.performanceToggleButton = null;
+        this.removePerformancePanel();
         this.disableRepoVirtualization();
         this.closeTagEditPopover();
+        this.repoQueryEngine.destroy();
         return Promise.resolve();
     }
 } // End of GithubStarsView class
