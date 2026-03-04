@@ -160,6 +160,10 @@ export class GithubStarsView extends ItemView {
 
         // Repositories Container
         this.repoContainer = container.createDiv('github-stars-repos');
+        this.repoContainer.removeEventListener('click', this.handleRepoContainerClick);
+        this.repoContainer.addEventListener('click', this.handleRepoContainerClick);
+        this.repoContainer.removeEventListener('change', this.handleRepoContainerChange);
+        this.repoContainer.addEventListener('change', this.handleRepoContainerChange);
 
         // Initial rendering of repositories
         this.renderRepositories();
@@ -904,6 +908,119 @@ export class GithubStarsView extends ItemView {
             this.updateTagsFilter(this.tagsContainer);
         });
     }
+
+    private parseRepoId(rawRepoId: string | undefined): number | null {
+        if (!rawRepoId) return null;
+        const repoId = Number(rawRepoId);
+        if (!Number.isFinite(repoId)) return null;
+        return repoId;
+    }
+
+    private resolveRepoIdFromActionElement(actionEl: HTMLElement): number | null {
+        const directRepoId = this.parseRepoId(actionEl.dataset.repoId);
+        if (directRepoId !== null) {
+            return directRepoId;
+        }
+        const cardEl = actionEl.closest<HTMLElement>('.github-stars-repo');
+        if (!cardEl) return null;
+        return this.parseRepoId(cardEl.dataset.repoId);
+    }
+
+    /**
+     * 仓库区域事件委托：统一处理卡片内部 click 事件，减少每张卡片的监听器数量
+     */
+    private handleRepoContainerClick = (event: MouseEvent): void => {
+        if (!this.repoContainer) return;
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) return;
+
+        const actionEl = target.closest<HTMLElement>('[data-repo-action]');
+        if (!actionEl || !this.repoContainer.contains(actionEl)) {
+            return;
+        }
+
+        const action = actionEl.dataset.repoAction;
+        if (!action) return;
+
+        if (action === 'open-repo') {
+            event.preventDefault();
+            const repoId = this.resolveRepoIdFromActionElement(actionEl);
+            if (repoId === null) return;
+            const repo = this.combinedRepositoriesById.get(repoId);
+            if (repo?.html_url) {
+                window.open(repo.html_url, '_blank');
+            }
+            return;
+        }
+
+        if (action === 'toggle-tag-filter') {
+            event.preventDefault();
+            event.stopPropagation();
+            const rawTagName = actionEl.dataset.tagName || '';
+            const normalizedTagName = this.normalizeTagName(rawTagName);
+            if (!normalizedTagName) return;
+
+            const currentState = this.filterByTags.get(normalizedTagName) || false;
+            this.filterByTags.set(normalizedTagName, !currentState);
+            this.requestTagsFilterUpdate();
+            this.clearInvisibleSelections();
+            this.requestRepositoriesRender();
+            return;
+        }
+
+        if (action === 'edit-repo') {
+            event.preventDefault();
+            const repoId = this.resolveRepoIdFromActionElement(actionEl);
+            if (repoId === null) return;
+
+            const originalGithubRepo = this.githubRepositories.find((item) => item.id === repoId);
+            if (originalGithubRepo) {
+                this.openEditModal(originalGithubRepo);
+            } else {
+                console.error('Could not find original GitHub repo data for ID:', repoId);
+                new Notice(t('view.cannotEditRepo'));
+            }
+            return;
+        }
+
+        if (action === 'open-linked-note') {
+            event.preventDefault();
+            let linkedNotePath = (actionEl.dataset.linkedNote || '').trim();
+            if (!linkedNotePath) {
+                const repoId = this.resolveRepoIdFromActionElement(actionEl);
+                if (repoId !== null) {
+                    linkedNotePath = this.combinedRepositoriesById.get(repoId)?.linked_note || '';
+                }
+            }
+            if (!linkedNotePath) return;
+
+            this.app.workspace.openLinkText(linkedNotePath, '', false).catch((err) =>
+                console.error('Failed to open linked note:', err)
+            );
+        }
+    };
+
+    /**
+     * 仓库区域事件委托：统一处理卡片内部 change 事件（导出模式复选框）
+     */
+    private handleRepoContainerChange = (event: Event): void => {
+        if (!this.repoContainer) return;
+        const target = event.target;
+        if (!(target instanceof HTMLInputElement)) return;
+        if (!this.repoContainer.contains(target)) return;
+        if (target.dataset.repoAction !== 'toggle-repo-selection') return;
+
+        const repoId = this.resolveRepoIdFromActionElement(target);
+        if (repoId === null) return;
+
+        if (target.checked) {
+            this.selectedRepos.add(repoId);
+        } else {
+            this.selectedRepos.delete(repoId);
+        }
+        this.updateExportConfirmButton();
+        this.updateSelectAllButton();
+    };
 
     /**
      * 等待下一帧，避免一次性大批量 DOM 插入导致主线程长时间阻塞
@@ -1864,6 +1981,7 @@ export class GithubStarsView extends ItemView {
      */
     private renderRepositoryCard(repo: RenderRepository, parent: HTMLElement, prioritizeAvatarLoad = false): HTMLElement {
         const repoEl = parent.createEl('div', { cls: 'github-stars-repo' });
+        repoEl.setAttribute('data-repo-id', String(repo.id));
 
         const headerEl = repoEl.createEl('div', { cls: 'github-stars-repo-header' });
 
@@ -1874,9 +1992,8 @@ export class GithubStarsView extends ItemView {
                 cls: 'github-stars-repo-checkbox'
             });
             checkbox.checked = this.selectedRepos.has(repo.id);
-            checkbox.addEventListener('change', () => {
-                this.toggleRepoSelection(repo.id);
-            });
+            checkbox.setAttribute('data-repo-action', 'toggle-repo-selection');
+            checkbox.setAttribute('data-repo-id', String(repo.id));
         }
 
         if (repo.owner) {
@@ -1922,12 +2039,10 @@ export class GithubStarsView extends ItemView {
             cls: 'github-stars-repo-link'
         });
         linkEl.textContent = repo.full_name || repo.name || 'Unnamed repo';
-        linkEl.onclick = () => {
-            if (repo.html_url) {
-                window.open(repo.html_url, '_blank');
-            }
-            return false;
-        };
+        linkEl.setAttribute('data-repo-action', 'open-repo');
+        linkEl.setAttribute('data-repo-id', String(repo.id));
+        linkEl.setAttribute('role', 'link');
+        linkEl.setAttribute('tabindex', '0');
 
         if (Array.isArray(repo.tags) && repo.tags.length > 0) {
             const titleTagsEl = titleGroupEl.createEl('div', { cls: 'github-stars-repo-title-tags' });
@@ -1937,16 +2052,8 @@ export class GithubStarsView extends ItemView {
                     text: tag
                 });
                 this.applyTagColorStyle(tagEl, tag);
-
-                tagEl.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const normalizedTag = this.normalizeTagName(tag);
-                    const currentState = this.filterByTags.get(normalizedTag) || false;
-                    this.filterByTags.set(normalizedTag, !currentState);
-                    this.requestTagsFilterUpdate();
-                    this.clearInvisibleSelections();
-                    this.requestRepositoriesRender();
-                });
+                tagEl.setAttribute('data-repo-action', 'toggle-tag-filter');
+                tagEl.setAttribute('data-tag-name', tag);
             });
         }
 
@@ -1995,15 +2102,8 @@ export class GithubStarsView extends ItemView {
             cls: 'github-stars-repo-edit',
             text: t('view.editRepo')
         });
-        editButton.addEventListener('click', () => {
-            const originalGithubRepo = this.githubRepositories.find((item) => item.id === repo.id);
-            if (originalGithubRepo) {
-                this.openEditModal(originalGithubRepo);
-            } else {
-                console.error('Could not find original GitHub repo data for ID:', repo.id);
-                new Notice(t('view.cannotEditRepo'));
-            }
-        });
+        editButton.setAttribute('data-repo-action', 'edit-repo');
+        editButton.setAttribute('data-repo-id', String(repo.id));
 
         if (repo.notes) {
             const notesContainer = repoEl.createEl('div', { cls: 'github-stars-repo-notes' });
@@ -2024,12 +2124,9 @@ export class GithubStarsView extends ItemView {
                 href: '#',
                 cls: 'internal-link'
             });
-            link.addEventListener('click', (ev) => {
-                ev.preventDefault();
-                this.app.workspace.openLinkText(repo.linked_note!, '', false).catch((err) =>
-                    console.error('Failed to open linked note:', err)
-                );
-            });
+            link.setAttribute('data-repo-action', 'open-linked-note');
+            link.setAttribute('data-linked-note', repo.linked_note);
+            link.setAttribute('data-repo-id', String(repo.id));
         }
         this.scheduleRepoCardAvatarLoad(repoEl, prioritizeAvatarLoad);
         return repoEl;
@@ -2726,6 +2823,10 @@ export class GithubStarsView extends ItemView {
     onClose(): Promise<void> {
         this.repoRenderVersion += 1;
         this.hideRepoRenderStatus();
+        if (this.repoContainer) {
+            this.repoContainer.removeEventListener('click', this.handleRepoContainerClick);
+            this.repoContainer.removeEventListener('change', this.handleRepoContainerChange);
+        }
         if (this.repoRenderFrameId !== null) {
             window.cancelAnimationFrame(this.repoRenderFrameId);
             this.repoRenderFrameId = null;
