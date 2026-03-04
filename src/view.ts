@@ -20,6 +20,7 @@ const FALLBACK_TAG_DARK_TEXT_COLOR = '#111827';
 const REPO_AVATAR_SIZE = 72;
 const ACCOUNT_AVATAR_SIZE = 96;
 const REPO_AVATAR_OBSERVER_ROOT_MARGIN = '420px 0px';
+const REPO_RENDER_BUDGET_CHECK_INTERVAL = 4;
 
 type RenderRepository = GithubRepository & {
     notes?: string;
@@ -1052,6 +1053,24 @@ export class GithubStarsView extends ItemView {
     }
 
     /**
+     * 每帧渲染预算（毫秒），用于限制单帧 DOM 插入开销，减少连续操作卡顿峰值
+     */
+    private getRepoRenderFrameBudgetMs(totalCount: number): number {
+        const mode = this.getRepoRenderPerformanceMode();
+        if (mode === 'visual') {
+            if (totalCount > 1400) return 4.5;
+            if (totalCount > 900) return 5.2;
+            if (totalCount > 500) return 5.8;
+            return 6.6;
+        }
+
+        if (totalCount > 1400) return 4.2;
+        if (totalCount > 900) return 4.8;
+        if (totalCount > 500) return 5.4;
+        return 6.2;
+    }
+
+    /**
      * 控制高优先级头像数量，避免一次性抢占过多网络并发
      */
     private getHighPriorityAvatarCount(): number {
@@ -1914,6 +1933,7 @@ export class GithubStarsView extends ItemView {
         this.repoContainer.empty();
         const totalCount = repositories.length;
         const batchSize = this.getRepoRenderBatchSize(totalCount);
+        const frameBudgetMs = this.getRepoRenderFrameBudgetMs(totalCount);
         const mode = this.getRepoRenderPerformanceMode();
         const firstScreenMinimum = mode === 'visual' ? 96 : 64;
         const firstScreenCount = Math.min(totalCount, Math.max(batchSize * 2, firstScreenMinimum));
@@ -1926,11 +1946,40 @@ export class GithubStarsView extends ItemView {
         }
 
         const highPriorityAvatarCount = Math.min(firstScreenCount, this.getHighPriorityAvatarCount());
-        for (let index = 0; index < firstScreenCount; index++) {
+        let firstScreenIndex = 0;
+        const firstScreenPerFrameCap = Math.max(batchSize, 16);
+        while (firstScreenIndex < firstScreenCount) {
             if (renderVersion !== this.repoRenderVersion || !this.repoContainer) {
                 return;
             }
-            this.renderOrReuseRepositoryCard(repositories[index], index < highPriorityAvatarCount);
+
+            const frameDeadline = performance.now() + frameBudgetMs;
+            let renderedInFrame = 0;
+            while (firstScreenIndex < firstScreenCount) {
+                if (renderVersion !== this.repoRenderVersion || !this.repoContainer) {
+                    return;
+                }
+                this.renderOrReuseRepositoryCard(
+                    repositories[firstScreenIndex],
+                    firstScreenIndex < highPriorityAvatarCount
+                );
+                firstScreenIndex += 1;
+                renderedInFrame += 1;
+
+                if (renderedInFrame >= firstScreenPerFrameCap) {
+                    break;
+                }
+                if (
+                    renderedInFrame % REPO_RENDER_BUDGET_CHECK_INTERVAL === 0 &&
+                    performance.now() >= frameDeadline
+                ) {
+                    break;
+                }
+            }
+
+            if (firstScreenIndex < firstScreenCount) {
+                await this.waitForNextFrame();
+            }
         }
         this.finalizeInteractionMeasurement();
         this.requestPerformancePanelRefresh();
@@ -1944,27 +1993,45 @@ export class GithubStarsView extends ItemView {
             return;
         }
 
-        await this.waitForNextFrame();
-
-        for (let start = firstScreenCount; start < totalCount; start += batchSize) {
+        let nextStatusTickAt = performance.now();
+        let renderedIndex = firstScreenCount;
+        const restPerFrameCap = Math.max(8, batchSize);
+        while (renderedIndex < totalCount) {
             if (renderVersion !== this.repoRenderVersion || !this.repoContainer) {
                 return;
             }
 
-            const end = Math.min(totalCount, start + batchSize);
-            for (let index = start; index < end; index++) {
+            const frameDeadline = performance.now() + frameBudgetMs;
+            let renderedInFrame = 0;
+            while (renderedIndex < totalCount) {
                 if (renderVersion !== this.repoRenderVersion || !this.repoContainer) {
                     return;
                 }
-                this.renderOrReuseRepositoryCard(repositories[index], false);
+                this.renderOrReuseRepositoryCard(repositories[renderedIndex], false);
+                renderedIndex += 1;
+                renderedInFrame += 1;
+
+                if (renderedInFrame >= restPerFrameCap) {
+                    break;
+                }
+                if (
+                    renderedInFrame % REPO_RENDER_BUDGET_CHECK_INTERVAL === 0 &&
+                    performance.now() >= frameDeadline
+                ) {
+                    break;
+                }
             }
 
-            if (shouldShowStatus) {
-                const percent = Math.min(100, Math.round((end / totalCount) * 100));
+            if (
+                shouldShowStatus &&
+                (renderedIndex >= totalCount || performance.now() >= nextStatusTickAt)
+            ) {
+                const percent = Math.min(100, Math.round((renderedIndex / totalCount) * 100));
                 this.showRepoRenderStatus(`正在更新列表… ${percent}%`);
+                nextStatusTickAt = performance.now() + 96;
             }
 
-            if (end < totalCount) {
+            if (renderedIndex < totalCount) {
                 await this.waitForNextFrame();
             }
         }
