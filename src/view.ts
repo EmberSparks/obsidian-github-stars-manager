@@ -4,7 +4,7 @@ import { GithubRepository, UserRepoEnhancements, GithubAccount, RepoRenderPerfor
 import { EditRepoModal } from './modal';
 import { EmojiUtils } from './emojiUtils';
 import { t } from './i18n';
-import { RepoQueryEngine, RepoQueryDataItem, RepoQueryInput } from './repoQueryEngine';
+import { RepoQueryEngine, RepoQueryDataItem, RepoQueryDataPatch, RepoQueryInput } from './repoQueryEngine';
 
 export const VIEW_TYPE_STARS = 'github-stars-view';
 
@@ -19,6 +19,7 @@ const FALLBACK_TAG_TEXT_COLOR = '#ffffff';
 const FALLBACK_TAG_DARK_TEXT_COLOR = '#111827';
 const REPO_AVATAR_SIZE = 72;
 const ACCOUNT_AVATAR_SIZE = 96;
+const REPO_AVATAR_OBSERVER_ROOT_MARGIN = '420px 0px';
 
 type RenderRepository = GithubRepository & {
     notes?: string;
@@ -85,12 +86,16 @@ export class GithubStarsView extends ItemView {
     pendingMergeTargetTag: string | null = null;
     repoRenderFrameId: number | null = null;
     tagsFilterFrameId: number | null = null;
+    repoCardElementCache: Map<number, HTMLElement> = new Map();
+    repoCardSignatureCache: Map<number, string> = new Map();
+    repoAvatarObserver: IntersectionObserver | null = null;
     repoRenderVersion: number = 0;
     repoQueryEngine: RepoQueryEngine;
     combinedRepositoriesCache: RenderRepository[] = [];
     combinedRepositoriesById: Map<number, RenderRepository> = new Map();
     combinedDataVersion: number = 0;
     syncedQueryDataVersion: number = -1;
+    syncedQueryDataSignatureById: Map<number, string> = new Map();
     latestVisibleRepositories: RenderRepository[] = [];
     hasVisibleRepositoriesSnapshot: boolean = false;
     performancePanelEl: HTMLElement | null = null;
@@ -546,6 +551,163 @@ export class GithubStarsView extends ItemView {
         } catch {
             return rawUrl;
         }
+    }
+
+    /**
+     * 复用卡片前生成签名，字段变化时才重建卡片 DOM
+     */
+    private buildRepoCardSignature(repo: RenderRepository): string {
+        const tags = Array.isArray(repo.tags) ? repo.tags : [];
+        const tagColorSignature = tags
+            .map((tag) => `${tag}:${this.getTagColor(tag)}`)
+            .join('\u0001');
+
+        return [
+            repo.full_name || '',
+            repo.name || '',
+            repo.html_url || '',
+            repo.description || '',
+            repo.language || '',
+            String(repo.stargazers_count ?? 0),
+            String(repo.forks_count ?? 0),
+            repo.updated_at || '',
+            repo.notes || '',
+            repo.linked_note || '',
+            tags.join('\u0001'),
+            tagColorSignature,
+            repo.owner?.login || '',
+            repo.owner?.avatar_url || '',
+            this.plugin.settings.enableExport ? '1' : '0',
+            this.isExportMode ? '1' : '0'
+        ].join('\u0002');
+    }
+
+    /**
+     * 仓库数据变化后，清理缓存里已不存在的卡片
+     */
+    private pruneRepoCardCacheForRemovedRepositories(): void {
+        const validRepoIdSet = new Set(this.combinedRepositoriesCache.map((repo) => repo.id));
+        this.repoCardElementCache.forEach((cardEl, repoId) => {
+            if (validRepoIdSet.has(repoId)) {
+                return;
+            }
+            this.repoCardElementCache.delete(repoId);
+            this.repoCardSignatureCache.delete(repoId);
+            cardEl.remove();
+        });
+    }
+
+    /**
+     * 清空仓库卡片缓存（视图关闭时使用）
+     */
+    private clearRepoCardCache(): void {
+        this.repoCardElementCache.forEach((cardEl) => {
+            cardEl.remove();
+        });
+        this.repoCardElementCache.clear();
+        this.repoCardSignatureCache.clear();
+    }
+
+    /**
+     * 建立头像可视区观察器，仅在接近可视区时再发起图片请求
+     */
+    private ensureRepoAvatarObserver(): void {
+        if (this.repoAvatarObserver) return;
+        if (typeof window.IntersectionObserver !== 'function') return;
+
+        this.repoAvatarObserver = new IntersectionObserver((entries) => {
+            entries.forEach((entry) => {
+                if (!entry.isIntersecting) return;
+                const avatarImg = entry.target as HTMLImageElement;
+                this.repoAvatarObserver?.unobserve(avatarImg);
+                this.loadDeferredRepoAvatar(avatarImg);
+            });
+        }, {
+            root: this.repoContainer || null,
+            rootMargin: REPO_AVATAR_OBSERVER_ROOT_MARGIN,
+            threshold: 0.01
+        });
+    }
+
+    /**
+     * 断开头像观察器，避免持有旧节点引用
+     */
+    private resetRepoAvatarObserver(): void {
+        if (!this.repoAvatarObserver) return;
+        this.repoAvatarObserver.disconnect();
+    }
+
+    /**
+     * 真正开始加载延迟头像
+     */
+    private loadDeferredRepoAvatar(avatarImg: HTMLImageElement): void {
+        const avatarSrc = avatarImg.dataset.avatarSrc;
+        if (!avatarSrc) return;
+        if (avatarImg.dataset.avatarRequested === '1' || avatarImg.dataset.avatarLoaded === '1') return;
+
+        avatarImg.dataset.avatarRequested = '1';
+        avatarImg.setAttribute('src', avatarSrc);
+        avatarImg.removeClass('is-deferred');
+    }
+
+    /**
+     * 根据优先级安排卡片头像加载策略
+     */
+    private scheduleRepoCardAvatarLoad(cardEl: HTMLElement, prioritizeAvatarLoad: boolean): void {
+        const avatarNodeList = cardEl.querySelectorAll<HTMLImageElement>('.github-stars-repo-avatar[data-avatar-src]');
+        if (avatarNodeList.length === 0) return;
+
+        if (prioritizeAvatarLoad) {
+            avatarNodeList.forEach((avatarImg) => {
+                this.loadDeferredRepoAvatar(avatarImg);
+            });
+            return;
+        }
+
+        this.ensureRepoAvatarObserver();
+        if (!this.repoAvatarObserver) {
+            avatarNodeList.forEach((avatarImg) => {
+                this.loadDeferredRepoAvatar(avatarImg);
+            });
+            return;
+        }
+
+        avatarNodeList.forEach((avatarImg) => {
+            if (avatarImg.dataset.avatarRequested === '1' || avatarImg.dataset.avatarLoaded === '1') {
+                return;
+            }
+            this.repoAvatarObserver?.observe(avatarImg);
+        });
+    }
+
+    /**
+     * 渲染或复用仓库卡片节点，减少排序/筛选时的 DOM 重建成本
+     */
+    private renderOrReuseRepositoryCard(repo: RenderRepository, prioritizeAvatarLoad = false): void {
+        if (!this.repoContainer) return;
+
+        const nextSignature = this.buildRepoCardSignature(repo);
+        const cachedCardEl = this.repoCardElementCache.get(repo.id);
+        const cachedSignature = this.repoCardSignatureCache.get(repo.id);
+
+        if (cachedCardEl && cachedSignature === nextSignature) {
+            const checkbox = cachedCardEl.querySelector<HTMLInputElement>('.github-stars-repo-checkbox');
+            if (checkbox) {
+                checkbox.checked = this.selectedRepos.has(repo.id);
+            }
+            this.repoContainer.appendChild(cachedCardEl);
+            this.scheduleRepoCardAvatarLoad(cachedCardEl, prioritizeAvatarLoad);
+            return;
+        }
+
+        if (cachedCardEl) {
+            cachedCardEl.remove();
+        }
+
+        const newCardEl = this.renderRepositoryCard(repo, this.repoContainer, prioritizeAvatarLoad);
+        newCardEl.setAttribute('data-repo-id', String(repo.id));
+        this.repoCardElementCache.set(repo.id, newCardEl);
+        this.repoCardSignatureCache.set(repo.id, nextSignature);
     }
 
     /**
@@ -1377,6 +1539,7 @@ export class GithubStarsView extends ItemView {
         const renderVersion = ++this.repoRenderVersion;
 
         if (!this.githubRepositories || this.githubRepositories.length === 0) {
+            this.resetRepoAvatarObserver();
             this.repoContainer.empty();
             this.repoContainer.createEl('div', { cls: 'github-stars-empty', text: t('view.noRepos') });
             this.hideRepoRenderStatus();
@@ -1409,6 +1572,7 @@ export class GithubStarsView extends ItemView {
         if (renderVersion !== this.repoRenderVersion) return;
 
         if (sortedRepos.length === 0) {
+            this.resetRepoAvatarObserver();
             this.repoContainer.empty();
             this.repoContainer.createEl('div', { cls: 'github-stars-empty', text: t('view.noMatchingRepos') });
             this.hideRepoRenderStatus();
@@ -1443,11 +1607,11 @@ export class GithubStarsView extends ItemView {
             this.combinedRepositoriesCache.map((repo) => [repo.id, repo] as const)
         );
         this.combinedDataVersion += 1;
-        this.syncedQueryDataVersion = -1;
+        this.pruneRepoCardCacheForRemovedRepositories();
     }
 
-    private toRepoQueryDataList(): RepoQueryDataItem[] {
-        return this.combinedRepositoriesCache.map((repo) => ({
+    private toRepoQueryDataItem(repo: RenderRepository): RepoQueryDataItem {
+        return {
             id: repo.id,
             name: repo.name,
             full_name: repo.full_name,
@@ -1461,7 +1625,57 @@ export class GithubStarsView extends ItemView {
             forks_count: repo.forks_count,
             updated_at: repo.updated_at,
             starred_at: repo.starred_at
-        }));
+        };
+    }
+
+    private toRepoQueryDataList(): RepoQueryDataItem[] {
+        return this.combinedRepositoriesCache.map((repo) => this.toRepoQueryDataItem(repo));
+    }
+
+    private buildRepoQueryDataSignature(repo: RepoQueryDataItem): string {
+        const tags = Array.isArray(repo.tags) ? repo.tags : [];
+        return [
+            String(repo.id),
+            repo.name || '',
+            repo.full_name || '',
+            repo.description || '',
+            repo.owner?.login || '',
+            repo.notes || '',
+            repo.language || '',
+            tags.join('\u0001'),
+            repo.account_id || '',
+            String(repo.stargazers_count ?? 0),
+            String(repo.forks_count ?? 0),
+            repo.updated_at || '',
+            repo.starred_at || ''
+        ].join('\u0002');
+    }
+
+    private buildRepoQueryDataPatch(
+        nextRepoDataList: RepoQueryDataItem[]
+    ): { patch: RepoQueryDataPatch; nextSignatureById: Map<number, string> } {
+        const nextSignatureById = new Map<number, string>();
+        const upserts: RepoQueryDataItem[] = [];
+
+        nextRepoDataList.forEach((repoData) => {
+            const signature = this.buildRepoQueryDataSignature(repoData);
+            nextSignatureById.set(repoData.id, signature);
+            if (this.syncedQueryDataSignatureById.get(repoData.id) !== signature) {
+                upserts.push(repoData);
+            }
+        });
+
+        const removedIds: number[] = [];
+        this.syncedQueryDataSignatureById.forEach((_, repoId) => {
+            if (!nextSignatureById.has(repoId)) {
+                removedIds.push(repoId);
+            }
+        });
+
+        return {
+            patch: { upserts, removedIds },
+            nextSignatureById
+        };
     }
 
     private async syncQueryDataIfNeeded(): Promise<void> {
@@ -1470,10 +1684,25 @@ export class GithubStarsView extends ItemView {
         }
 
         const targetVersion = this.combinedDataVersion;
-        await this.repoQueryEngine.setData(this.toRepoQueryDataList());
+        const nextRepoDataList = this.toRepoQueryDataList();
+        const { patch, nextSignatureById } = this.buildRepoQueryDataPatch(nextRepoDataList);
+
+        const needFullSync = this.syncedQueryDataVersion < 0 || this.syncedQueryDataSignatureById.size === 0;
+        if (needFullSync) {
+            await this.repoQueryEngine.setData(nextRepoDataList);
+        } else if (patch.upserts.length > 0 || patch.removedIds.length > 0) {
+            await this.repoQueryEngine.patchData(patch);
+        }
+
         if (targetVersion === this.combinedDataVersion) {
             this.syncedQueryDataVersion = targetVersion;
+            this.syncedQueryDataSignatureById = nextSignatureById;
+            return;
         }
+
+        // 数据在同步过程中再次变化时，强制下次执行一次全量同步，确保 worker 与主线程一致
+        this.syncedQueryDataVersion = -1;
+        this.syncedQueryDataSignatureById.clear();
     }
 
     private getCurrentQueryInput(): RepoQueryInput {
@@ -1564,6 +1793,7 @@ export class GithubStarsView extends ItemView {
     private async renderFullRepositories(repositories: RenderRepository[], renderVersion: number): Promise<void> {
         if (!this.repoContainer) return;
         const renderStartAt = performance.now();
+        this.resetRepoAvatarObserver();
         this.repoContainer.empty();
         const totalCount = repositories.length;
         const batchSize = this.getRepoRenderBatchSize(totalCount);
@@ -1583,7 +1813,7 @@ export class GithubStarsView extends ItemView {
             if (renderVersion !== this.repoRenderVersion || !this.repoContainer) {
                 return;
             }
-            this.renderRepositoryCard(repositories[index], this.repoContainer, index < highPriorityAvatarCount);
+            this.renderOrReuseRepositoryCard(repositories[index], index < highPriorityAvatarCount);
         }
         this.finalizeInteractionMeasurement();
         this.requestPerformancePanelRefresh();
@@ -1609,7 +1839,7 @@ export class GithubStarsView extends ItemView {
                 if (renderVersion !== this.repoRenderVersion || !this.repoContainer) {
                     return;
                 }
-                this.renderRepositoryCard(repositories[index], this.repoContainer, false);
+                this.renderOrReuseRepositoryCard(repositories[index], false);
             }
 
             if (shouldShowStatus) {
@@ -1662,20 +1892,23 @@ export class GithubStarsView extends ItemView {
                 const avatarImg = avatarWrapper.createEl('img', {
                     cls: 'github-stars-repo-avatar',
                     attr: {
-                        src: optimizedAvatarUrl,
+                        'data-avatar-src': optimizedAvatarUrl,
                         alt: `${repo.owner.login} avatar`,
                         loading: prioritizeAvatarLoad ? 'eager' : 'lazy',
                         decoding: 'async',
                         fetchpriority: prioritizeAvatarLoad ? 'high' : 'low'
                     }
                 });
+                avatarImg.addClass('is-deferred');
 
                 avatarImg.addEventListener('load', () => {
+                    avatarImg.dataset.avatarLoaded = '1';
                     avatarImg.addClass('is-loaded');
                     avatarFallback.addClass('hidden');
                 });
 
                 avatarImg.addEventListener('error', () => {
+                    avatarImg.dataset.avatarLoaded = '1';
                     avatarImg.addClass('display-none');
                     avatarFallback.removeClass('hidden');
                 });
@@ -1798,6 +2031,7 @@ export class GithubStarsView extends ItemView {
                 );
             });
         }
+        this.scheduleRepoCardAvatarLoad(repoEl, prioritizeAvatarLoad);
         return repoEl;
     }
 
@@ -2508,6 +2742,11 @@ export class GithubStarsView extends ItemView {
         this.pendingInteractionStartAt = null;
         this.performanceToggleButton = null;
         this.removePerformancePanel();
+        this.resetRepoAvatarObserver();
+        this.repoAvatarObserver = null;
+        this.clearRepoCardCache();
+        this.syncedQueryDataSignatureById.clear();
+        this.syncedQueryDataVersion = -1;
         this.closeTagEditPopover();
         this.repoQueryEngine.destroy();
         return Promise.resolve();

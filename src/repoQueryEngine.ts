@@ -30,14 +30,21 @@ export interface RepoQueryOutput {
     total: number;
 }
 
-type WorkerRequestType = 'setData' | 'query';
-type WorkerResponseType = 'setData:ok' | 'query:result' | 'error';
+export interface RepoQueryDataPatch {
+    upserts: RepoQueryDataItem[];
+    removedIds: number[];
+}
+
+type WorkerRequestType = 'setData' | 'patchData' | 'query';
+type WorkerResponseType = 'setData:ok' | 'patchData:ok' | 'query:result' | 'error';
 
 interface WorkerRequestMessage {
     requestId: number;
     type: WorkerRequestType;
     payload: {
         repositories?: RepoQueryDataItem[];
+        upserts?: RepoQueryDataItem[];
+        removedIds?: number[];
         input?: RepoQueryInput;
     };
 }
@@ -136,6 +143,8 @@ export class RepoQueryEngine {
     private nextRequestId = 1;
     private pendingRequests = new Map<number, PendingRequest>();
     private fallbackRepositories: RepoQueryDataItem[] = [];
+    private fallbackRepositoryMap = new Map<number, RepoQueryDataItem>();
+    private fallbackRepositoriesDirty = false;
     private workerEnabled = false;
 
     constructor() {
@@ -143,7 +152,7 @@ export class RepoQueryEngine {
     }
 
     async setData(repositories: RepoQueryDataItem[]): Promise<void> {
-        this.fallbackRepositories = repositories;
+        this.setFallbackRepositories(repositories);
         if (!this.workerEnabled || !this.worker) {
             return;
         }
@@ -151,8 +160,21 @@ export class RepoQueryEngine {
         await this.postRequest<void>('setData', { repositories });
     }
 
+    async patchData(patch: RepoQueryDataPatch): Promise<void> {
+        this.applyFallbackPatch(patch);
+        if (!this.workerEnabled || !this.worker) {
+            return;
+        }
+
+        await this.postRequest<void>('patchData', {
+            upserts: patch.upserts,
+            removedIds: patch.removedIds
+        });
+    }
+
     async query(input: RepoQueryInput): Promise<RepoQueryOutput> {
         if (!this.workerEnabled || !this.worker) {
+            this.ensureFallbackRepositoriesReady();
             const orderedIds = runRepoQuery(this.fallbackRepositories, input);
             return { orderedIds, total: orderedIds.length };
         }
@@ -223,6 +245,10 @@ export class RepoQueryEngine {
             request.resolve(undefined);
             return;
         }
+        if (response.type === 'patchData:ok') {
+            request.resolve(undefined);
+            return;
+        }
 
         request.resolve(response.payload || { orderedIds: [], total: 0 });
     }
@@ -249,10 +275,37 @@ export class RepoQueryEngine {
         });
     }
 
+    private setFallbackRepositories(repositories: RepoQueryDataItem[]): void {
+        this.fallbackRepositories = repositories;
+        this.fallbackRepositoryMap = new Map(repositories.map((repo) => [repo.id, repo] as const));
+        this.fallbackRepositoriesDirty = false;
+    }
+
+    private applyFallbackPatch(patch: RepoQueryDataPatch): void {
+        const upserts = Array.isArray(patch.upserts) ? patch.upserts : [];
+        const removedIds = Array.isArray(patch.removedIds) ? patch.removedIds : [];
+
+        removedIds.forEach((repoId) => {
+            this.fallbackRepositoryMap.delete(repoId);
+        });
+        upserts.forEach((repo) => {
+            this.fallbackRepositoryMap.set(repo.id, repo);
+        });
+        this.fallbackRepositoriesDirty = true;
+    }
+
+    private ensureFallbackRepositoriesReady(): void {
+        if (!this.fallbackRepositoriesDirty) return;
+        this.fallbackRepositories = Array.from(this.fallbackRepositoryMap.values());
+        this.fallbackRepositoriesDirty = false;
+    }
+
     private buildWorkerScript(): string {
         return `
 const runRepoQuery = ${runRepoQuery.toString()};
 let repositories = [];
+let repositoryMap = new Map();
+let repositoriesDirty = false;
 self.onmessage = (event) => {
     const data = event.data || {};
     const requestId = Number(data.requestId || 0);
@@ -261,10 +314,31 @@ self.onmessage = (event) => {
     try {
         if (type === 'setData') {
             repositories = Array.isArray(payload.repositories) ? payload.repositories : [];
+            repositoryMap = new Map(repositories.map((repo) => [repo.id, repo]));
+            repositoriesDirty = false;
             self.postMessage({ requestId, type: 'setData:ok' });
             return;
         }
+        if (type === 'patchData') {
+            const removedIds = Array.isArray(payload.removedIds) ? payload.removedIds : [];
+            const upserts = Array.isArray(payload.upserts) ? payload.upserts : [];
+            removedIds.forEach((repoId) => {
+                repositoryMap.delete(repoId);
+            });
+            upserts.forEach((repo) => {
+                if (repo && typeof repo.id === 'number') {
+                    repositoryMap.set(repo.id, repo);
+                }
+            });
+            repositoriesDirty = true;
+            self.postMessage({ requestId, type: 'patchData:ok' });
+            return;
+        }
         if (type === 'query') {
+            if (repositoriesDirty) {
+                repositories = Array.from(repositoryMap.values());
+                repositoriesDirty = false;
+            }
             const input = payload.input || {
                 textFilter: '',
                 activeTagFilters: [],
