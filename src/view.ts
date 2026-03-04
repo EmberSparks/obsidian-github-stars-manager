@@ -21,6 +21,11 @@ const REPO_AVATAR_SIZE = 72;
 const ACCOUNT_AVATAR_SIZE = 96;
 const REPO_AVATAR_OBSERVER_ROOT_MARGIN = '420px 0px';
 const REPO_RENDER_BUDGET_CHECK_INTERVAL = 4;
+const REPO_MASONRY_COLUMN_WIDTH = 280;
+const REPO_MASONRY_COLUMN_GAP = 16;
+const REPO_MASONRY_HORIZONTAL_PADDING = 32;
+const REPO_ESTIMATED_CARD_HEIGHT_VISUAL = 320;
+const REPO_ESTIMATED_CARD_HEIGHT_BALANCED = 300;
 
 type RenderRepository = GithubRepository & {
     notes?: string;
@@ -89,6 +94,7 @@ export class GithubStarsView extends ItemView {
     tagsFilterFrameId: number | null = null;
     repoCardElementCache: Map<number, HTMLElement> = new Map();
     repoCardSignatureCache: Map<number, string> = new Map();
+    repoCardBuildContainer: HTMLElement | null = null;
     repoAvatarObserver: IntersectionObserver | null = null;
     repoRenderVersion: number = 0;
     repoQueryEngine: RepoQueryEngine;
@@ -611,6 +617,10 @@ export class GithubStarsView extends ItemView {
         });
         this.repoCardElementCache.clear();
         this.repoCardSignatureCache.clear();
+        if (this.repoCardBuildContainer) {
+            this.repoCardBuildContainer.empty();
+            this.repoCardBuildContainer = null;
+        }
     }
 
     /**
@@ -688,9 +698,7 @@ export class GithubStarsView extends ItemView {
     /**
      * 渲染或复用仓库卡片节点，减少排序/筛选时的 DOM 重建成本
      */
-    private renderOrReuseRepositoryCard(repo: RenderRepository, prioritizeAvatarLoad = false): void {
-        if (!this.repoContainer) return;
-
+    private renderOrReuseRepositoryCard(repo: RenderRepository, prioritizeAvatarLoad = false): HTMLElement {
         const nextSignature = this.buildRepoCardSignature(repo);
         const cachedCardEl = this.repoCardElementCache.get(repo.id);
         const cachedSignature = this.repoCardSignatureCache.get(repo.id);
@@ -700,19 +708,18 @@ export class GithubStarsView extends ItemView {
             if (checkbox) {
                 checkbox.checked = this.selectedRepos.has(repo.id);
             }
-            this.repoContainer.appendChild(cachedCardEl);
-            this.scheduleRepoCardAvatarLoad(cachedCardEl, prioritizeAvatarLoad);
-            return;
+            return cachedCardEl;
         }
 
         if (cachedCardEl) {
             cachedCardEl.remove();
         }
 
-        const newCardEl = this.renderRepositoryCard(repo, this.repoContainer, prioritizeAvatarLoad);
+        const newCardEl = this.renderRepositoryCard(repo, this.getRepoCardBuildContainer(), prioritizeAvatarLoad);
         newCardEl.setAttribute('data-repo-id', String(repo.id));
         this.repoCardElementCache.set(repo.id, newCardEl);
         this.repoCardSignatureCache.set(repo.id, nextSignature);
+        return newCardEl;
     }
 
     /**
@@ -1068,6 +1075,45 @@ export class GithubStarsView extends ItemView {
         if (totalCount > 900) return 4.8;
         if (totalCount > 500) return 5.4;
         return 6.2;
+    }
+
+    /**
+     * 估算首屏渲染数量（基于视口与瀑布流列数），避免固定值导致首帧过重
+     */
+    private getAdaptiveFirstScreenCount(totalCount: number, batchSize: number): number {
+        const mode = this.getRepoRenderPerformanceMode();
+        const fallbackMinimum = mode === 'visual' ? 32 : 24;
+        if (!this.repoContainer) {
+            return Math.min(totalCount, Math.max(batchSize, fallbackMinimum));
+        }
+
+        const containerWidth = Math.max(
+            REPO_MASONRY_COLUMN_WIDTH,
+            this.repoContainer.clientWidth - REPO_MASONRY_HORIZONTAL_PADDING
+        );
+        const columnCount = Math.max(
+            1,
+            Math.floor((containerWidth + REPO_MASONRY_COLUMN_GAP) / (REPO_MASONRY_COLUMN_WIDTH + REPO_MASONRY_COLUMN_GAP))
+        );
+        const viewportHeight = Math.max(this.repoContainer.clientHeight, 560);
+        const estimatedCardHeight = mode === 'visual'
+            ? REPO_ESTIMATED_CARD_HEIGHT_VISUAL
+            : REPO_ESTIMATED_CARD_HEIGHT_BALANCED;
+        const targetRows = Math.max(2, Math.ceil((viewportHeight * 1.35) / estimatedCardHeight));
+        const targetCount = columnCount * targetRows;
+        const minimumCount = Math.max(fallbackMinimum, batchSize);
+        const maximumCount = mode === 'visual' ? 72 : 56;
+        return Math.min(totalCount, Math.min(maximumCount, Math.max(minimumCount, targetCount)));
+    }
+
+    /**
+     * 获取构建卡片用的离屏容器，配合 DocumentFragment 降低布局抖动
+     */
+    private getRepoCardBuildContainer(): HTMLElement {
+        if (!this.repoCardBuildContainer) {
+            this.repoCardBuildContainer = document.createElement('div');
+        }
+        return this.repoCardBuildContainer;
     }
 
     /**
@@ -1934,9 +1980,7 @@ export class GithubStarsView extends ItemView {
         const totalCount = repositories.length;
         const batchSize = this.getRepoRenderBatchSize(totalCount);
         const frameBudgetMs = this.getRepoRenderFrameBudgetMs(totalCount);
-        const mode = this.getRepoRenderPerformanceMode();
-        const firstScreenMinimum = mode === 'visual' ? 96 : 64;
-        const firstScreenCount = Math.min(totalCount, Math.max(batchSize * 2, firstScreenMinimum));
+        const firstScreenCount = this.getAdaptiveFirstScreenCount(totalCount, batchSize);
         const shouldShowStatus = totalCount > firstScreenCount;
 
         if (shouldShowStatus) {
@@ -1955,14 +1999,16 @@ export class GithubStarsView extends ItemView {
 
             const frameDeadline = performance.now() + frameBudgetMs;
             let renderedInFrame = 0;
+            const frameFragment = document.createDocumentFragment();
+            const frameCardQueue: Array<{ cardEl: HTMLElement; prioritizeAvatarLoad: boolean }> = [];
             while (firstScreenIndex < firstScreenCount) {
                 if (renderVersion !== this.repoRenderVersion || !this.repoContainer) {
                     return;
                 }
-                this.renderOrReuseRepositoryCard(
-                    repositories[firstScreenIndex],
-                    firstScreenIndex < highPriorityAvatarCount
-                );
+                const prioritizeAvatarLoad = firstScreenIndex < highPriorityAvatarCount;
+                const cardEl = this.renderOrReuseRepositoryCard(repositories[firstScreenIndex], prioritizeAvatarLoad);
+                frameFragment.appendChild(cardEl);
+                frameCardQueue.push({ cardEl, prioritizeAvatarLoad });
                 firstScreenIndex += 1;
                 renderedInFrame += 1;
 
@@ -1975,6 +2021,13 @@ export class GithubStarsView extends ItemView {
                 ) {
                     break;
                 }
+            }
+
+            if (this.repoContainer && frameCardQueue.length > 0) {
+                this.repoContainer.appendChild(frameFragment);
+                frameCardQueue.forEach(({ cardEl, prioritizeAvatarLoad }) => {
+                    this.scheduleRepoCardAvatarLoad(cardEl, prioritizeAvatarLoad);
+                });
             }
 
             if (firstScreenIndex < firstScreenCount) {
@@ -2003,11 +2056,15 @@ export class GithubStarsView extends ItemView {
 
             const frameDeadline = performance.now() + frameBudgetMs;
             let renderedInFrame = 0;
+            const frameFragment = document.createDocumentFragment();
+            const frameCardQueue: Array<{ cardEl: HTMLElement; prioritizeAvatarLoad: boolean }> = [];
             while (renderedIndex < totalCount) {
                 if (renderVersion !== this.repoRenderVersion || !this.repoContainer) {
                     return;
                 }
-                this.renderOrReuseRepositoryCard(repositories[renderedIndex], false);
+                const cardEl = this.renderOrReuseRepositoryCard(repositories[renderedIndex], false);
+                frameFragment.appendChild(cardEl);
+                frameCardQueue.push({ cardEl, prioritizeAvatarLoad: false });
                 renderedIndex += 1;
                 renderedInFrame += 1;
 
@@ -2020,6 +2077,13 @@ export class GithubStarsView extends ItemView {
                 ) {
                     break;
                 }
+            }
+
+            if (this.repoContainer && frameCardQueue.length > 0) {
+                this.repoContainer.appendChild(frameFragment);
+                frameCardQueue.forEach(({ cardEl, prioritizeAvatarLoad }) => {
+                    this.scheduleRepoCardAvatarLoad(cardEl, prioritizeAvatarLoad);
+                });
             }
 
             if (
@@ -2125,21 +2189,30 @@ export class GithubStarsView extends ItemView {
         }
 
         if (repo.description) {
+            const descriptionText = repo.description;
             const descEl = repoEl.createEl('div', { cls: 'github-stars-repo-desc' });
-            EmojiUtils.setEmojiText(descEl, repo.description);
+            EmojiUtils.setEmojiText(descEl, descriptionText);
 
-            if (repo.description.length > 100) {
-                const tooltip = repoEl.createEl('div', {
-                    cls: 'github-stars-repo-desc-tooltip',
-                    text: repo.description
-                });
+            if (descriptionText.length > 100) {
+                let tooltip: HTMLElement | null = null;
+                const ensureTooltip = (): HTMLElement => {
+                    if (!tooltip) {
+                        tooltip = repoEl.createEl('div', {
+                            cls: 'github-stars-repo-desc-tooltip',
+                            text: descriptionText
+                        });
+                    }
+                    return tooltip;
+                };
 
                 descEl.addEventListener('mouseenter', () => {
-                    tooltip.addClass('display-block');
+                    ensureTooltip().addClass('display-block');
                 });
 
                 descEl.addEventListener('mouseleave', () => {
-                    tooltip.removeClass('display-block');
+                    if (tooltip) {
+                        tooltip.removeClass('display-block');
+                    }
                 });
             }
         }
@@ -2172,6 +2245,16 @@ export class GithubStarsView extends ItemView {
         editButton.setAttribute('data-repo-action', 'edit-repo');
         editButton.setAttribute('data-repo-id', String(repo.id));
 
+        this.scheduleRepoSecondaryContentMount(repoEl, repo);
+        return repoEl;
+    }
+
+    /**
+     * 按需挂载次要内容（笔记/关联笔记），降低首轮渲染压强
+     */
+    private mountRepoSecondaryContent(repoEl: HTMLElement, repo: RenderRepository): void {
+        if (repoEl.dataset.secondaryMounted === '1') return;
+
         if (repo.notes) {
             const notesContainer = repoEl.createEl('div', { cls: 'github-stars-repo-notes' });
             notesContainer.createEl('span', {
@@ -2195,8 +2278,43 @@ export class GithubStarsView extends ItemView {
             link.setAttribute('data-linked-note', repo.linked_note);
             link.setAttribute('data-repo-id', String(repo.id));
         }
-        this.scheduleRepoCardAvatarLoad(repoEl, prioritizeAvatarLoad);
-        return repoEl;
+
+        repoEl.dataset.secondaryMounted = '1';
+        delete repoEl.dataset.secondaryPending;
+    }
+
+    /**
+     * 将次要内容延后到空闲时段挂载，减少主渲染路径开销
+     */
+    private scheduleRepoSecondaryContentMount(repoEl: HTMLElement, repo: RenderRepository): void {
+        if (!repo.notes && !repo.linked_note) {
+            repoEl.dataset.secondaryMounted = '1';
+            delete repoEl.dataset.secondaryPending;
+            return;
+        }
+        if (repoEl.dataset.secondaryMounted === '1' || repoEl.dataset.secondaryPending === '1') {
+            return;
+        }
+
+        repoEl.dataset.secondaryPending = '1';
+        const mountTask = (): void => {
+            if (!repoEl.isConnected) {
+                delete repoEl.dataset.secondaryPending;
+                return;
+            }
+            this.mountRepoSecondaryContent(repoEl, repo);
+        };
+
+        const requestIdle = (window as Window & {
+            requestIdleCallback?: (callback: IdleRequestCallback, opts?: IdleRequestOptions) => number;
+        }).requestIdleCallback;
+
+        if (typeof requestIdle === 'function') {
+            requestIdle(() => mountTask(), { timeout: 320 });
+            return;
+        }
+
+        window.setTimeout(() => mountTask(), 24);
     }
 
     /**
