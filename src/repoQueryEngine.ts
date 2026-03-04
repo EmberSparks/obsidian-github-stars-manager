@@ -61,27 +61,54 @@ interface PendingRequest {
     reject: (reason?: unknown) => void;
 }
 
-function runRepoQuery(repositories: RepoQueryDataItem[], input: RepoQueryInput): number[] {
+interface RepoQueryPreparedItem {
+    id: number;
+    accountId: string;
+    searchableText: string;
+    normalizedTagSet: Set<string>;
+    stargazersCount: number;
+    forksCount: number;
+    updatedAtTimestamp: number;
+    starredAtTimestamp: number;
+}
+
+function prepareRepoForQuery(repo: RepoQueryDataItem): RepoQueryPreparedItem {
     const normalizeTag = (tag: string): string => tag.trim().toLowerCase();
     const parseDate = (rawDate?: string): number => {
         if (!rawDate) return 0;
         const timestamp = Date.parse(rawDate);
         return Number.isFinite(timestamp) ? timestamp : 0;
     };
-    const includesKeyword = (repo: RepoQueryDataItem, keyword: string): boolean => {
-        if (!keyword) return true;
-        const tags = Array.isArray(repo.tags) ? repo.tags : [];
-        return (
-            (repo.name || '').toLowerCase().includes(keyword) ||
-            (repo.full_name || '').toLowerCase().includes(keyword) ||
-            (repo.description || '').toLowerCase().includes(keyword) ||
-            (repo.owner?.login || '').toLowerCase().includes(keyword) ||
-            (repo.notes || '').toLowerCase().includes(keyword) ||
-            (repo.language || '').toLowerCase().includes(keyword) ||
-            tags.some((tag) => tag.toLowerCase().includes(keyword))
-        );
-    };
 
+    const normalizedTags = Array.isArray(repo.tags)
+        ? repo.tags
+            .map((tag) => normalizeTag(String(tag)))
+            .filter((tag) => tag.length > 0)
+        : [];
+    const searchableTextParts = [
+        repo.name || '',
+        repo.full_name || '',
+        repo.description || '',
+        repo.owner?.login || '',
+        repo.notes || '',
+        repo.language || '',
+        ...normalizedTags
+    ];
+
+    return {
+        id: repo.id,
+        accountId: repo.account_id ? String(repo.account_id) : '',
+        searchableText: searchableTextParts.join('\n').toLowerCase(),
+        normalizedTagSet: new Set(normalizedTags),
+        stargazersCount: Number(repo.stargazers_count) || 0,
+        forksCount: Number(repo.forks_count) || 0,
+        updatedAtTimestamp: parseDate(repo.updated_at),
+        starredAtTimestamp: parseDate(repo.starred_at)
+    };
+}
+
+function runRepoQuery(repositories: RepoQueryPreparedItem[], input: RepoQueryInput): number[] {
+    const normalizeTag = (tag: string): string => tag.trim().toLowerCase();
     const keyword = (input.textFilter || '').trim().toLowerCase();
     const enabledAccountIds = new Set((input.enabledAccountIds || []).map((accountId) => String(accountId)));
     const activeTagFilters = (input.activeTagFilters || [])
@@ -95,40 +122,39 @@ function runRepoQuery(repositories: RepoQueryDataItem[], input: RepoQueryInput):
     }
 
     const filtered = repositories.filter((repo) => {
-        if (repo.account_id && !enabledAccountIds.has(repo.account_id)) {
+        if (repo.accountId && !enabledAccountIds.has(repo.accountId)) {
             return false;
         }
-        if (!includesKeyword(repo, keyword)) {
+        if (keyword && !repo.searchableText.includes(keyword)) {
             return false;
         }
         if (!needTagFilter) {
             return true;
         }
-        const repoTagSet = new Set((repo.tags || []).map((tag) => normalizeTag(tag)));
-        return activeTagFilters.some((tag) => repoTagSet.has(tag));
+        return activeTagFilters.some((tag) => repo.normalizedTagSet.has(tag));
     });
 
     filtered.sort((left, right) => {
         switch (input.sortBy) {
             case 'stars': {
-                const leftValue = left.stargazers_count || 0;
-                const rightValue = right.stargazers_count || 0;
+                const leftValue = left.stargazersCount;
+                const rightValue = right.stargazersCount;
                 return isDesc ? rightValue - leftValue : leftValue - rightValue;
             }
             case 'forks': {
-                const leftValue = left.forks_count || 0;
-                const rightValue = right.forks_count || 0;
+                const leftValue = left.forksCount;
+                const rightValue = right.forksCount;
                 return isDesc ? rightValue - leftValue : leftValue - rightValue;
             }
             case 'updated': {
-                const leftValue = parseDate(left.updated_at);
-                const rightValue = parseDate(right.updated_at);
+                const leftValue = left.updatedAtTimestamp;
+                const rightValue = right.updatedAtTimestamp;
                 return isDesc ? rightValue - leftValue : leftValue - rightValue;
             }
             case 'starred_at':
             default: {
-                const leftValue = parseDate(left.starred_at);
-                const rightValue = parseDate(right.starred_at);
+                const leftValue = left.starredAtTimestamp;
+                const rightValue = right.starredAtTimestamp;
                 return isDesc ? rightValue - leftValue : leftValue - rightValue;
             }
         }
@@ -142,9 +168,9 @@ export class RepoQueryEngine {
     private workerUrl: string | null = null;
     private nextRequestId = 1;
     private pendingRequests = new Map<number, PendingRequest>();
-    private fallbackRepositories: RepoQueryDataItem[] = [];
-    private fallbackRepositoryMap = new Map<number, RepoQueryDataItem>();
-    private fallbackRepositoriesDirty = false;
+    private fallbackPreparedRepositories: RepoQueryPreparedItem[] = [];
+    private fallbackPreparedRepositoryMap = new Map<number, RepoQueryPreparedItem>();
+    private fallbackPreparedRepositoriesDirty = false;
     private workerEnabled = false;
 
     constructor() {
@@ -175,7 +201,7 @@ export class RepoQueryEngine {
     async query(input: RepoQueryInput): Promise<RepoQueryOutput> {
         if (!this.workerEnabled || !this.worker) {
             this.ensureFallbackRepositoriesReady();
-            const orderedIds = runRepoQuery(this.fallbackRepositories, input);
+            const orderedIds = runRepoQuery(this.fallbackPreparedRepositories, input);
             return { orderedIds, total: orderedIds.length };
         }
 
@@ -276,9 +302,12 @@ export class RepoQueryEngine {
     }
 
     private setFallbackRepositories(repositories: RepoQueryDataItem[]): void {
-        this.fallbackRepositories = repositories;
-        this.fallbackRepositoryMap = new Map(repositories.map((repo) => [repo.id, repo] as const));
-        this.fallbackRepositoriesDirty = false;
+        const preparedRepositories = repositories.map((repo) => prepareRepoForQuery(repo));
+        this.fallbackPreparedRepositories = preparedRepositories;
+        this.fallbackPreparedRepositoryMap = new Map(
+            preparedRepositories.map((repo) => [repo.id, repo] as const)
+        );
+        this.fallbackPreparedRepositoriesDirty = false;
     }
 
     private applyFallbackPatch(patch: RepoQueryDataPatch): void {
@@ -286,22 +315,23 @@ export class RepoQueryEngine {
         const removedIds = Array.isArray(patch.removedIds) ? patch.removedIds : [];
 
         removedIds.forEach((repoId) => {
-            this.fallbackRepositoryMap.delete(repoId);
+            this.fallbackPreparedRepositoryMap.delete(repoId);
         });
         upserts.forEach((repo) => {
-            this.fallbackRepositoryMap.set(repo.id, repo);
+            this.fallbackPreparedRepositoryMap.set(repo.id, prepareRepoForQuery(repo));
         });
-        this.fallbackRepositoriesDirty = true;
+        this.fallbackPreparedRepositoriesDirty = true;
     }
 
     private ensureFallbackRepositoriesReady(): void {
-        if (!this.fallbackRepositoriesDirty) return;
-        this.fallbackRepositories = Array.from(this.fallbackRepositoryMap.values());
-        this.fallbackRepositoriesDirty = false;
+        if (!this.fallbackPreparedRepositoriesDirty) return;
+        this.fallbackPreparedRepositories = Array.from(this.fallbackPreparedRepositoryMap.values());
+        this.fallbackPreparedRepositoriesDirty = false;
     }
 
     private buildWorkerScript(): string {
         return `
+const prepareRepoForQuery = ${prepareRepoForQuery.toString()};
 const runRepoQuery = ${runRepoQuery.toString()};
 let repositories = [];
 let repositoryMap = new Map();
@@ -313,7 +343,10 @@ self.onmessage = (event) => {
     const payload = data.payload || {};
     try {
         if (type === 'setData') {
-            repositories = Array.isArray(payload.repositories) ? payload.repositories : [];
+            const sourceRepositories = Array.isArray(payload.repositories) ? payload.repositories : [];
+            repositories = sourceRepositories
+                .filter((repo) => repo && typeof repo.id === 'number')
+                .map((repo) => prepareRepoForQuery(repo));
             repositoryMap = new Map(repositories.map((repo) => [repo.id, repo]));
             repositoriesDirty = false;
             self.postMessage({ requestId, type: 'setData:ok' });
@@ -327,7 +360,7 @@ self.onmessage = (event) => {
             });
             upserts.forEach((repo) => {
                 if (repo && typeof repo.id === 'number') {
-                    repositoryMap.set(repo.id, repo);
+                    repositoryMap.set(repo.id, prepareRepoForQuery(repo));
                 }
             });
             repositoriesDirty = true;
