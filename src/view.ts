@@ -21,6 +21,9 @@ const REPO_AVATAR_SIZE = 72;
 const ACCOUNT_AVATAR_SIZE = 96;
 const REPO_AVATAR_OBSERVER_ROOT_MARGIN = '420px 0px';
 const REPO_RENDER_BUDGET_CHECK_INTERVAL = 4;
+const PERF_DURATION_SAMPLE_WINDOW_SIZE = 120;
+const PERF_LONG_TASK_THRESHOLD_MS = 50;
+const PERF_LONG_TASK_WINDOW_MS = 30_000;
 const REPO_MASONRY_COLUMN_WIDTH = 280;
 const REPO_MASONRY_COLUMN_GAP = 16;
 const REPO_MASONRY_HORIZONTAL_PADDING = 32;
@@ -33,20 +36,25 @@ type RenderRepository = GithubRepository & {
     linked_note?: string;
 };
 
-type PerfDurationMetricKey = 'query' | 'render' | 'interaction';
+type PerfDurationMetricKey = 'query' | 'render' | 'interaction' | 'firstScreen';
 
 interface PerfDurationMetrics {
     lastMs: number;
     avgMs: number;
     samples: number;
+    p95Ms: number;
+    p99Ms: number;
+    recentSamplesMs: number[];
 }
 
 interface ViewPerformanceStats {
     query: PerfDurationMetrics;
     render: PerfDurationMetrics;
     interaction: PerfDurationMetrics;
+    firstScreen: PerfDurationMetrics;
     fpsEstimate: number;
     jankFrames30s: number;
+    longTasks30s: number;
 }
 
 function hexToRgb(hexColor: string): { r: number; g: number; b: number } | null {
@@ -115,6 +123,8 @@ export class GithubStarsView extends ItemView {
     performanceLastFrameAt: number = 0;
     performanceLastFrameUiRefreshAt: number = 0;
     performanceFrameSamples: Array<{ timestamp: number; delta: number }> = [];
+    performanceLongTaskObserver: PerformanceObserver | null = null;
+    performanceLongTaskSamples: Array<{ timestamp: number; duration: number }> = [];
 
     constructor(leaf: WorkspaceLeaf, plugin: GithubStarsPlugin) {
         super(leaf);
@@ -186,7 +196,10 @@ export class GithubStarsView extends ItemView {
         return {
             lastMs: 0,
             avgMs: 0,
-            samples: 0
+            samples: 0,
+            p95Ms: 0,
+            p99Ms: 0,
+            recentSamplesMs: []
         };
     }
 
@@ -195,9 +208,21 @@ export class GithubStarsView extends ItemView {
             query: this.createInitialDurationMetrics(),
             render: this.createInitialDurationMetrics(),
             interaction: this.createInitialDurationMetrics(),
+            firstScreen: this.createInitialDurationMetrics(),
             fpsEstimate: 0,
-            jankFrames30s: 0
+            jankFrames30s: 0,
+            longTasks30s: 0
         };
+    }
+
+    private calculatePercentile(values: number[], percentile: number): number {
+        if (!Array.isArray(values) || values.length === 0) return 0;
+        const sortedValues = [...values].sort((a, b) => a - b);
+        const index = Math.min(
+            sortedValues.length - 1,
+            Math.max(0, Math.ceil((percentile / 100) * sortedValues.length) - 1)
+        );
+        return sortedValues[index];
     }
 
     private formatPerformanceDuration(durationMs: number): string {
@@ -214,6 +239,12 @@ export class GithubStarsView extends ItemView {
         metric.lastMs = durationMs;
         metric.avgMs = ((metric.avgMs * metric.samples) + durationMs) / nextSamples;
         metric.samples = nextSamples;
+        metric.recentSamplesMs.push(durationMs);
+        if (metric.recentSamplesMs.length > PERF_DURATION_SAMPLE_WINDOW_SIZE) {
+            metric.recentSamplesMs.splice(0, metric.recentSamplesMs.length - PERF_DURATION_SAMPLE_WINDOW_SIZE);
+        }
+        metric.p95Ms = this.calculatePercentile(metric.recentSamplesMs, 95);
+        metric.p99Ms = this.calculatePercentile(metric.recentSamplesMs, 99);
         this.requestPerformancePanelRefresh();
     }
 
@@ -238,6 +269,7 @@ export class GithubStarsView extends ItemView {
         this.performanceLastFrameAt = 0;
         this.performanceLastFrameUiRefreshAt = 0;
         this.performanceFrameSamples = [];
+        this.performanceLongTaskSamples = [];
         this.requestPerformancePanelRefresh();
         if (showNotice) {
             new Notice(t('view.perfResetDone'));
@@ -271,6 +303,7 @@ export class GithubStarsView extends ItemView {
 
     private removePerformancePanel(): void {
         this.stopPerformanceFrameMonitor();
+        this.stopPerformanceLongTaskMonitor();
         if (this.performancePanelRefreshFrameId !== null) {
             window.cancelAnimationFrame(this.performancePanelRefreshFrameId);
             this.performancePanelRefreshFrameId = null;
@@ -294,8 +327,10 @@ export class GithubStarsView extends ItemView {
 
         if (this.isPerformancePanelExpanded) {
             this.startPerformanceFrameMonitor();
+            this.startPerformanceLongTaskMonitor();
         } else {
             this.stopPerformanceFrameMonitor();
+            this.stopPerformanceLongTaskMonitor();
         }
     }
 
@@ -320,12 +355,14 @@ export class GithubStarsView extends ItemView {
             `[${t('view.perfPanelTitle')}]`,
             `${t('view.perfDataTotal')}: ${this.githubRepositories.length}`,
             `${t('view.perfDataVisible')}: ${visibleCount}`,
-            `${t('view.perfQuerySummary')} - ${t('view.perfLast')}: ${this.formatPerformanceDuration(this.performanceStats.query.lastMs)}, ${t('view.perfAvg')}: ${this.formatPerformanceDuration(this.performanceStats.query.avgMs)}`,
-            `${t('view.perfRenderSummary')} - ${t('view.perfLast')}: ${this.formatPerformanceDuration(this.performanceStats.render.lastMs)}, ${t('view.perfAvg')}: ${this.formatPerformanceDuration(this.performanceStats.render.avgMs)}`,
-            `${t('view.perfInteractionSummary')} - ${t('view.perfLast')}: ${this.formatPerformanceDuration(this.performanceStats.interaction.lastMs)}, ${t('view.perfAvg')}: ${this.formatPerformanceDuration(this.performanceStats.interaction.avgMs)}`,
+            `${t('view.perfQuerySummary')} - ${t('view.perfLast')}: ${this.formatPerformanceDuration(this.performanceStats.query.lastMs)}, ${t('view.perfAvg')}: ${this.formatPerformanceDuration(this.performanceStats.query.avgMs)}, ${t('view.perfP95')}: ${this.formatPerformanceDuration(this.performanceStats.query.p95Ms)}, ${t('view.perfP99')}: ${this.formatPerformanceDuration(this.performanceStats.query.p99Ms)}`,
+            `${t('view.perfRenderSummary')} - ${t('view.perfLast')}: ${this.formatPerformanceDuration(this.performanceStats.render.lastMs)}, ${t('view.perfAvg')}: ${this.formatPerformanceDuration(this.performanceStats.render.avgMs)}, ${t('view.perfP95')}: ${this.formatPerformanceDuration(this.performanceStats.render.p95Ms)}, ${t('view.perfP99')}: ${this.formatPerformanceDuration(this.performanceStats.render.p99Ms)}`,
+            `${t('view.perfFirstScreenSummary')} - ${t('view.perfLast')}: ${this.formatPerformanceDuration(this.performanceStats.firstScreen.lastMs)}, ${t('view.perfAvg')}: ${this.formatPerformanceDuration(this.performanceStats.firstScreen.avgMs)}, ${t('view.perfP95')}: ${this.formatPerformanceDuration(this.performanceStats.firstScreen.p95Ms)}, ${t('view.perfP99')}: ${this.formatPerformanceDuration(this.performanceStats.firstScreen.p99Ms)}`,
+            `${t('view.perfInteractionSummary')} - ${t('view.perfLast')}: ${this.formatPerformanceDuration(this.performanceStats.interaction.lastMs)}, ${t('view.perfAvg')}: ${this.formatPerformanceDuration(this.performanceStats.interaction.avgMs)}, ${t('view.perfP95')}: ${this.formatPerformanceDuration(this.performanceStats.interaction.p95Ms)}, ${t('view.perfP99')}: ${this.formatPerformanceDuration(this.performanceStats.interaction.p99Ms)}`,
             `${t('view.perfWorker')}: ${workerLabel}`,
             `${t('view.perfFps')}: ${this.performanceStats.fpsEstimate.toFixed(1)}`,
             `${t('view.perfJank')}: ${this.performanceStats.jankFrames30s}`,
+            `${t('view.perfLongTask')}: ${this.performanceStats.longTasks30s}`,
             `${t('view.perfCacheReads')}: ${cacheStats.reads}`,
             `${t('view.perfCacheWrites')}: ${cacheStats.writes}`,
             `${t('view.perfCacheHits')}: ${cacheStats.restoreHits}`
@@ -411,12 +448,44 @@ export class GithubStarsView extends ItemView {
             this.formatPerformanceDuration(this.performanceStats.query.avgMs)
         );
         appendSection(
+            `${t('view.perfQuerySummary')} · ${t('view.perfP95')}`,
+            this.formatPerformanceDuration(this.performanceStats.query.p95Ms)
+        );
+        appendSection(
+            `${t('view.perfQuerySummary')} · ${t('view.perfP99')}`,
+            this.formatPerformanceDuration(this.performanceStats.query.p99Ms)
+        );
+        appendSection(
             `${t('view.perfRenderSummary')} · ${t('view.perfLast')}`,
             this.formatPerformanceDuration(this.performanceStats.render.lastMs)
         );
         appendSection(
             `${t('view.perfRenderSummary')} · ${t('view.perfAvg')}`,
             this.formatPerformanceDuration(this.performanceStats.render.avgMs)
+        );
+        appendSection(
+            `${t('view.perfRenderSummary')} · ${t('view.perfP95')}`,
+            this.formatPerformanceDuration(this.performanceStats.render.p95Ms)
+        );
+        appendSection(
+            `${t('view.perfRenderSummary')} · ${t('view.perfP99')}`,
+            this.formatPerformanceDuration(this.performanceStats.render.p99Ms)
+        );
+        appendSection(
+            `${t('view.perfFirstScreenSummary')} · ${t('view.perfLast')}`,
+            this.formatPerformanceDuration(this.performanceStats.firstScreen.lastMs)
+        );
+        appendSection(
+            `${t('view.perfFirstScreenSummary')} · ${t('view.perfAvg')}`,
+            this.formatPerformanceDuration(this.performanceStats.firstScreen.avgMs)
+        );
+        appendSection(
+            `${t('view.perfFirstScreenSummary')} · ${t('view.perfP95')}`,
+            this.formatPerformanceDuration(this.performanceStats.firstScreen.p95Ms)
+        );
+        appendSection(
+            `${t('view.perfFirstScreenSummary')} · ${t('view.perfP99')}`,
+            this.formatPerformanceDuration(this.performanceStats.firstScreen.p99Ms)
         );
         appendSection(
             `${t('view.perfInteractionSummary')} · ${t('view.perfLast')}`,
@@ -426,9 +495,18 @@ export class GithubStarsView extends ItemView {
             `${t('view.perfInteractionSummary')} · ${t('view.perfAvg')}`,
             this.formatPerformanceDuration(this.performanceStats.interaction.avgMs)
         );
+        appendSection(
+            `${t('view.perfInteractionSummary')} · ${t('view.perfP95')}`,
+            this.formatPerformanceDuration(this.performanceStats.interaction.p95Ms)
+        );
+        appendSection(
+            `${t('view.perfInteractionSummary')} · ${t('view.perfP99')}`,
+            this.formatPerformanceDuration(this.performanceStats.interaction.p99Ms)
+        );
         appendSection(`${t('view.perfWorker')}`, workerLabel);
         appendSection(`${t('view.perfFps')}`, this.performanceStats.fpsEstimate.toFixed(1));
         appendSection(`${t('view.perfJank')}`, `${this.performanceStats.jankFrames30s}`);
+        appendSection(`${t('view.perfLongTask')}`, `${this.performanceStats.longTasks30s}`);
         appendSection(`${t('view.perfCacheReads')}`, `${cacheStats.reads}`);
         appendSection(`${t('view.perfCacheWrites')}`, `${cacheStats.writes}`);
         appendSection(`${t('view.perfCacheHits')}`, `${cacheStats.restoreHits}`);
@@ -453,25 +531,72 @@ export class GithubStarsView extends ItemView {
         this.performanceLastFrameUiRefreshAt = 0;
     }
 
+    private startPerformanceLongTaskMonitor(): void {
+        if (!this.isPerformancePanelExpanded || !this.isPerformanceMonitorEnabled()) return;
+        if (this.performanceLongTaskObserver) return;
+        if (typeof window.PerformanceObserver !== 'function') return;
+        if (
+            Array.isArray(PerformanceObserver.supportedEntryTypes) &&
+            !PerformanceObserver.supportedEntryTypes.includes('longtask')
+        ) {
+            return;
+        }
+
+        try {
+            const observer = new PerformanceObserver((entryList) => {
+                const entries = entryList.getEntries();
+                if (!entries || entries.length === 0) return;
+                entries.forEach((entry) => {
+                    if (!Number.isFinite(entry.duration) || entry.duration < PERF_LONG_TASK_THRESHOLD_MS) {
+                        return;
+                    }
+                    this.performanceLongTaskSamples.push({
+                        timestamp: entry.startTime + entry.duration,
+                        duration: entry.duration
+                    });
+                });
+                const validFrom = performance.now() - PERF_LONG_TASK_WINDOW_MS;
+                this.performanceLongTaskSamples = this.performanceLongTaskSamples.filter((sample) => sample.timestamp >= validFrom);
+                this.performanceStats.longTasks30s = this.performanceLongTaskSamples.length;
+                this.requestPerformancePanelRefresh();
+            });
+            observer.observe({ entryTypes: ['longtask'] });
+            this.performanceLongTaskObserver = observer;
+        } catch (error) {
+            console.warn('Failed to initialize long task monitor:', error);
+        }
+    }
+
+    private stopPerformanceLongTaskMonitor(): void {
+        if (!this.performanceLongTaskObserver) return;
+        this.performanceLongTaskObserver.disconnect();
+        this.performanceLongTaskObserver = null;
+    }
+
     private handlePerformanceFrame(timestamp: number): void {
         if (!this.isPerformancePanelExpanded || !this.isPerformanceMonitorEnabled()) {
             this.stopPerformanceFrameMonitor();
+            this.stopPerformanceLongTaskMonitor();
             return;
         }
 
         if (this.performanceLastFrameAt > 0) {
             const delta = timestamp - this.performanceLastFrameAt;
             this.performanceFrameSamples.push({ timestamp, delta });
-            const validFrom = timestamp - 30_000;
-            this.performanceFrameSamples = this.performanceFrameSamples.filter((sample) => sample.timestamp >= validFrom);
+            const frameValidFrom = timestamp - 30_000;
+            this.performanceFrameSamples = this.performanceFrameSamples.filter((sample) => sample.timestamp >= frameValidFrom);
 
             if (this.performanceFrameSamples.length > 0) {
                 const totalDelta = this.performanceFrameSamples.reduce((sum, sample) => sum + sample.delta, 0);
                 this.performanceStats.fpsEstimate = totalDelta > 0
                     ? Math.max(1, Math.min(144, (1000 * this.performanceFrameSamples.length) / totalDelta))
                     : 0;
-                this.performanceStats.jankFrames30s = this.performanceFrameSamples.filter((sample) => sample.delta > 50).length;
+                this.performanceStats.jankFrames30s = this.performanceFrameSamples.filter((sample) => sample.delta > PERF_LONG_TASK_THRESHOLD_MS).length;
             }
+
+            const longTaskValidFrom = timestamp - PERF_LONG_TASK_WINDOW_MS;
+            this.performanceLongTaskSamples = this.performanceLongTaskSamples.filter((sample) => sample.timestamp >= longTaskValidFrom);
+            this.performanceStats.longTasks30s = this.performanceLongTaskSamples.length;
 
             if ((timestamp - this.performanceLastFrameUiRefreshAt) >= 900) {
                 this.performanceLastFrameUiRefreshAt = timestamp;
@@ -1770,6 +1895,11 @@ export class GithubStarsView extends ItemView {
         this.hasVisibleRepositoriesSnapshot = true;
         this.updateTotalStarsCount(sortedRepos.length);
 
+        const renderedByDiff = await this.renderRepositoriesByDiff(sortedRepos, renderVersion);
+        if (renderedByDiff) {
+            return;
+        }
+
         void this.renderFullRepositories(sortedRepos, renderVersion);
     }
 
@@ -1970,6 +2100,127 @@ export class GithubStarsView extends ItemView {
     }
 
     /**
+     * 判断是否可使用差量渲染（已有列表时优先差量，避免整量清空重建）
+     */
+    private canUseDiffRender(): boolean {
+        if (!this.repoContainer) return false;
+        if (this.repoContainer.querySelector('.github-stars-empty')) return false;
+        return Boolean(this.repoContainer.querySelector('.github-stars-repo[data-repo-id]'));
+    }
+
+    /**
+     * 差量渲染：仅移除无效卡片 + 按目标顺序最小化移动/插入，降低排序/筛选卡顿
+     */
+    private async renderRepositoriesByDiff(repositories: RenderRepository[], renderVersion: number): Promise<boolean> {
+        if (!this.repoContainer || !this.canUseDiffRender()) {
+            return false;
+        }
+
+        const renderStartAt = performance.now();
+        this.resetRepoAvatarObserver();
+        const totalCount = repositories.length;
+        const batchSize = this.getRepoRenderBatchSize(totalCount);
+        const frameBudgetMs = this.getRepoRenderFrameBudgetMs(totalCount);
+        const firstScreenCount = this.getAdaptiveFirstScreenCount(totalCount, batchSize);
+        const highPriorityAvatarCount = Math.min(firstScreenCount, this.getHighPriorityAvatarCount());
+        const shouldShowStatus = totalCount > firstScreenCount;
+        const maxPerFrame = Math.max(10, batchSize);
+        let nextStatusTickAt = performance.now();
+        let firstScreenRecorded = false;
+        const firstScreenThreshold = Math.min(firstScreenCount, totalCount);
+
+        if (shouldShowStatus) {
+            this.showRepoRenderStatus('正在更新列表…');
+        } else {
+            this.hideRepoRenderStatus();
+        }
+
+        const nextRepoIdSet = new Set(repositories.map((repo) => repo.id));
+        const staleCards = Array.from(this.repoContainer.querySelectorAll<HTMLElement>('.github-stars-repo[data-repo-id]'));
+        staleCards.forEach((cardEl) => {
+            const repoId = this.parseRepoId(cardEl.dataset.repoId);
+            if (repoId === null || !nextRepoIdSet.has(repoId)) {
+                cardEl.remove();
+            }
+        });
+
+        let renderedIndex = 0;
+        while (renderedIndex < totalCount) {
+            if (renderVersion !== this.repoRenderVersion || !this.repoContainer) {
+                return true;
+            }
+
+            const frameDeadline = performance.now() + frameBudgetMs;
+            let renderedInFrame = 0;
+            while (renderedIndex < totalCount) {
+                if (renderVersion !== this.repoRenderVersion || !this.repoContainer) {
+                    return true;
+                }
+
+                const prioritizeAvatarLoad = renderedIndex < highPriorityAvatarCount;
+                const repo = repositories[renderedIndex];
+                const cardEl = this.renderOrReuseRepositoryCard(repo, prioritizeAvatarLoad);
+                const currentAtIndex = this.repoContainer.children[renderedIndex] as HTMLElement | null;
+                if (currentAtIndex !== cardEl) {
+                    this.repoContainer.insertBefore(cardEl, currentAtIndex || null);
+                }
+                this.scheduleRepoCardAvatarLoad(cardEl, prioritizeAvatarLoad);
+
+                renderedIndex += 1;
+                renderedInFrame += 1;
+
+                if (!firstScreenRecorded && renderedIndex >= firstScreenThreshold) {
+                    firstScreenRecorded = true;
+                    this.recordPerformanceDuration('firstScreen', performance.now() - renderStartAt);
+                }
+
+                if (renderedInFrame >= maxPerFrame) {
+                    break;
+                }
+                if (
+                    renderedInFrame % REPO_RENDER_BUDGET_CHECK_INTERVAL === 0 &&
+                    performance.now() >= frameDeadline
+                ) {
+                    break;
+                }
+            }
+
+            if (
+                shouldShowStatus &&
+                (renderedIndex >= totalCount || performance.now() >= nextStatusTickAt)
+            ) {
+                const percent = Math.min(100, Math.round((renderedIndex / totalCount) * 100));
+                this.showRepoRenderStatus(`正在更新列表… ${percent}%`);
+                nextStatusTickAt = performance.now() + 96;
+            }
+
+            if (renderedIndex < totalCount) {
+                await this.waitForNextFrame();
+            }
+        }
+
+        if (!firstScreenRecorded) {
+            this.recordPerformanceDuration('firstScreen', performance.now() - renderStartAt);
+        }
+
+        while (this.repoContainer.children.length > totalCount) {
+            const trailingNode = this.repoContainer.lastElementChild as HTMLElement | null;
+            if (!trailingNode || !trailingNode.classList.contains('github-stars-repo')) {
+                break;
+            }
+            trailingNode.remove();
+        }
+
+        if (renderVersion === this.repoRenderVersion) {
+            this.hideRepoRenderStatus();
+            this.recordPerformanceDuration('render', performance.now() - renderStartAt);
+            this.finalizeInteractionMeasurement();
+            this.requestPerformancePanelRefresh();
+        }
+        return true;
+    }
+
+    /**
      * 常规渲染（非虚拟化）
      */
     private async renderFullRepositories(repositories: RenderRepository[], renderVersion: number): Promise<void> {
@@ -2034,6 +2285,7 @@ export class GithubStarsView extends ItemView {
                 await this.waitForNextFrame();
             }
         }
+        this.recordPerformanceDuration('firstScreen', performance.now() - renderStartAt);
         this.finalizeInteractionMeasurement();
         this.requestPerformancePanelRefresh();
 
