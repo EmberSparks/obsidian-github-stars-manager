@@ -35,6 +35,7 @@ export const en = {
         tagsLabel: 'Tags',
         showMore: 'More',
         showLess: 'Collapse',
+        clearTagFilters: 'Clear filters',
         tagManageEnter: 'Manage tags',
         tagManageExit: 'Done',
         tagManageHint: 'Click tags to edit them, or create new ones.',

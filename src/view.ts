@@ -1764,11 +1764,27 @@ export class GithubStarsView extends ItemView {
             }
         });
 
-        // 2. 决定显示多少标签
+        // 2. 按“已选在前、未选在后”组织显示顺序（各自保持原有顺序稳定）
+        const selectedTags: string[] = [];
+        const unselectedTags: string[] = [];
+        currentTags.forEach((tag) => {
+            const normalizedTag = this.normalizeTagName(tag);
+            if (this.filterByTags.get(normalizedTag)) {
+                selectedTags.push(tag);
+                return;
+            }
+            unselectedTags.push(tag);
+        });
+        const orderedTags = [...selectedTags, ...unselectedTags];
+
+        // 3. 决定显示多少标签（折叠态保证所有已选标签可见）
         const maxVisibleTags = 5;
-        const tagsToShow = this.showAllTags ? currentTags : currentTags.slice(0, maxVisibleTags);
+        const collapsedVisibleCount = Math.max(maxVisibleTags, selectedTags.length);
+        const tagsToShow = this.showAllTags
+            ? orderedTags
+            : orderedTags.slice(0, collapsedVisibleCount);
         
-        // 3. 创建标签按钮
+        // 4. 创建标签按钮
         tagsToShow.forEach(tag => {
             const count = tagCounts.get(tag) || 0;
             const normalizedTag = this.normalizeTagName(tag);
@@ -1803,7 +1819,7 @@ export class GithubStarsView extends ItemView {
 
                 const currentState = this.filterByTags.get(normalizedTag) || false;
                 this.filterByTags.set(normalizedTag, !currentState);
-                tagEl.toggleClass('active', !currentState);
+                this.requestTagsFilterUpdate();
                 
                 // 清除不可见仓库的选择状态
                 this.clearInvisibleSelections();
@@ -1811,11 +1827,30 @@ export class GithubStarsView extends ItemView {
             });
         });
 
-        // 4. 添加"更多"按钮
-        if (!this.isTagManageMode && currentTags.length > maxVisibleTags) {
+        // 5. 添加“清空筛选”按钮
+        if (!this.isTagManageMode && selectedTags.length > 0) {
+            const clearFilterButton = container.createEl('span', {
+                cls: 'github-stars-tag-clear',
+                text: t('view.clearTagFilters')
+            });
+            clearFilterButton.addEventListener('click', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                this.filterByTags.clear();
+                this.requestTagsFilterUpdate();
+                this.clearInvisibleSelections();
+                this.requestRepositoriesRender();
+            });
+        }
+
+        // 6. 添加"更多/收起"按钮
+        const hasCollapsibleTags = orderedTags.length > collapsedVisibleCount;
+        if (!this.isTagManageMode && (hasCollapsibleTags || this.showAllTags)) {
             const moreButton = container.createEl('span', {
                 cls: 'github-stars-tag-more',
-                text: this.showAllTags ? t('view.showLess') : t('view.showMore') + ` (+${currentTags.length - maxVisibleTags})`
+                text: this.showAllTags
+                    ? t('view.showLess')
+                    : t('view.showMore') + ` (+${orderedTags.length - collapsedVisibleCount})`
             });
 
             moreButton.addEventListener('click', (e) => {

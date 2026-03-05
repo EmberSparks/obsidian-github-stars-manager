@@ -37,6 +37,7 @@ export const zh: TranslationKeys = {
         tagsLabel: '标签',
         showMore: '更多',
         showLess: '收起',
+        clearTagFilters: '清空筛选',
         tagManageEnter: '管理标签',
         tagManageExit: '完成',
         tagManageHint: '点击标签可编辑，也可新建标签。',
