@@ -1,9 +1,10 @@
 import { App, Modal, Setting, Notice, TFile } from 'obsidian';
-import { GithubRepository, UserRepoEnhancements } from './types';
+import { GithubRepository, InvalidUserEnhancementRecord, UserRepoEnhancements } from './types';
 import GithubStarsPlugin from './main';
 import { EmojiUtils } from './emojiUtils';
 import { t } from './i18n';
 import { TagChipsInput } from './components/TagChipsInput';
+import { buildEnhancementRepoSnapshot } from './userEnhancementCleanup';
 
 /**
  * 编辑仓库信息的模态框
@@ -178,14 +179,17 @@ export class EditRepoModal extends Modal {
      */
     async saveChanges() {
         const repoId = this.githubRepo.id;
+        const existingEnhancement = this.plugin.data.userEnhancements[repoId];
 
         const updatedEnhancement: UserRepoEnhancements = {
+            ...existingEnhancement,
             notes: this.notes.trim(),
             tags: this.tags
                 .split(',')
                 .map(tag => tag.trim())
                 .filter(tag => tag.length > 0),
-            linked_note: this.linkedNote.trim() || undefined
+            linked_note: this.linkedNote.trim() || undefined,
+            repoSnapshot: buildEnhancementRepoSnapshot(this.githubRepo, new Date().toISOString())
         };
 
         this.plugin.data.userEnhancements[repoId] = updatedEnhancement;
@@ -269,5 +273,285 @@ class NoteSelectorModal extends Modal {
     onClose() {
         const { contentEl } = this;
         contentEl.empty();
+    }
+}
+
+class ConfirmInvalidDataDeleteAllModal extends Modal {
+    private message: string;
+    private resolve: (confirmed: boolean) => void;
+
+    constructor(app: App, message: string, resolve: (confirmed: boolean) => void) {
+        super(app);
+        this.message = message;
+        this.resolve = resolve;
+    }
+
+    onOpen() {
+        const { contentEl } = this;
+        contentEl.empty();
+
+        contentEl.createEl('h2', { text: t('settings.confirmActionTitle') });
+        contentEl.createEl('p', { text: this.message });
+
+        const buttonContainer = contentEl.createDiv('modal-button-container');
+        const cancelButton = buttonContainer.createEl('button', { text: t('common.cancel') });
+        cancelButton.addEventListener('click', () => {
+            this.resolve(false);
+            this.close();
+        });
+
+        const confirmButton = buttonContainer.createEl('button', {
+            text: t('modal.invalidDataDeleteAllConfirmButton'),
+            cls: 'mod-warning'
+        });
+        confirmButton.addEventListener('click', () => {
+            this.resolve(true);
+            this.close();
+        });
+
+        cancelButton.focus();
+    }
+
+    onClose() {
+        const { contentEl } = this;
+        contentEl.empty();
+    }
+}
+
+export class InvalidEnhancementRecordsModal extends Modal {
+    plugin: GithubStarsPlugin;
+    records: InvalidUserEnhancementRecord[] = [];
+    listEl?: HTMLElement;
+    summaryEl?: HTMLElement;
+    deleteAllButton?: HTMLButtonElement;
+    refreshSnapshotsButton?: HTMLButtonElement;
+    isMutating: boolean = false;
+    isRefreshingSnapshots: boolean = false;
+
+    constructor(app: App, plugin: GithubStarsPlugin) {
+        super(app);
+        this.plugin = plugin;
+        this.records = plugin.getInvalidUserEnhancementRecords();
+    }
+
+    onOpen() {
+        const { contentEl } = this;
+        this.modalEl.addClass('github-stars-invalid-data-modal');
+        contentEl.createEl('h2', { text: t('modal.invalidDataTitle') });
+        this.summaryEl = contentEl.createEl('p', { cls: 'github-stars-invalid-data-summary' });
+
+        const actionsEl = contentEl.createDiv('github-stars-invalid-data-actions');
+        const closeButton = actionsEl.createEl('button', { text: t('common.cancel') });
+        closeButton.addEventListener('click', () => this.close());
+
+        this.refreshSnapshotsButton = actionsEl.createEl('button', {
+            text: t('modal.invalidDataRefreshSnapshots')
+        });
+        this.refreshSnapshotsButton.addEventListener('click', () => {
+            void this.handleRefreshSnapshots();
+        });
+
+        this.deleteAllButton = actionsEl.createEl('button', {
+            text: t('modal.invalidDataDeleteAll')
+        });
+        this.deleteAllButton.addClass('mod-warning');
+        this.deleteAllButton.addEventListener('click', () => {
+            void this.handleDeleteAll();
+        });
+
+        this.listEl = contentEl.createDiv('github-stars-invalid-data-list');
+        this.renderRecords();
+    }
+
+    onClose() {
+        this.contentEl.empty();
+    }
+
+    private renderRecords(): void {
+        if (!this.listEl || !this.summaryEl || !this.deleteAllButton || !this.refreshSnapshotsButton) return;
+        this.records = this.plugin.getInvalidUserEnhancementRecords();
+        this.summaryEl.setText(t('modal.invalidDataSummary', { count: String(this.records.length) }));
+        const isBusy = this.isMutating || this.isRefreshingSnapshots;
+        const missingSnapshotCount = this.records.filter(
+            (record) => !(record.repoSnapshot?.full_name?.trim() && record.repoSnapshot?.html_url?.trim())
+        ).length;
+        this.deleteAllButton.disabled = isBusy || this.records.length === 0;
+        this.refreshSnapshotsButton.disabled = isBusy || missingSnapshotCount === 0;
+        this.refreshSnapshotsButton.textContent = this.isRefreshingSnapshots
+            ? t('modal.invalidDataRefreshRunning')
+            : t('modal.invalidDataRefreshSnapshots');
+        this.listEl.empty();
+
+        if (this.records.length === 0) {
+            this.listEl.createEl('div', {
+                cls: 'github-stars-invalid-data-empty',
+                text: t('modal.invalidDataEmpty')
+            });
+            return;
+        }
+
+        this.records.forEach((record) => {
+            const snapshot = record.repoSnapshot;
+            const itemEl = this.listEl!.createDiv('github-stars-invalid-data-item');
+            const headerEl = itemEl.createDiv('github-stars-invalid-data-item-header');
+            headerEl.createEl('div', {
+                cls: 'github-stars-invalid-data-item-title',
+                text: snapshot?.full_name?.trim() || t('modal.invalidDataRepoId', { repoId: String(record.repoId) })
+            });
+
+            const deleteButton = headerEl.createEl('button', {
+                cls: 'github-stars-invalid-data-delete-one',
+                text: t('common.delete')
+            });
+            deleteButton.disabled = isBusy;
+            deleteButton.addEventListener('click', () => {
+                void this.handleDeleteOne(record.repoId);
+            });
+
+            itemEl.createEl('div', {
+                cls: 'github-stars-invalid-data-item-meta',
+                text: t('modal.invalidDataRepoId', { repoId: String(record.repoId) })
+            });
+
+            if (snapshot?.html_url?.trim()) {
+                const linkRow = itemEl.createDiv('github-stars-invalid-data-item-meta');
+                linkRow.createSpan({ text: t('modal.invalidDataRepoLink') });
+                const linkEl = linkRow.createEl('a', {
+                    cls: 'github-stars-invalid-data-item-link',
+                    text: snapshot.html_url.trim()
+                });
+                linkEl.href = snapshot.html_url.trim();
+                linkEl.target = '_blank';
+                linkEl.rel = 'noopener noreferrer';
+            } else {
+                itemEl.createEl('div', {
+                    cls: 'github-stars-invalid-data-item-warning',
+                    text: t('modal.invalidDataNoSnapshot')
+                });
+            }
+
+            if (snapshot?.description?.trim()) {
+                itemEl.createEl('div', {
+                    cls: 'github-stars-invalid-data-item-meta',
+                    text: t('modal.invalidDataDescription', { description: snapshot.description.trim() })
+                });
+            }
+
+            if (snapshot?.last_seen_at?.trim()) {
+                itemEl.createEl('div', {
+                    cls: 'github-stars-invalid-data-item-meta',
+                    text: t('modal.invalidDataSnapshotTime', {
+                        time: this.formatSnapshotTime(snapshot.last_seen_at)
+                    })
+                });
+            }
+
+            itemEl.createEl('div', {
+                cls: 'github-stars-invalid-data-item-tags',
+                text: t('modal.invalidDataTags', {
+                    tags: record.tags.length > 0 ? record.tags.join(', ') : t('modal.invalidDataNone')
+                })
+            });
+
+            const notesText = record.notes.trim();
+            itemEl.createEl('div', {
+                cls: 'github-stars-invalid-data-item-meta',
+                text: notesText
+                    ? t('modal.invalidDataNotesPreview', { notes: notesText })
+                    : t('modal.invalidDataNoNotes')
+            });
+
+            itemEl.createEl('div', {
+                cls: 'github-stars-invalid-data-item-meta',
+                text: record.linked_note?.trim()
+                    ? t('modal.invalidDataLinkedNote', { path: record.linked_note.trim() })
+                    : t('modal.invalidDataNoLinkedNote')
+            });
+        });
+    }
+
+    private formatSnapshotTime(timestamp: string): string {
+        const parsed = new Date(timestamp);
+        if (Number.isNaN(parsed.getTime())) {
+            return timestamp;
+        }
+        return parsed.toLocaleString();
+    }
+
+    private async handleRefreshSnapshots(): Promise<void> {
+        const repoIdsToRefresh = this.records
+            .filter((record) => !(record.repoSnapshot?.full_name?.trim() && record.repoSnapshot?.html_url?.trim()))
+            .map((record) => record.repoId);
+
+        if (repoIdsToRefresh.length === 0) {
+            new Notice(t('modal.invalidDataRefreshNoop'));
+            return;
+        }
+
+        this.isRefreshingSnapshots = true;
+        this.renderRecords();
+        try {
+            const result = await this.plugin.refreshInvalidUserEnhancementSnapshots(repoIdsToRefresh);
+            if (result.requestedCount === 0) {
+                new Notice(t('modal.invalidDataRefreshNoop'));
+            } else {
+                new Notice(t('modal.invalidDataRefreshDone', {
+                    updated: String(result.updatedCount),
+                    missing: String(result.unresolvedCount)
+                }));
+            }
+        } finally {
+            this.isRefreshingSnapshots = false;
+            this.renderRecords();
+        }
+    }
+
+    private async handleDeleteOne(repoId: number): Promise<void> {
+        this.isMutating = true;
+        this.renderRecords();
+        try {
+            const deletedCount = await this.plugin.deleteInvalidUserEnhancements([repoId]);
+            if (deletedCount > 0) {
+                new Notice(t('modal.invalidDataDeleteDone', { count: String(deletedCount) }));
+            } else {
+                new Notice(t('modal.invalidDataDeleteMissing'));
+            }
+        } finally {
+            this.isMutating = false;
+            this.renderRecords();
+        }
+    }
+
+    private async handleDeleteAll(): Promise<void> {
+        if (this.records.length === 0) return;
+        const confirmed = await this.confirmDeleteAll();
+        if (!confirmed) {
+            return;
+        }
+
+        this.isMutating = true;
+        this.renderRecords();
+        try {
+            const deletedCount = await this.plugin.deleteInvalidUserEnhancements(
+                this.records.map((record) => record.repoId)
+            );
+            if (deletedCount > 0) {
+                new Notice(t('modal.invalidDataDeleteDone', { count: String(deletedCount) }));
+            } else {
+                new Notice(t('modal.invalidDataDeleteMissing'));
+            }
+        } finally {
+            this.isMutating = false;
+            this.renderRecords();
+        }
+    }
+
+    private async confirmDeleteAll(): Promise<boolean> {
+        const message = t('modal.invalidDataDeleteAllConfirmMessage', {
+            count: String(this.records.length)
+        });
+        return new Promise((resolve) => {
+            new ConfirmInvalidDataDeleteAllModal(this.app, message, resolve).open();
+        });
     }
 }

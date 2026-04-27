@@ -566,20 +566,6 @@
   font-style: italic;
 }
 
-.github-stars-render-status {
-  margin: 0 16px 8px 16px;
-  padding: 4px 10px;
-  border: 1px dashed var(--background-modifier-border);
-  border-radius: 8px;
-  color: var(--text-muted);
-  font-size: var(--font-ui-smaller);
-  line-height: 1.4;
-  background: var(--background-secondary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 /* 仓库卡片 - 应用商店风格 */
 .github-stars-repo {
     padding: 12px;
@@ -2156,6 +2142,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 /* 添加账号按钮 */
@@ -2262,6 +2249,26 @@
 .total-stars-number {
   font-weight: 600;
   color: var(--text-normal);
+}
+
+.github-stars-invalid-data-button {
+  min-height: 32px;
+  white-space: nowrap;
+  font-size: 0.85em;
+}
+
+.github-stars-invalid-data-button.has-invalid-data {
+  color: #b45309;
+  border-color: rgba(245, 158, 11, 0.35);
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.14) 0%, rgba(251, 191, 36, 0.08) 100%);
+  box-shadow: 0 1px 3px rgba(245, 158, 11, 0.12);
+}
+
+.github-stars-invalid-data-button.has-invalid-data:hover {
+  color: #92400e;
+  border-color: rgba(245, 158, 11, 0.5);
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.18) 0%, rgba(251, 191, 36, 0.12) 100%);
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.18);
 }
 
 /* 折叠内容容器 */
@@ -3190,6 +3197,104 @@
 
 .github-stars-properties-action-btn-danger {
   border-color: var(--background-modifier-border-hover);
+}
+
+.github-stars-invalid-data-modal {
+  width: min(760px, calc(100vw - 48px));
+  max-width: 760px;
+}
+
+.github-stars-invalid-data-modal .modal-content {
+  max-height: calc(100vh - 120px);
+}
+
+.github-stars-invalid-data-summary {
+  margin: 10px 0 14px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.github-stars-invalid-data-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.github-stars-invalid-data-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: min(56vh, 520px);
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.github-stars-invalid-data-item {
+  padding: 14px 16px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 12px;
+  background: var(--background-secondary);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.github-stars-invalid-data-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.github-stars-invalid-data-item-title {
+  font-weight: 600;
+  color: var(--text-normal);
+  word-break: break-all;
+}
+
+.github-stars-invalid-data-item-tags {
+  margin-bottom: 6px;
+  color: var(--text-normal);
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.github-stars-invalid-data-item-meta {
+  color: var(--text-muted);
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.github-stars-invalid-data-item-meta + .github-stars-invalid-data-item-meta {
+  margin-top: 4px;
+}
+
+.github-stars-invalid-data-item-link {
+  color: var(--link-color);
+  text-decoration: none;
+  word-break: break-all;
+}
+
+.github-stars-invalid-data-item-link:hover {
+  text-decoration: underline;
+}
+
+.github-stars-invalid-data-item-warning {
+  color: var(--text-warning);
+  line-height: 1.5;
+}
+
+.github-stars-invalid-data-delete-one {
+  flex-shrink: 0;
+}
+
+.github-stars-invalid-data-empty {
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--text-muted);
+  border: 1px dashed var(--background-modifier-border);
+  border-radius: 12px;
+  background: var(--background-secondary);
 }
 
 /* 内联样式替代类 */

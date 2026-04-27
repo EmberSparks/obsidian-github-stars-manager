@@ -50,7 +50,7 @@ class SingleAccountGithubService {
      */
     public async fetchStarredRepositories(): Promise<GithubRepository[]> {
         if (!this.checkInitialized()) {
-            return [];
+            throw new Error(`GitHub client not initialized for account ${this.account.username}`);
         }
         
         try {
@@ -108,7 +108,10 @@ class SingleAccountGithubService {
             return repositories;
         } catch (error) {
             console.error(`获取星标仓库失败 (${this.account.username}):`, error);
-            return [];
+            if (error instanceof Error) {
+                throw error;
+            }
+            throw new Error(`Failed to fetch starred repositories for ${this.account.username}`);
         }
     }
     
@@ -129,6 +132,33 @@ class SingleAccountGithubService {
             };
         } catch (error) {
             console.error(`获取用户信息失败 (${this.account.username}):`, error);
+            return null;
+        }
+    }
+
+    /**
+     * 按仓库 ID 获取仓库详情，用于补齐本地失效数据的历史快照。
+     */
+    public async fetchRepositoryById(repositoryId: number): Promise<GithubRepository | null> {
+        if (!this.checkInitialized()) {
+            return null;
+        }
+
+        try {
+            const response = await this.octokit!.request('GET /repositories/{repo_id}', {
+                repo_id: repositoryId
+            });
+            return {
+                ...(response.data as GithubRepository),
+                account_id: this.account.id
+            };
+        } catch (error) {
+            const status = typeof error === 'object' && error && 'status' in error
+                ? Number((error as { status?: number }).status)
+                : 0;
+            if (status !== 404) {
+                console.warn(`按仓库 ID 获取详情失败 (${this.account.username}, repoId=${repositoryId}):`, error);
+            }
             return null;
         }
     }
@@ -307,6 +337,24 @@ export class GithubService {
         }
         
         return await service.getCurrentUser();
+    }
+
+    /**
+     * 尝试从任一可用账号按仓库 ID 拉取仓库详情。
+     */
+    public async fetchRepositoryById(repositoryId: number): Promise<GithubRepository | null> {
+        if (!Number.isFinite(repositoryId) || this.services.size === 0) {
+            return null;
+        }
+
+        for (const service of this.services.values()) {
+            const repository = await service.fetchRepositoryById(repositoryId);
+            if (repository) {
+                return repository;
+            }
+        }
+
+        return null;
     }
 
     // 向后兼容的方法

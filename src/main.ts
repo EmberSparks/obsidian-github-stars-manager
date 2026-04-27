@@ -1,11 +1,27 @@
 import { Plugin, Notice, WorkspaceLeaf, addIcon } from 'obsidian';
-import { GithubStarsSettings, PluginData, CombinedPluginData, GithubRepository, ExportOptions, DEFAULT_EXPORT_OPTIONS } from './types'; // 移除 LocalRepository, 添加 GithubRepository, ExportOptions
+import {
+    GithubStarsSettings,
+    PluginData,
+    CombinedPluginData,
+    GithubRepository,
+    ExportOptions,
+    DEFAULT_EXPORT_OPTIONS,
+    InvalidUserEnhancementRecord
+} from './types'; // 移除 LocalRepository, 添加 GithubRepository, ExportOptions
 import { DEFAULT_SETTINGS, GithubStarsSettingTab } from './settings';
 import { GithubService } from './githubService';
 import { GithubStarsView, VIEW_TYPE_STARS } from './view';
 import { ExportService } from './exportService';
 import { I18n, t } from './i18n';
 import { GithubStarsCacheService } from './cacheService';
+import { countTagAssociations } from './tagAssociation';
+import {
+    buildEnhancementRepoSnapshot,
+    getOrphanEnhancementRecords,
+    mergeRepositoriesAfterSync,
+    removeEnhancementsByRepoIds,
+    syncEnhancementSnapshotsWithRepositories
+} from './userEnhancementCleanup';
 
 // GitHub星标图标 (不变)
 const GITHUB_STAR_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-star"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>`;
@@ -382,41 +398,123 @@ export default class GithubStarsPlugin extends Plugin {
         console.debug('Repositories received:', syncResult.repositories?.length || 0);
         console.debug('Account sync times:', syncResult.accountSyncTimes);
         console.debug('Errors:', syncResult.errors);
+        const successfulAccountCount = Object.keys(syncResult.accountSyncTimes).length;
+        const failedAccountIds = Object.keys(syncResult.errors);
+        const errorCount = failedAccountIds.length;
 
-        // 检查是否有有效的仓库数据
-        if (!syncResult.repositories || syncResult.repositories.length === 0) {
-            console.warn('同步结果中没有仓库数据');
-            const errorCount = Object.keys(syncResult.errors).length;
+        if (successfulAccountCount === 0) {
             if (errorCount > 0) {
                 console.error('同步错误详情:', syncResult.errors);
-                new Notice(t('plugin.syncFailedWithErrors', { errors: Object.values(syncResult.errors).join(', ') }));
             } else {
-                new Notice(t('plugin.syncCompleteNoRepos'));
+                console.warn('同步结果中没有成功账号，跳过本地数据更新');
             }
             return;
         }
 
-        // 更新仓库数据
-        this.data.githubRepositories = syncResult.repositories;
+        const snapshotRecordedAt = new Date().toISOString();
+        this.data.githubRepositories = mergeRepositoriesAfterSync({
+            previousRepositories: this.data.githubRepositories || [],
+            syncedRepositories: syncResult.repositories || [],
+            failedAccountIds
+        });
         console.debug('Updated githubRepositories count:', this.data.githubRepositories.length);
+        this.data.userEnhancements = syncEnhancementSnapshotsWithRepositories(
+            this.data.userEnhancements,
+            syncResult.repositories || [],
+            snapshotRecordedAt
+        );
 
-        // 更新同步时间
-        this.data.lastSyncTime = new Date().toISOString();
+        if (errorCount > 0) {
+            console.warn('检测到部分账号同步失败，已跳过孤儿增强数据清理');
+        }
+
+        this.data.lastSyncTime = snapshotRecordedAt;
         this.data.accountSyncTimes = {
             ...this.data.accountSyncTimes,
             ...syncResult.accountSyncTimes
         };
 
-        // 保存数据
         await this.savePluginData();
         console.debug('Plugin data saved after sync. Final GitHub Repos count:', this.data.githubRepositories.length);
 
-        // 显示同步结果
-        const errorCount = Object.keys(syncResult.errors).length;
         if (errorCount > 0) {
             console.error('同步错误:', syncResult.errors);
         }
+    }
 
+    getInvalidUserEnhancementRecords(): InvalidUserEnhancementRecord[] {
+        return getOrphanEnhancementRecords(
+            this.data.userEnhancements,
+            this.data.githubRepositories
+        );
+    }
+
+    async deleteInvalidUserEnhancements(repoIds: number[]): Promise<number> {
+        const existingInvalidRepoIdSet = new Set(
+            this.getInvalidUserEnhancementRecords().map((record) => record.repoId)
+        );
+        const targetRepoIds = repoIds.filter((repoId) => existingInvalidRepoIdSet.has(repoId));
+        if (targetRepoIds.length === 0) {
+            return 0;
+        }
+
+        const result = removeEnhancementsByRepoIds(this.data.userEnhancements, targetRepoIds);
+        this.data.userEnhancements = result.userEnhancements;
+        await this.savePluginData();
+        return result.removedRepoIds.length;
+    }
+
+    async refreshInvalidUserEnhancementSnapshots(repoIds: number[]): Promise<{
+        requestedCount: number;
+        updatedCount: number;
+        unresolvedCount: number;
+    }> {
+        const invalidRecordMap = new Map(
+            this.getInvalidUserEnhancementRecords().map((record) => [record.repoId, record] as const)
+        );
+        const targetRepoIds = repoIds.filter((repoId) => invalidRecordMap.has(repoId));
+        const repoIdsToRefresh = targetRepoIds.filter((repoId) => {
+            const record = invalidRecordMap.get(repoId);
+            const snapshot = record?.repoSnapshot;
+            return !(snapshot?.full_name?.trim() && snapshot?.html_url?.trim());
+        });
+
+        if (repoIdsToRefresh.length === 0) {
+            return {
+                requestedCount: 0,
+                updatedCount: 0,
+                unresolvedCount: 0
+            };
+        }
+
+        const snapshotRecordedAt = new Date().toISOString();
+        let updatedCount = 0;
+        let unresolvedCount = 0;
+
+        for (const repoId of repoIdsToRefresh) {
+            const repository = await this.githubService.fetchRepositoryById(repoId);
+            const enhancement = this.data.userEnhancements[repoId];
+            if (!repository || !enhancement) {
+                unresolvedCount += 1;
+                continue;
+            }
+
+            this.data.userEnhancements[repoId] = {
+                ...enhancement,
+                repoSnapshot: buildEnhancementRepoSnapshot(repository, snapshotRecordedAt)
+            };
+            updatedCount += 1;
+        }
+
+        if (updatedCount > 0) {
+            await this.savePluginData();
+        }
+
+        return {
+            requestedCount: repoIdsToRefresh.length,
+            updatedCount,
+            unresolvedCount
+        };
     }
 
     // --- 视图管理 (activateView 不变, updateViews 更新) ---
@@ -534,22 +632,7 @@ export default class GithubStarsPlugin extends Plugin {
      * 获取标签的关联仓库数量
      */
     getTagAssociationCount(tagName: string): number {
-        const normalizedTagName = tagName.trim().toLowerCase();
-        if (!normalizedTagName) return 0;
-
-        let associatedRepositoryCount = 0;
-        Object.values(this.data.userEnhancements || {}).forEach((enhancement) => {
-            if (!Array.isArray(enhancement.tags) || enhancement.tags.length === 0) {
-                return;
-            }
-            const hasAssociatedTag = enhancement.tags.some(
-                (tag) => tag.toLowerCase() === normalizedTagName
-            );
-            if (hasAssociatedTag) {
-                associatedRepositoryCount += 1;
-            }
-        });
-        return associatedRepositoryCount;
+        return countTagAssociations(this.data.userEnhancements, tagName);
     }
 
     /**

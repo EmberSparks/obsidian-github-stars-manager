@@ -68,11 +68,29 @@ export interface GithubRepository {
     account_id?: string; // 标识来源账号
 }
 
+export interface UserEnhancementRepoSnapshot {
+    full_name: string;
+    html_url: string;
+    owner_login: string;
+    description: string;
+    last_seen_at: string;
+    account_id?: string;
+}
+
 // 新增：用户为仓库添加的增强信息接口
 export interface UserRepoEnhancements {
     notes: string;
     tags: string[];
     linked_note?: string;
+    repoSnapshot?: UserEnhancementRepoSnapshot;
+}
+
+export interface InvalidUserEnhancementRecord {
+    repoId: number;
+    tags: string[];
+    notes: string;
+    linked_note?: string;
+    repoSnapshot?: UserEnhancementRepoSnapshot;
 }
 
 // 插件核心数据接口 (修改后)
