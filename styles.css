@@ -312,11 +312,12 @@
   background: var(--background-primary);
   color: var(--text-muted);
   border-radius: 10px;
-  padding: 6px 10px;
+  padding: 5px 9px;
   font-size: var(--font-ui-smaller);
   font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
+  flex: 0 0 auto;
 }
 
 .github-stars-tag-manage-toggle:hover {
@@ -335,11 +336,12 @@
   background: var(--background-secondary);
   color: var(--text-muted);
   border-radius: 10px;
-  padding: 6px 10px;
+  padding: 5px 9px;
   font-size: var(--font-ui-smaller);
   font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
+  flex: 0 0 auto;
 }
 
 .github-stars-tag-manage-add:hover {
@@ -440,8 +442,28 @@
 .github-stars-tags-container {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
+  min-width: 0;
+  padding: 3px 0;
+  margin: -3px 0;
+}
+
+.github-stars-tags-container.is-collapsed {
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+
+.github-stars-tags-container.is-collapsed > * {
+  flex: 0 0 auto;
+}
+
+.github-stars-tag-measure {
+  position: fixed;
+  left: -10000px;
+  top: -10000px;
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .github-stars-tags-empty {
@@ -450,9 +472,9 @@
 }
 
 .github-stars-tag {
-  padding: 6px 12px;
+  padding: 5px 10px;
   border-radius: 20px;
-  font-size: 0.85em;
+  font-size: 0.8em;
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease, opacity 0.2s ease;
   background-color: var(--background-secondary);
@@ -461,6 +483,11 @@
   font-weight: 600; /* Make tags bold */
   box-shadow: 0 1px 2px var(--github-tag-shadow-color, rgba(0, 0, 0, 0.14));
   position: relative;
+  white-space: nowrap;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 0 0 auto;
 }
 
 .github-stars-tag:hover {
@@ -516,12 +543,14 @@
 .github-stars-tag-more {
   color: var(--interactive-accent);
   cursor: pointer;
-  font-size: 0.85em;
-  padding: 6px 12px;
+  font-size: 0.8em;
+  padding: 5px 10px;
   border-radius: 20px;
   background-color: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
   transition: all 0.2s ease;
+  white-space: nowrap;
+  flex: 0 0 auto;
 }
 
 .github-stars-tag-more:hover {
@@ -532,12 +561,14 @@
 .github-stars-tag-clear {
   color: var(--text-muted);
   cursor: pointer;
-  font-size: 0.85em;
-  padding: 6px 12px;
+  font-size: 0.8em;
+  padding: 5px 10px;
   border-radius: 20px;
   background-color: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
   transition: all 0.2s ease;
+  white-space: nowrap;
+  flex: 0 0 auto;
 }
 
 .github-stars-tag-clear:hover {
@@ -833,22 +864,51 @@
 }
 
 .github-stars-repo-edit {
-    background-color: var(--interactive-accent);
-    color: var(--text-on-accent);
-    border: none;
-    border-radius: 12px; /* 小红书风格的圆角按钮 */
-    padding: 4px 10px; /* 更紧凑的按钮 */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    background: linear-gradient(180deg, var(--background-primary) 0%, var(--background-secondary) 100%);
+    color: var(--text-normal);
+    border: 1px solid var(--background-modifier-border-hover);
+    border-radius: 999px;
+    padding: 6px 11px;
     cursor: pointer;
-    transition: all 0.2s ease;
-    font-weight: 500;
-    font-size: 0.75em; /* 更小的字体 */
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
+    font-weight: 600;
+    font-size: 0.76em;
+    line-height: 1;
+    white-space: nowrap;
+    box-shadow: 0 4px 10px rgba(15, 23, 42, 0.08);
+    flex: 0 0 auto;
 }
 
 .github-stars-repo-edit:hover {
-    background-color: var(--interactive-accent-hover);
+    color: var(--interactive-accent);
+    border-color: rgba(var(--interactive-accent-rgb), 0.45);
+    background: linear-gradient(180deg, var(--background-primary) 0%, var(--background-modifier-hover) 100%);
     transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
+}
+
+.github-stars-repo-edit-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    color: currentColor;
+    opacity: 0.82;
+}
+
+.github-stars-repo-edit-icon svg {
+    width: 14px;
+    height: 14px;
+    stroke-width: 2.1px;
+}
+
+.github-stars-repo-edit-label {
+    line-height: 1;
 }
 
 /* 笔记容器 - 现代卡片风格 */
@@ -1510,10 +1570,14 @@
 
 /* 编辑按钮 - iOS风格 */
 .github-stars-theme-ios-glass .github-stars-repo-edit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   background: linear-gradient(135deg, var(--ios-glass-accent) 0%, rgba(0, 122, 255, 0.7) 100%);
   border: 1px solid rgba(0, 122, 255, 0.3);
-  border-radius: 12px;
-  padding: 8px 16px;
+  border-radius: 999px;
+  padding: 8px 14px;
   font-weight: 600;
   box-shadow: 0 4px 12px rgba(0, 122, 255, 0.25);
   transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
@@ -2568,20 +2632,30 @@
 }
 
 .github-stars-repo-edit {
-    padding: 6px 12px;
-    border: 1px solid var(--background-modifier-border);
-    border-radius: 4px;
-    background: var(--background-primary);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 6px 11px;
+    border: 1px solid var(--background-modifier-border-hover);
+    border-radius: 999px;
+    background: linear-gradient(180deg, var(--background-primary) 0%, var(--background-secondary) 100%);
     color: var(--text-normal);
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
     font-size: 12px;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+    box-shadow: 0 4px 10px rgba(15, 23, 42, 0.08);
 }
 
 .github-stars-repo-edit:hover {
-    background: var(--background-modifier-hover);
-    border-color: var(--background-modifier-border-hover);
+    background: linear-gradient(180deg, var(--background-primary) 0%, var(--background-modifier-hover) 100%);
+    border-color: rgba(var(--interactive-accent-rgb), 0.45);
+    color: var(--interactive-accent);
     transform: translateY(-1px);
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
 }
 
 .github-stars-repo-edit:active {

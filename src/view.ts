@@ -44,7 +44,7 @@ const REPO_RENDER_BUDGET_CHECK_INTERVAL = 4;
 const PERF_DURATION_SAMPLE_WINDOW_SIZE = 120;
 const PERF_LONG_TASK_THRESHOLD_MS = 50;
 const PERF_LONG_TASK_WINDOW_MS = 30_000;
-const REPO_CARD_RENDER_SCHEMA_VERSION = '20260428-avatar-inline-v1';
+const REPO_CARD_RENDER_SCHEMA_VERSION = '20260428-tag-row-and-edit-button-v1';
 const REPO_GRID_COLUMN_WIDTH = 280;
 const REPO_GRID_COLUMN_GAP = 16;
 const REPO_GRID_HORIZONTAL_PADDING = 32;
@@ -1247,6 +1247,7 @@ export class GithubStarsView extends ItemView {
         }
 
         this.repoContainerResizeObserver = new ResizeObserver(() => {
+            this.requestTagsFilterUpdate();
             this.requestRepoMasonryLayout();
             this.requestLoadMoreRepositoriesIfNeeded();
         });
@@ -2290,12 +2291,18 @@ export class GithubStarsView extends ItemView {
         });
         const orderedTags = [...selectedTags, ...unselectedTags];
 
-        // 3. 决定显示多少标签（折叠态保证所有已选标签可见）
-        const maxVisibleTags = 5;
-        const collapsedVisibleCount = Math.max(maxVisibleTags, selectedTags.length);
+        // 3. 按容器宽度决定折叠态显示数量，默认尽量填满一行
+        const collapsedVisibleCount = this.calculateCollapsedVisibleTagCount({
+            container,
+            orderedTags,
+            selectedTags,
+            tagCounts
+        });
         const tagsToShow = this.showAllTags
             ? orderedTags
             : orderedTags.slice(0, collapsedVisibleCount);
+
+        container.toggleClass('is-collapsed', !this.showAllTags && !this.isTagManageMode);
         
         // 4. 创建标签按钮
         tagsToShow.forEach(tag => {
@@ -2382,6 +2389,73 @@ export class GithubStarsView extends ItemView {
                 this.requestTagsFilterUpdate();
             });
         }
+    }
+
+    private calculateCollapsedVisibleTagCount(options: {
+        container: HTMLElement;
+        orderedTags: string[];
+        selectedTags: string[];
+        tagCounts: Map<string, number>;
+    }): number {
+        const { container, orderedTags, selectedTags, tagCounts } = options;
+        if (orderedTags.length === 0 || this.showAllTags || this.isTagManageMode) {
+            return orderedTags.length;
+        }
+
+        const containerWidth = Math.floor(container.getBoundingClientRect().width);
+        if (containerWidth <= 0) {
+            return Math.max(6, selectedTags.length);
+        }
+
+        const computedStyle = window.getComputedStyle(container);
+        const gap = Number.parseFloat(computedStyle.columnGap || computedStyle.gap || '8') || 8;
+        const existingChildren = Array.from(container.children) as HTMLElement[];
+        let usedWidth = existingChildren.reduce((sum, child) => {
+            return sum + Math.ceil(child.getBoundingClientRect().width);
+        }, 0);
+        usedWidth += gap * Math.max(0, existingChildren.length - 1);
+
+        const clearButtonWidth = selectedTags.length > 0
+            ? gap + this.measureTagFilterItemWidth('github-stars-tag-clear', t('view.clearTagFilters'))
+            : 0;
+
+        let visibleCount = 0;
+
+        for (let index = 0; index < orderedTags.length; index++) {
+            const tag = orderedTags[index];
+            const count = getTagDisplayCount({
+                tagName: tag,
+                visibleCount: tagCounts.get(tag) || 0,
+                isTagManageMode: this.isTagManageMode,
+                userEnhancements: this.userEnhancements
+            });
+            const tagWidth = gap + this.measureTagFilterItemWidth('github-stars-tag', `${tag} (${count})`);
+            const remainingCount = orderedTags.length - index - 1;
+            const moreButtonWidth = remainingCount > 0
+                ? gap + this.measureTagFilterItemWidth('github-stars-tag-more', `${t('view.showMore')} (+${remainingCount})`)
+                : 0;
+            const mustKeepVisible = index < selectedTags.length;
+            const nextWidth = usedWidth + tagWidth + clearButtonWidth + moreButtonWidth;
+
+            if (!mustKeepVisible && nextWidth > containerWidth && visibleCount > 0) {
+                break;
+            }
+
+            usedWidth += tagWidth;
+            visibleCount += 1;
+        }
+
+        return Math.max(visibleCount, Math.min(selectedTags.length, orderedTags.length), 1);
+    }
+
+    private measureTagFilterItemWidth(className: string, text: string): number {
+        const probeEl = document.body.createEl('span', {
+            cls: `${className} github-stars-tag-measure`,
+            text
+        });
+        const width = Math.ceil(probeEl.getBoundingClientRect().width);
+        probeEl.remove();
+        return width;
     }
 
     /**
@@ -3066,12 +3140,17 @@ export class GithubStarsView extends ItemView {
         setIcon(calendarIcon, 'calendar');
         updatedSpan.createEl('span', { text: ` ${this.formatRelativeTime(repo.updated_at)}` });
 
-        const editButton = footerEl.createEl('button', {
-            cls: 'github-stars-repo-edit',
-            text: t('view.editRepo')
-        });
+        const editButton = footerEl.createEl('button', { cls: 'github-stars-repo-edit' });
         editButton.setAttribute('data-repo-action', 'edit-repo');
         editButton.setAttribute('data-repo-id', String(repo.id));
+        editButton.setAttribute('aria-label', t('view.editRepo'));
+        editButton.setAttribute('title', t('view.editRepo'));
+        const editIcon = editButton.createEl('span', { cls: 'github-stars-repo-edit-icon' });
+        setIcon(editIcon, 'pencil');
+        editButton.createEl('span', {
+            cls: 'github-stars-repo-edit-label',
+            text: t('view.editRepo')
+        });
 
         this.scheduleRepoSecondaryContentMount(repoEl, secondaryContentEl, repo);
         return repoEl;
