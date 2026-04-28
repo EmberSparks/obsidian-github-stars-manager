@@ -8,20 +8,7 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  padding: 0 10px;
-}
-
-/* 标题 */
-.github-stars-header {
-  margin: 10px 0;
-  border-bottom: 1px solid var(--background-modifier-border);
-  padding-bottom: 10px;
-}
-
-.github-stars-header h2 {
-  margin: 0;
-  font-size: 1.5em;
-  color: var(--text-normal);
+  padding: 10px 10px 0;
 }
 
 /* 工具栏 */
@@ -591,6 +578,10 @@
 .github-stars-repo-list {
   position: relative;
   min-height: 100%;
+}
+
+.github-stars-repo-list.is-restoring-layout {
+  visibility: hidden;
 }
 
 /* 空状态 */

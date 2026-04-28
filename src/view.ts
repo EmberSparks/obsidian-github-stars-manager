@@ -115,6 +115,7 @@ export class GithubStarsView extends ItemView {
     searchInput: HTMLInputElement;
     repoContainer: HTMLElement;
     repoListEl: HTMLElement | null = null;
+    isReopeningView: boolean = false;
     filterByTags: Map<string, boolean> = new Map();
     tagsContainer: HTMLElement;
     currentFilter: string = '';
@@ -207,10 +208,6 @@ export class GithubStarsView extends ItemView {
         container.empty();
         container.classList.add('github-stars-container');
 
-        // Header (unchanged)
-        const headerDiv = container.createDiv('github-stars-header');
-        headerDiv.createEl('h2', { text: t('view.title') });
-
         // Toolbar (unchanged structure, button logic remains)
         const toolbarDiv = container.createDiv('github-stars-toolbar');
         this.createToolbar(toolbarDiv);
@@ -233,12 +230,23 @@ export class GithubStarsView extends ItemView {
         this.repoContainer.addEventListener('scroll', this.handleRepoContainerScroll, { passive: true });
         this.repoContainer.empty();
         this.repoListEl = this.repoContainer.createDiv('github-stars-repo-list');
+        this.isReopeningView = true;
+        this.repoListEl.addClass('is-restoring-layout');
         this.ensureRepoContainerResizeObserver();
 
-        // Initial rendering of repositories
-        this.renderRepositories();
+        // 视图切回时，等容器尺寸稳定一帧后再首渲染，避免先按错误宽度堆叠后再重排
+        void this.renderRepositoriesAfterViewRestore();
 
         return Promise.resolve();
+    }
+
+    private async renderRepositoriesAfterViewRestore(): Promise<void> {
+        await this.waitForNextFrame();
+        await this.waitForNextFrame();
+        if (!this.repoListEl || !this.repoContainer) {
+            return;
+        }
+        this.renderRepositories();
     }
 
     private isPerformanceMonitorEnabled(): boolean {
@@ -1187,12 +1195,19 @@ export class GithubStarsView extends ItemView {
         this.invalidateRepoMasonryState(true);
         this.repoListEl.empty();
         this.repoListEl.setCssProps({ height: '' });
+        if (this.isReopeningView) {
+            this.repoListEl.addClass('is-restoring-layout');
+        } else {
+            this.repoListEl.removeClass('is-restoring-layout');
+        }
     }
 
     private renderRepoEmptyState(message: string): void {
         this.resetRepoAvatarObserver();
         this.clearRepoListContent();
         this.repoContainer.scrollTop = 0;
+        this.repoListEl?.removeClass('is-restoring-layout');
+        this.isReopeningView = false;
         this.repoListEl?.createEl('div', { cls: 'github-stars-empty', text: message });
     }
 
@@ -1393,6 +1408,8 @@ export class GithubStarsView extends ItemView {
         });
 
         this.repoListEl.setCssProps({ height: `${layout.containerHeight}px` });
+        this.repoListEl.removeClass('is-restoring-layout');
+        this.isReopeningView = false;
         this.resetRepoCardResizeObserver();
     }
 
@@ -3968,6 +3985,7 @@ export class GithubStarsView extends ItemView {
         this.repoCardResizeObserver = null;
         this.resetRepoRenderWindowState(true);
         this.repoListEl = null;
+        this.isReopeningView = false;
         this.clearRepoCardCache();
         this.syncedQueryDataSignatureById.clear();
         this.syncedQueryDataVersion = -1;
