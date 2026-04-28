@@ -164,3 +164,51 @@ test('部分失败时保留失败账号上一次同步的仓库数据', () => {
 
     assert.deepEqual(result.map((repo) => repo.id).sort((left, right) => left - right), [1, 2, 3]);
 });
+
+test('同步结果缺少头像字段时保留本地已有头像', () => {
+    const previousRepositories = [{
+        id: 1,
+        node_id: 'R_kgDOB',
+        name: 'keep-avatar',
+        full_name: 'owner/keep-avatar',
+        html_url: 'https://github.com/owner/keep-avatar',
+        description: 'old description',
+        owner: {
+            login: 'owner',
+            avatar_url: 'https://avatars.githubusercontent.com/u/1?v=4'
+        },
+        private: false,
+        fork: false,
+        url: 'https://api.github.com/repos/owner/keep-avatar',
+        stargazers_count: 1,
+        watchers_count: 1,
+        language: 'TypeScript',
+        forks_count: 0,
+        open_issues_count: 0,
+        topics: [],
+        created_at: '2026-01-01T00:00:00.000Z',
+        updated_at: '2026-01-02T00:00:00.000Z',
+        pushed_at: '2026-01-03T00:00:00.000Z',
+        starred_at: '2026-04-01T00:00:00.000Z',
+        account_id: 'main'
+    }] as GithubRepository[];
+    const syncedRepositories = [{
+        ...previousRepositories[0],
+        description: 'new description',
+        owner: {
+            login: 'owner',
+            avatar_url: ''
+        },
+        starred_at: '2026-04-02T00:00:00.000Z'
+    }] as GithubRepository[];
+
+    const [result] = mergeRepositoriesAfterSync({
+        previousRepositories,
+        syncedRepositories,
+        failedAccountIds: []
+    });
+
+    assert.equal(result.owner.avatar_url, 'https://avatars.githubusercontent.com/u/1?v=4');
+    assert.equal(result.description, 'new description');
+    assert.equal(result.starred_at, '2026-04-02T00:00:00.000Z');
+});

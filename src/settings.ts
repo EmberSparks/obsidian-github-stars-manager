@@ -2,6 +2,7 @@ import { App, PluginSettingTab, Setting, Notice, Modal, requestUrl } from 'obsid
 import GithubStarsPlugin from './main';
 import { GithubStarsSettings, GithubAccount, PropertyTemplate, DEFAULT_PROPERTIES_TEMPLATE } from './types';
 import { t } from './i18n';
+import { classifyGithubError, createGithubHttpError } from './githubErrorUtils';
 
 const MIN_SYNC_INTERVAL_DAYS = 1;
 const MAX_SYNC_INTERVAL_DAYS = 30;
@@ -69,6 +70,33 @@ export const DEFAULT_SETTINGS: GithubStarsSettings = {
 
 export class GithubStarsSettingTab extends PluginSettingTab {
     plugin: GithubStarsPlugin;
+
+    private getGithubFailureNoticeKey(kind: ReturnType<typeof classifyGithubError>['kind']): string {
+        switch (kind) {
+            case 'network':
+                return 'settings.syncFailedNoticeNetwork';
+            case 'auth':
+                return 'settings.syncFailedNoticeAuth';
+            case 'rate_limit':
+                return 'settings.syncFailedNoticeRateLimit';
+            default:
+                return 'settings.syncFailedNoticeUnknown';
+        }
+    }
+
+    private getAccountTestFailureNotice(error: unknown): string {
+        const errorInfo = classifyGithubError(error);
+        switch (errorInfo.kind) {
+            case 'network':
+                return t('settings.accountTestFailedNetwork');
+            case 'auth':
+                return t('settings.accountTestFailedAuth');
+            case 'rate_limit':
+                return t('settings.accountTestFailedRateLimit');
+            default:
+                return t('settings.accountTestFailedUnknown', { message: errorInfo.message });
+        }
+    }
 
     private optimizeGithubAvatarUrl(rawUrl: string, size: number): string {
         if (!rawUrl) return rawUrl;
@@ -226,7 +254,8 @@ export class GithubStarsSettingTab extends PluginSettingTab {
                     } catch (error) {
                         console.error('Sync failed:', error);
                         button.setButtonText(t('settings.syncFailed'));
-                        new Notice(t('settings.syncFailedNotice'), 5000);
+                        const noticeKey = this.getGithubFailureNoticeKey(classifyGithubError(error).kind);
+                        new Notice(t(noticeKey), 5000);
                         setTimeout(() => {
                             button.setButtonText(t('settings.syncButton'));
                             button.setDisabled(false);
@@ -419,15 +448,6 @@ export class GithubStarsSettingTab extends PluginSettingTab {
 
                         if (response.status === 200) {
                             // 检查令牌过期时间
-                            const rateResponse = await requestUrl({
-                                url: 'https://api.github.com/rate_limit',
-                                method: 'GET',
-                                headers: {
-                                    'Authorization': `token ${account.token}`,
-                                    'User-Agent': 'Obsidian-GitHub-Stars-Manager'
-                                }
-                            });
-
                             let expiryInfo = '';
                             const expiresHeader = response.headers['github-authentication-token-expiration'];
                             if (expiresHeader) {
@@ -444,8 +464,23 @@ export class GithubStarsSettingTab extends PluginSettingTab {
                                 expiryInfo = '\n无过期时间 (经典令牌)';
                             }
 
-                            const rateData = rateResponse.json;
-                            const rateLimitInfo = `\nAPI限额: ${rateData.rate.remaining}/${rateData.rate.limit}`;
+                            let rateLimitInfo = '';
+                            try {
+                                const rateResponse = await requestUrl({
+                                    url: 'https://api.github.com/rate_limit',
+                                    method: 'GET',
+                                    headers: {
+                                        'Authorization': `token ${account.token}`,
+                                        'User-Agent': 'Obsidian-GitHub-Stars-Manager'
+                                    }
+                                });
+                                if (rateResponse.status === 200 && rateResponse.json?.rate) {
+                                    const rateData = rateResponse.json;
+                                    rateLimitInfo = `\nAPI限额: ${rateData.rate.remaining}/${rateData.rate.limit}`;
+                                }
+                            } catch (rateError) {
+                                console.warn('获取 GitHub API 限额失败，但令牌校验已通过:', rateError);
+                            }
 
                             new Notice(`✅ 令牌有效${expiryInfo}${rateLimitInfo}`, 8000);
                             testBtn.textContent = '✓ 有效';
@@ -455,18 +490,18 @@ export class GithubStarsSettingTab extends PluginSettingTab {
                                 testBtn.removeClass('test-success');
                             }, 3000);
                         } else {
-                            new Notice('❌ 令牌无效或已过期', 5000);
-                            testBtn.textContent = '✗ 无效';
-                            testBtn.addClass('test-error');
-                            setTimeout(() => {
-                                testBtn.textContent = '测试';
-                                testBtn.removeClass('test-error');
-                            }, 3000);
+                            throw createGithubHttpError(
+                                response.status,
+                                typeof response.json?.message === 'string'
+                                    ? response.json.message
+                                    : 'GitHub token validation failed'
+                            );
                         }
                     } catch (error) {
                         console.error('Token test failed:', error);
-                        new Notice('❌ 令牌测试失败: ' + (error instanceof Error ? error.message : '未知错误'), 5000);
-                        testBtn.textContent = '✗ 错误';
+                        new Notice(this.getAccountTestFailureNotice(error), 5000);
+                        const errorKind = classifyGithubError(error).kind;
+                        testBtn.textContent = errorKind === 'auth' ? '✗ 无效' : '✗ 错误';
                         testBtn.addClass('test-error');
                         setTimeout(() => {
                             testBtn.textContent = '测试';

@@ -6,6 +6,25 @@ import { EmojiUtils } from './emojiUtils';
 import { t } from './i18n';
 import { RepoQueryEngine, RepoQueryDataItem, RepoQueryDataPatch, RepoQueryInput } from './repoQueryEngine';
 import { getTagDisplayCount } from './tagAssociation';
+import {
+    buildRepoRenderQueryKey as buildRepoRenderWindowKey,
+    getNextRepoVisibleLimit,
+    getRepoIncrementCount as calculateRepoIncrementCount,
+    shouldLoadMoreRepositories
+} from './repoRenderWindow';
+import {
+    calculateMasonryLayout,
+    hasMasonryItemSizeChanges,
+    type MasonryItemSize,
+    type MasonryLayoutPosition,
+    type MasonryLayoutResult
+} from './repoMasonryLayout';
+import {
+    getMasonryWindowRange,
+    hasMasonryWindowSnapshotChanged,
+    shouldUseMasonryWindowing,
+    type MasonryWindowSnapshot
+} from './repoMasonryWindow';
 
 export const VIEW_TYPE_STARS = 'github-stars-view';
 
@@ -25,11 +44,30 @@ const REPO_RENDER_BUDGET_CHECK_INTERVAL = 4;
 const PERF_DURATION_SAMPLE_WINDOW_SIZE = 120;
 const PERF_LONG_TASK_THRESHOLD_MS = 50;
 const PERF_LONG_TASK_WINDOW_MS = 30_000;
-const REPO_MASONRY_COLUMN_WIDTH = 280;
-const REPO_MASONRY_COLUMN_GAP = 16;
-const REPO_MASONRY_HORIZONTAL_PADDING = 32;
+const REPO_CARD_RENDER_SCHEMA_VERSION = '20260428-avatar-inline-v1';
+const REPO_GRID_COLUMN_WIDTH = 280;
+const REPO_GRID_COLUMN_GAP = 16;
+const REPO_GRID_HORIZONTAL_PADDING = 32;
 const REPO_ESTIMATED_CARD_HEIGHT_VISUAL = 320;
 const REPO_ESTIMATED_CARD_HEIGHT_BALANCED = 300;
+const REPO_INCREMENTAL_LOAD_THRESHOLD_PX = 480;
+const REPO_INCREMENTAL_ROWS_PER_CHUNK = 4;
+const REPO_WINDOW_OVERSCAN_VIEWPORTS = 1.5;
+const REPO_WINDOWING_MIN_LOADED_COUNT = 140;
+
+interface RepoMasonryWindowState {
+    layout: MasonryLayoutResult;
+    itemHeights: number[];
+    positionsByRepoId: Map<number, MasonryLayoutPosition>;
+    renderedRepositories: RenderRepository[];
+    windowSnapshot: MasonryWindowSnapshot;
+}
+
+interface RepoMasonryBaseState {
+    layout: MasonryLayoutResult;
+    itemHeights: number[];
+    cacheKey: string;
+}
 
 type RenderRepository = GithubRepository & {
     notes?: string;
@@ -76,6 +114,7 @@ export class GithubStarsView extends ItemView {
     allTags: string[] = []; // Added
     searchInput: HTMLInputElement;
     repoContainer: HTMLElement;
+    repoListEl: HTMLElement | null = null;
     filterByTags: Map<string, boolean> = new Map();
     tagsContainer: HTMLElement;
     currentFilter: string = '';
@@ -114,6 +153,18 @@ export class GithubStarsView extends ItemView {
     syncedQueryDataSignatureById: Map<number, string> = new Map();
     latestVisibleRepositories: RenderRepository[] = [];
     hasVisibleRepositoriesSnapshot: boolean = false;
+    repoVisibleLimit: number = 0;
+    repoRenderWindowQueryKey: string = '';
+    repoLoadMoreFrameId: number | null = null;
+    repoWindowRenderFrameId: number | null = null;
+    repoMasonryLayoutFrameId: number | null = null;
+    repoContainerResizeObserver: ResizeObserver | null = null;
+    repoCardResizeObserver: ResizeObserver | null = null;
+    repoObservedCards: Set<HTMLElement> = new Set();
+    repoCardMeasuredSizes: Map<number, MasonryItemSize> = new Map();
+    repoMasonryBaseStateCache: RepoMasonryBaseState | null = null;
+    repoMasonryMeasureRevision: number = 0;
+    repoRenderedWindowSnapshot: MasonryWindowSnapshot | null = null;
     performancePanelEl: HTMLElement | null = null;
     performanceToggleButton: HTMLButtonElement | null = null;
     isPerformancePanelExpanded: boolean = false;
@@ -178,6 +229,11 @@ export class GithubStarsView extends ItemView {
         this.repoContainer.addEventListener('click', this.handleRepoContainerClick);
         this.repoContainer.removeEventListener('change', this.handleRepoContainerChange);
         this.repoContainer.addEventListener('change', this.handleRepoContainerChange);
+        this.repoContainer.removeEventListener('scroll', this.handleRepoContainerScroll);
+        this.repoContainer.addEventListener('scroll', this.handleRepoContainerScroll, { passive: true });
+        this.repoContainer.empty();
+        this.repoListEl = this.repoContainer.createDiv('github-stars-repo-list');
+        this.ensureRepoContainerResizeObserver();
 
         // Initial rendering of repositories
         this.renderRepositories();
@@ -676,7 +732,10 @@ export class GithubStarsView extends ItemView {
         if (!rawUrl) return rawUrl;
         try {
             const parsedUrl = new URL(rawUrl);
-            if (!parsedUrl.hostname.includes('githubusercontent.com')) {
+            if (
+                !parsedUrl.hostname.includes('githubusercontent.com') &&
+                !parsedUrl.hostname.includes('github.com')
+            ) {
                 return rawUrl;
             }
             parsedUrl.searchParams.set('s', String(size));
@@ -696,6 +755,7 @@ export class GithubStarsView extends ItemView {
             .join('\u0001');
 
         return [
+            REPO_CARD_RENDER_SCHEMA_VERSION,
             repo.full_name || '',
             repo.name || '',
             repo.html_url || '',
@@ -726,6 +786,7 @@ export class GithubStarsView extends ItemView {
             }
             this.repoCardElementCache.delete(repoId);
             this.repoCardSignatureCache.delete(repoId);
+            this.repoCardMeasuredSizes.delete(repoId);
             cardEl.remove();
         });
     }
@@ -734,11 +795,14 @@ export class GithubStarsView extends ItemView {
      * 清空仓库卡片缓存（视图关闭时使用）
      */
     private clearRepoCardCache(): void {
+        this.resetRepoCardResizeObserver();
+        this.invalidateRepoMasonryState(true);
         this.repoCardElementCache.forEach((cardEl) => {
             cardEl.remove();
         });
         this.repoCardElementCache.clear();
         this.repoCardSignatureCache.clear();
+        this.repoCardMeasuredSizes.clear();
         if (this.repoCardBuildContainer) {
             this.repoCardBuildContainer.empty();
             this.repoCardBuildContainer = null;
@@ -791,29 +855,19 @@ export class GithubStarsView extends ItemView {
      * 根据优先级安排卡片头像加载策略
      */
     private scheduleRepoCardAvatarLoad(cardEl: HTMLElement, prioritizeAvatarLoad: boolean): void {
-        const avatarNodeList = cardEl.querySelectorAll<HTMLImageElement>('.github-stars-repo-avatar[data-avatar-src]');
+        const avatarNodeList = cardEl.querySelectorAll<HTMLImageElement>('.github-stars-repo-avatar');
         if (avatarNodeList.length === 0) return;
 
-        if (prioritizeAvatarLoad) {
-            avatarNodeList.forEach((avatarImg) => {
-                this.loadDeferredRepoAvatar(avatarImg);
-            });
-            return;
-        }
-
-        this.ensureRepoAvatarObserver();
-        if (!this.repoAvatarObserver) {
-            avatarNodeList.forEach((avatarImg) => {
-                this.loadDeferredRepoAvatar(avatarImg);
-            });
-            return;
-        }
-
         avatarNodeList.forEach((avatarImg) => {
-            if (avatarImg.dataset.avatarRequested === '1' || avatarImg.dataset.avatarLoaded === '1') {
+            if (avatarImg.complete && avatarImg.naturalWidth > 0) {
+                avatarImg.dataset.avatarLoaded = '1';
+                avatarImg.addClass('is-loaded');
+                avatarImg.parentElement
+                    ?.querySelector<HTMLElement>('.github-stars-repo-avatar-fallback')
+                    ?.addClass('display-none');
                 return;
             }
-            this.repoAvatarObserver?.observe(avatarImg);
+            this.loadDeferredRepoAvatar(avatarImg);
         });
     }
 
@@ -839,6 +893,7 @@ export class GithubStarsView extends ItemView {
 
         const newCardEl = this.renderRepositoryCard(repo, this.getRepoCardBuildContainer(), prioritizeAvatarLoad);
         newCardEl.setAttribute('data-repo-id', String(repo.id));
+        newCardEl.addClass('is-pending-layout');
         this.repoCardElementCache.set(repo.id, newCardEl);
         this.repoCardSignatureCache.set(repo.id, nextSignature);
         return newCardEl;
@@ -1045,6 +1100,301 @@ export class GithubStarsView extends ItemView {
         });
     }
 
+    private cancelPendingRepoLoadMore(): void {
+        if (this.repoLoadMoreFrameId === null) {
+            return;
+        }
+        window.cancelAnimationFrame(this.repoLoadMoreFrameId);
+        this.repoLoadMoreFrameId = null;
+    }
+
+    private cancelPendingRepoWindowRender(): void {
+        if (this.repoWindowRenderFrameId === null) {
+            return;
+        }
+        window.cancelAnimationFrame(this.repoWindowRenderFrameId);
+        this.repoWindowRenderFrameId = null;
+    }
+
+    private invalidateRepoMasonryState(resetWindowSnapshot = false): void {
+        this.repoMasonryBaseStateCache = null;
+        if (resetWindowSnapshot) {
+            this.repoRenderedWindowSnapshot = null;
+        }
+    }
+
+    private resetRepoRenderWindowState(resetQueryKey = false): void {
+        this.repoVisibleLimit = 0;
+        this.cancelPendingRepoLoadMore();
+        this.cancelPendingRepoWindowRender();
+        this.invalidateRepoMasonryState(true);
+        if (resetQueryKey) {
+            this.repoRenderWindowQueryKey = '';
+        }
+    }
+
+    private requestLoadMoreRepositoriesIfNeeded(): void {
+        if (!this.repoContainer || this.repoLoadMoreFrameId !== null) {
+            return;
+        }
+        if (!this.hasVisibleRepositoriesSnapshot || this.latestVisibleRepositories.length === 0) {
+            return;
+        }
+        if (this.repoVisibleLimit >= this.latestVisibleRepositories.length) {
+            return;
+        }
+
+        this.repoLoadMoreFrameId = window.requestAnimationFrame(() => {
+            this.repoLoadMoreFrameId = null;
+            this.loadMoreRepositoriesIfNeeded();
+        });
+    }
+
+    private loadMoreRepositoriesIfNeeded(): void {
+        if (!this.repoContainer) return;
+        const totalCount = this.latestVisibleRepositories.length;
+        if (totalCount === 0 || this.repoVisibleLimit >= totalCount) {
+            return;
+        }
+
+        const shouldLoadMore = shouldLoadMoreRepositories({
+            scrollTop: this.repoContainer.scrollTop,
+            clientHeight: this.repoContainer.clientHeight,
+            scrollHeight: this.repoContainer.scrollHeight,
+            thresholdPx: REPO_INCREMENTAL_LOAD_THRESHOLD_PX
+        });
+        if (!shouldLoadMore) {
+            return;
+        }
+
+        const incrementCount = this.getRepoIncrementCount(totalCount);
+        const nextLimit = getNextRepoVisibleLimit({
+            currentLimit: this.repoVisibleLimit,
+            totalCount,
+            incrementCount
+        });
+        if (nextLimit === this.repoVisibleLimit) {
+            return;
+        }
+
+        this.repoVisibleLimit = nextLimit;
+        this.requestRepositoriesRender();
+    }
+
+    private clearRepoListContent(): void {
+        if (!this.repoListEl) return;
+        this.resetRepoCardResizeObserver();
+        this.invalidateRepoMasonryState(true);
+        this.repoListEl.empty();
+        this.repoListEl.setCssProps({ height: '' });
+    }
+
+    private renderRepoEmptyState(message: string): void {
+        this.resetRepoAvatarObserver();
+        this.clearRepoListContent();
+        this.repoContainer.scrollTop = 0;
+        this.repoListEl?.createEl('div', { cls: 'github-stars-empty', text: message });
+    }
+
+    private getCurrentLoadedRepositories(): RenderRepository[] {
+        if (this.latestVisibleRepositories.length === 0 || this.repoVisibleLimit <= 0) {
+            return [];
+        }
+        return this.latestVisibleRepositories.slice(0, Math.min(this.repoVisibleLimit, this.latestVisibleRepositories.length));
+    }
+
+    private cancelPendingRepoMasonryLayout(): void {
+        if (this.repoMasonryLayoutFrameId === null) {
+            return;
+        }
+        window.cancelAnimationFrame(this.repoMasonryLayoutFrameId);
+        this.repoMasonryLayoutFrameId = null;
+    }
+
+    private requestRepoMasonryLayout(repositories?: RenderRepository[]): void {
+        if (!this.repoListEl || this.repoMasonryLayoutFrameId !== null) {
+            return;
+        }
+        const targetRepositories = repositories ? [...repositories] : this.getCurrentLoadedRepositories();
+        if (targetRepositories.length === 0) {
+            return;
+        }
+
+        this.repoMasonryLayoutFrameId = window.requestAnimationFrame(() => {
+            this.repoMasonryLayoutFrameId = null;
+            this.applyRepoMasonryLayout(targetRepositories);
+        });
+    }
+
+    private requestRepoWindowRender(): void {
+        if (!this.repoListEl || this.repoWindowRenderFrameId !== null) {
+            return;
+        }
+        const loadedRepositories = this.getCurrentLoadedRepositories();
+        if (loadedRepositories.length === 0) {
+            return;
+        }
+
+        this.repoWindowRenderFrameId = window.requestAnimationFrame(() => {
+            this.repoWindowRenderFrameId = null;
+            this.renderLoadedRepositoriesWindow();
+        });
+    }
+
+    private ensureRepoContainerResizeObserver(): void {
+        if (this.repoContainerResizeObserver || !this.repoContainer || typeof ResizeObserver !== 'function') {
+            return;
+        }
+
+        this.repoContainerResizeObserver = new ResizeObserver(() => {
+            this.requestRepoMasonryLayout();
+            this.requestLoadMoreRepositoriesIfNeeded();
+        });
+        this.repoContainerResizeObserver.observe(this.repoContainer);
+    }
+
+    private ensureRepoCardResizeObserver(): void {
+        if (this.repoCardResizeObserver || typeof ResizeObserver !== 'function') {
+            return;
+        }
+
+        this.repoCardResizeObserver = new ResizeObserver((entries) => {
+            let requiresRelayout = false;
+
+            entries.forEach((entry) => {
+                const cardEl = entry.target as HTMLElement;
+                const repoId = this.parseRepoId(cardEl.dataset.repoId);
+                if (repoId === null) {
+                    return;
+                }
+
+                const nextSize: MasonryItemSize = {
+                    width: entry.contentRect.width,
+                    height: entry.contentRect.height
+                };
+                const previousSize = this.repoCardMeasuredSizes.get(repoId);
+                this.repoCardMeasuredSizes.set(repoId, nextSize);
+
+                if (!previousSize) {
+                    return;
+                }
+
+                if (hasMasonryItemSizeChanges({
+                    previousSizes: [previousSize],
+                    nextSizes: [nextSize]
+                })) {
+                    requiresRelayout = true;
+                }
+            });
+
+            if (!requiresRelayout) {
+                return;
+            }
+
+            this.requestRepoMasonryLayout();
+            this.requestLoadMoreRepositoriesIfNeeded();
+        });
+    }
+
+    private resetRepoCardResizeObserver(): void {
+        if (!this.repoCardResizeObserver) {
+            this.repoObservedCards.clear();
+            return;
+        }
+
+        this.repoCardResizeObserver.disconnect();
+        this.repoObservedCards.clear();
+    }
+
+    private syncRepoCardResizeObservation(cards: HTMLElement[]): void {
+        if (typeof ResizeObserver !== 'function') {
+            return;
+        }
+
+        this.ensureRepoCardResizeObserver();
+        if (!this.repoCardResizeObserver) {
+            return;
+        }
+
+        const nextObservedCards = new Set(cards);
+        Array.from(this.repoObservedCards).forEach((cardEl) => {
+            if (nextObservedCards.has(cardEl)) {
+                return;
+            }
+            this.repoCardResizeObserver?.unobserve(cardEl);
+            this.repoObservedCards.delete(cardEl);
+        });
+
+        cards.forEach((cardEl) => {
+            if (this.repoObservedCards.has(cardEl)) {
+                return;
+            }
+            this.repoCardResizeObserver?.observe(cardEl);
+            this.repoObservedCards.add(cardEl);
+        });
+    }
+
+    private applyRepoMasonryLayout(repositories: RenderRepository[]): void {
+        if (!this.repoContainer || !this.repoListEl || repositories.length === 0) {
+            return;
+        }
+
+        const contentWidth = Math.max(
+            REPO_GRID_COLUMN_WIDTH,
+            this.repoContainer.clientWidth - REPO_GRID_HORIZONTAL_PADDING
+        );
+        const cards = repositories
+            .map((repository) => this.repoCardElementCache.get(repository.id) || null)
+            .filter((cardEl): cardEl is HTMLElement => Boolean(cardEl && this.repoListEl?.contains(cardEl)));
+        if (cards.length === 0) {
+            this.resetRepoCardResizeObserver();
+            return;
+        }
+
+        cards.forEach((cardEl) => {
+            cardEl.setCssProps({ width: '' });
+        });
+
+        const previewLayout = calculateMasonryLayout({
+            containerWidth: contentWidth,
+            minimumColumnWidth: REPO_GRID_COLUMN_WIDTH,
+            columnGap: REPO_GRID_COLUMN_GAP,
+            itemHeights: cards.map((cardEl) => cardEl.offsetHeight)
+        });
+
+        cards.forEach((cardEl) => {
+            cardEl.setCssProps({ width: `${previewLayout.columnWidth}px` });
+        });
+
+        const layout = calculateMasonryLayout({
+            containerWidth: contentWidth,
+            minimumColumnWidth: REPO_GRID_COLUMN_WIDTH,
+            columnGap: REPO_GRID_COLUMN_GAP,
+            itemHeights: cards.map((cardEl) => cardEl.offsetHeight)
+        });
+
+        cards.forEach((cardEl, index) => {
+            const position = layout.positions[index];
+            if (!position) return;
+            cardEl.setCssProps({
+                left: `${position.left}px`,
+                top: `${position.top}px`,
+                width: `${position.width}px`
+            });
+            const repoId = this.parseRepoId(cardEl.dataset.repoId);
+            if (repoId !== null) {
+                this.repoCardMeasuredSizes.set(repoId, {
+                    width: position.width,
+                    height: cardEl.offsetHeight
+                });
+            }
+            cardEl.removeClass('is-pending-layout');
+        });
+
+        this.repoListEl.setCssProps({ height: `${layout.containerHeight}px` });
+        this.resetRepoCardResizeObserver();
+    }
+
     /**
      * 合并同一帧内的标签区域重渲染请求
      */
@@ -1171,6 +1521,13 @@ export class GithubStarsView extends ItemView {
     };
 
     /**
+     * 仓库滚动区域：接近底部时按行增量加载更多卡片
+     */
+    private handleRepoContainerScroll = (): void => {
+        this.requestLoadMoreRepositoriesIfNeeded();
+    };
+
+    /**
      * 等待下一帧，避免一次性大批量 DOM 插入导致主线程长时间阻塞
      */
     private waitForNextFrame(): Promise<void> {
@@ -1218,7 +1575,7 @@ export class GithubStarsView extends ItemView {
     }
 
     /**
-     * 估算首屏渲染数量（基于视口与瀑布流列数），避免固定值导致首帧过重
+     * 估算首屏渲染数量（基于视口与网格列数），避免固定值导致首帧过重
      */
     private getAdaptiveFirstScreenCount(totalCount: number, batchSize: number): number {
         const mode = this.getRepoRenderPerformanceMode();
@@ -1228,12 +1585,12 @@ export class GithubStarsView extends ItemView {
         }
 
         const containerWidth = Math.max(
-            REPO_MASONRY_COLUMN_WIDTH,
-            this.repoContainer.clientWidth - REPO_MASONRY_HORIZONTAL_PADDING
+            REPO_GRID_COLUMN_WIDTH,
+            this.repoContainer.clientWidth - REPO_GRID_HORIZONTAL_PADDING
         );
         const columnCount = Math.max(
             1,
-            Math.floor((containerWidth + REPO_MASONRY_COLUMN_GAP) / (REPO_MASONRY_COLUMN_WIDTH + REPO_MASONRY_COLUMN_GAP))
+            Math.floor((containerWidth + REPO_GRID_COLUMN_GAP) / (REPO_GRID_COLUMN_WIDTH + REPO_GRID_COLUMN_GAP))
         );
         const viewportHeight = Math.max(this.repoContainer.clientHeight, 560);
         const estimatedCardHeight = mode === 'visual'
@@ -1244,6 +1601,165 @@ export class GithubStarsView extends ItemView {
         const minimumCount = Math.max(fallbackMinimum, batchSize);
         const maximumCount = mode === 'visual' ? 72 : 56;
         return Math.min(totalCount, Math.min(maximumCount, Math.max(minimumCount, targetCount)));
+    }
+
+    private getRepoIncrementCount(totalCount: number): number {
+        const batchSize = this.getRepoRenderBatchSize(totalCount);
+        if (!this.repoContainer) {
+            return Math.max(batchSize, 12);
+        }
+
+        const containerWidth = Math.max(
+            REPO_GRID_COLUMN_WIDTH,
+            this.repoContainer.clientWidth - REPO_GRID_HORIZONTAL_PADDING
+        );
+        return calculateRepoIncrementCount({
+            containerWidth,
+            columnWidth: REPO_GRID_COLUMN_WIDTH,
+            columnGap: REPO_GRID_COLUMN_GAP,
+            rowsPerChunk: REPO_INCREMENTAL_ROWS_PER_CHUNK,
+            minimumCount: Math.max(batchSize, 12)
+        });
+    }
+
+    private getRepositoriesInRenderWindow(repositories: RenderRepository[]): RenderRepository[] {
+        const totalCount = repositories.length;
+        const nextQueryKey = buildRepoRenderWindowKey(this.getCurrentQueryInput());
+        const batchSize = this.getRepoRenderBatchSize(totalCount);
+        const initialLimit = this.getAdaptiveFirstScreenCount(totalCount, batchSize);
+        const queryChanged = nextQueryKey !== this.repoRenderWindowQueryKey;
+
+        if (queryChanged) {
+            this.repoRenderWindowQueryKey = nextQueryKey;
+            this.repoVisibleLimit = initialLimit;
+            if (this.repoContainer) {
+                this.repoContainer.scrollTop = 0;
+            }
+        } else if (this.repoVisibleLimit <= 0) {
+            this.repoVisibleLimit = initialLimit;
+        } else {
+            this.repoVisibleLimit = Math.min(totalCount, this.repoVisibleLimit);
+        }
+
+        return repositories.slice(0, this.repoVisibleLimit);
+    }
+
+    private getEstimatedRepoCardHeight(repo: RenderRepository): number {
+        const cachedSize = this.repoCardMeasuredSizes.get(repo.id);
+        if (cachedSize) {
+            return cachedSize.height;
+        }
+
+        let estimatedHeight = this.getRepoRenderPerformanceMode() === 'visual'
+            ? REPO_ESTIMATED_CARD_HEIGHT_VISUAL
+            : REPO_ESTIMATED_CARD_HEIGHT_BALANCED;
+
+        if ((repo.description || '').length > 120) {
+            estimatedHeight += 18;
+        }
+        if (Array.isArray(repo.tags) && repo.tags.length > 0) {
+            estimatedHeight += repo.tags.length > 3 ? 20 : 10;
+        }
+        if (repo.notes) {
+            estimatedHeight += 92;
+        }
+        if (repo.linked_note) {
+            estimatedHeight += 40;
+        }
+
+        return estimatedHeight;
+    }
+
+    private getRepoMasonryBaseState(repositories: RenderRepository[]): RepoMasonryBaseState {
+        const contentWidth = Math.max(
+            REPO_GRID_COLUMN_WIDTH,
+            (this.repoContainer?.clientWidth || 0) - REPO_GRID_HORIZONTAL_PADDING
+        );
+        const roundedContentWidth = Math.round(contentWidth * 100) / 100;
+        const cacheKey = [
+            roundedContentWidth,
+            repositories.length,
+            this.repoMasonryMeasureRevision,
+            repositories.map((repo) => repo.id).join('\u0001')
+        ].join('\u0002');
+
+        if (this.repoMasonryBaseStateCache?.cacheKey === cacheKey) {
+            return this.repoMasonryBaseStateCache;
+        }
+
+        const itemHeights = repositories.map((repo) => this.getEstimatedRepoCardHeight(repo));
+        const layout = calculateMasonryLayout({
+            containerWidth: contentWidth,
+            minimumColumnWidth: REPO_GRID_COLUMN_WIDTH,
+            columnGap: REPO_GRID_COLUMN_GAP,
+            itemHeights
+        });
+
+        const baseState: RepoMasonryBaseState = {
+            layout,
+            itemHeights,
+            cacheKey
+        };
+        this.repoMasonryBaseStateCache = baseState;
+        return baseState;
+    }
+
+    private buildRepoMasonryWindowState(repositories: RenderRepository[]): RepoMasonryWindowState {
+        const baseState = this.getRepoMasonryBaseState(repositories);
+        const useWindowing = shouldUseMasonryWindowing({
+            loadedCount: repositories.length,
+            minimumWindowingCount: REPO_WINDOWING_MIN_LOADED_COUNT
+        });
+
+        const overscanPx = Math.max(
+            720,
+            Math.floor((this.repoContainer?.clientHeight || 0) * REPO_WINDOW_OVERSCAN_VIEWPORTS)
+        );
+        const range = useWindowing
+            ? getMasonryWindowRange({
+                positions: baseState.layout.positions,
+                itemHeights: baseState.itemHeights,
+                scrollTop: this.repoContainer?.scrollTop || 0,
+                clientHeight: this.repoContainer?.clientHeight || 0,
+                overscanPx
+            })
+            : {
+                startIndex: 0,
+                endIndex: Math.max(0, repositories.length - 1)
+            };
+
+        const renderedRepositories = range.endIndex >= range.startIndex
+            ? repositories.slice(range.startIndex, range.endIndex + 1)
+            : [];
+        const positionsByRepoId = new Map<number, MasonryLayoutPosition>();
+        renderedRepositories.forEach((repo, index) => {
+            const position = baseState.layout.positions[range.startIndex + index];
+            if (position) {
+                positionsByRepoId.set(repo.id, position);
+            }
+        });
+
+        return {
+            layout: baseState.layout,
+            itemHeights: baseState.itemHeights,
+            positionsByRepoId,
+            renderedRepositories,
+            windowSnapshot: {
+                startIndex: range.startIndex,
+                endIndex: range.endIndex,
+                totalCount: repositories.length,
+                layoutKey: baseState.cacheKey
+            }
+        };
+    }
+
+    private renderLoadedRepositoriesWindow(): void {
+        const loadedRepositories = this.getCurrentLoadedRepositories();
+        if (loadedRepositories.length === 0) {
+            return;
+        }
+
+        this.renderVisibleRepositoriesWindow(loadedRepositories);
     }
 
     /**
@@ -1883,9 +2399,8 @@ export class GithubStarsView extends ItemView {
         const renderVersion = ++this.repoRenderVersion;
 
         if (!this.githubRepositories || this.githubRepositories.length === 0) {
-            this.resetRepoAvatarObserver();
-            this.repoContainer.empty();
-            this.repoContainer.createEl('div', { cls: 'github-stars-empty', text: t('view.noRepos') });
+            this.resetRepoRenderWindowState(true);
+            this.renderRepoEmptyState(t('view.noRepos'));
             this.updateTotalStarsCount(0);
             this.latestVisibleRepositories = [];
             this.hasVisibleRepositoriesSnapshot = true;
@@ -1915,9 +2430,8 @@ export class GithubStarsView extends ItemView {
         if (renderVersion !== this.repoRenderVersion) return;
 
         if (sortedRepos.length === 0) {
-            this.resetRepoAvatarObserver();
-            this.repoContainer.empty();
-            this.repoContainer.createEl('div', { cls: 'github-stars-empty', text: t('view.noMatchingRepos') });
+            this.resetRepoRenderWindowState();
+            this.renderRepoEmptyState(t('view.noMatchingRepos'));
             this.updateTotalStarsCount(0);
             this.latestVisibleRepositories = [];
             this.hasVisibleRepositoriesSnapshot = true;
@@ -1929,9 +2443,12 @@ export class GithubStarsView extends ItemView {
         this.latestVisibleRepositories = sortedRepos;
         this.hasVisibleRepositoriesSnapshot = true;
         this.updateTotalStarsCount(sortedRepos.length);
+        sortedRepos = this.getRepositoriesInRenderWindow(sortedRepos);
+        if (renderVersion !== this.repoRenderVersion) return;
 
         const renderedByDiff = await this.renderRepositoriesByDiff(sortedRepos, renderVersion);
         if (renderedByDiff) {
+            this.requestLoadMoreRepositoriesIfNeeded();
             return;
         }
 
@@ -2134,20 +2651,75 @@ export class GithubStarsView extends ItemView {
         return this.sortRepositories(filteredRepos);
     }
 
+    private renderVisibleRepositoriesWindow(repositories: RenderRepository[]): void {
+        if (!this.repoContainer || !this.repoListEl) {
+            return;
+        }
+
+        const renderStartAt = performance.now();
+        const windowState = this.buildRepoMasonryWindowState(repositories);
+        if (
+            !hasMasonryWindowSnapshotChanged(this.repoRenderedWindowSnapshot, windowState.windowSnapshot) &&
+            this.repoListEl.childElementCount > 0
+        ) {
+            this.requestLoadMoreRepositoriesIfNeeded();
+            return;
+        }
+
+        const visibleRepositories = windowState.renderedRepositories;
+        const nextRepoIdSet = new Set(visibleRepositories.map((repo) => repo.id));
+        const existingCards = Array.from(this.repoListEl.querySelectorAll<HTMLElement>('.github-stars-repo[data-repo-id]'));
+        existingCards.forEach((cardEl) => {
+            const repoId = this.parseRepoId(cardEl.dataset.repoId);
+            if (repoId === null || !nextRepoIdSet.has(repoId)) {
+                cardEl.remove();
+            }
+        });
+
+        this.resetRepoAvatarObserver();
+        visibleRepositories.forEach((repo, index) => {
+            const cardEl = this.renderOrReuseRepositoryCard(repo, true);
+            const currentAtIndex = this.repoListEl?.children[index] as HTMLElement | null;
+            if (currentAtIndex !== cardEl) {
+                this.repoListEl?.insertBefore(cardEl, currentAtIndex || null);
+            }
+            this.scheduleRepoCardAvatarLoad(cardEl, true);
+        });
+
+        while (this.repoListEl.children.length > visibleRepositories.length) {
+            const trailingNode = this.repoListEl.lastElementChild as HTMLElement | null;
+            if (!trailingNode || !trailingNode.classList.contains('github-stars-repo')) {
+                break;
+            }
+            trailingNode.remove();
+        }
+
+        this.applyRepoMasonryLayout(repositories);
+        this.repoRenderedWindowSnapshot = windowState.windowSnapshot;
+        const durationMs = performance.now() - renderStartAt;
+        if ((this.repoContainer.scrollTop || 0) === 0) {
+            this.recordPerformanceDuration('firstScreen', durationMs);
+        }
+        this.recordPerformanceDuration('render', durationMs);
+        this.finalizeInteractionMeasurement();
+        this.requestPerformancePanelRefresh();
+        this.requestLoadMoreRepositoriesIfNeeded();
+    }
+
     /**
      * 判断是否可使用差量渲染（已有列表时优先差量，避免整量清空重建）
      */
     private canUseDiffRender(): boolean {
-        if (!this.repoContainer) return false;
-        if (this.repoContainer.querySelector('.github-stars-empty')) return false;
-        return Boolean(this.repoContainer.querySelector('.github-stars-repo[data-repo-id]'));
+        if (!this.repoListEl) return false;
+        if (this.repoListEl.querySelector('.github-stars-empty')) return false;
+        return Boolean(this.repoListEl.querySelector('.github-stars-repo[data-repo-id]'));
     }
 
     /**
      * 差量渲染：仅移除无效卡片 + 按目标顺序最小化移动/插入，降低排序/筛选卡顿
      */
     private async renderRepositoriesByDiff(repositories: RenderRepository[], renderVersion: number): Promise<boolean> {
-        if (!this.repoContainer || !this.canUseDiffRender()) {
+        if (!this.repoContainer || !this.repoListEl || !this.canUseDiffRender()) {
             return false;
         }
 
@@ -2163,7 +2735,7 @@ export class GithubStarsView extends ItemView {
         const firstScreenThreshold = Math.min(firstScreenCount, totalCount);
 
         const nextRepoIdSet = new Set(repositories.map((repo) => repo.id));
-        const staleCards = Array.from(this.repoContainer.querySelectorAll<HTMLElement>('.github-stars-repo[data-repo-id]'));
+        const staleCards = Array.from(this.repoListEl.querySelectorAll<HTMLElement>('.github-stars-repo[data-repo-id]'));
         staleCards.forEach((cardEl) => {
             const repoId = this.parseRepoId(cardEl.dataset.repoId);
             if (repoId === null || !nextRepoIdSet.has(repoId)) {
@@ -2180,16 +2752,16 @@ export class GithubStarsView extends ItemView {
             const frameDeadline = performance.now() + frameBudgetMs;
             let renderedInFrame = 0;
             while (renderedIndex < totalCount) {
-                if (renderVersion !== this.repoRenderVersion || !this.repoContainer) {
+                if (renderVersion !== this.repoRenderVersion || !this.repoListEl) {
                     return true;
                 }
 
                 const prioritizeAvatarLoad = renderedIndex < highPriorityAvatarCount;
                 const repo = repositories[renderedIndex];
                 const cardEl = this.renderOrReuseRepositoryCard(repo, prioritizeAvatarLoad);
-                const currentAtIndex = this.repoContainer.children[renderedIndex] as HTMLElement | null;
+                const currentAtIndex = this.repoListEl.children[renderedIndex] as HTMLElement | null;
                 if (currentAtIndex !== cardEl) {
-                    this.repoContainer.insertBefore(cardEl, currentAtIndex || null);
+                    this.repoListEl.insertBefore(cardEl, currentAtIndex || null);
                 }
                 this.scheduleRepoCardAvatarLoad(cardEl, prioritizeAvatarLoad);
 
@@ -2221,18 +2793,21 @@ export class GithubStarsView extends ItemView {
             this.recordPerformanceDuration('firstScreen', performance.now() - renderStartAt);
         }
 
-        while (this.repoContainer.children.length > totalCount) {
-            const trailingNode = this.repoContainer.lastElementChild as HTMLElement | null;
+        while (this.repoListEl.children.length > totalCount) {
+            const trailingNode = this.repoListEl.lastElementChild as HTMLElement | null;
             if (!trailingNode || !trailingNode.classList.contains('github-stars-repo')) {
                 break;
             }
             trailingNode.remove();
         }
 
+        this.applyRepoMasonryLayout(repositories);
+
         if (renderVersion === this.repoRenderVersion) {
             this.recordPerformanceDuration('render', performance.now() - renderStartAt);
             this.finalizeInteractionMeasurement();
             this.requestPerformancePanelRefresh();
+            this.requestLoadMoreRepositoriesIfNeeded();
         }
         return true;
     }
@@ -2241,10 +2816,10 @@ export class GithubStarsView extends ItemView {
      * 常规渲染（非虚拟化）
      */
     private async renderFullRepositories(repositories: RenderRepository[], renderVersion: number): Promise<void> {
-        if (!this.repoContainer) return;
+        if (!this.repoContainer || !this.repoListEl) return;
         const renderStartAt = performance.now();
         this.resetRepoAvatarObserver();
-        this.repoContainer.empty();
+        this.clearRepoListContent();
         const totalCount = repositories.length;
         const batchSize = this.getRepoRenderBatchSize(totalCount);
         const frameBudgetMs = this.getRepoRenderFrameBudgetMs(totalCount);
@@ -2263,7 +2838,7 @@ export class GithubStarsView extends ItemView {
             const frameFragment = document.createDocumentFragment();
             const frameCardQueue: Array<{ cardEl: HTMLElement; prioritizeAvatarLoad: boolean }> = [];
             while (firstScreenIndex < firstScreenCount) {
-                if (renderVersion !== this.repoRenderVersion || !this.repoContainer) {
+                if (renderVersion !== this.repoRenderVersion || !this.repoListEl) {
                     return;
                 }
                 const prioritizeAvatarLoad = firstScreenIndex < highPriorityAvatarCount;
@@ -2284,11 +2859,12 @@ export class GithubStarsView extends ItemView {
                 }
             }
 
-            if (this.repoContainer && frameCardQueue.length > 0) {
-                this.repoContainer.appendChild(frameFragment);
+            if (this.repoListEl && frameCardQueue.length > 0) {
+                this.repoListEl.appendChild(frameFragment);
                 frameCardQueue.forEach(({ cardEl, prioritizeAvatarLoad }) => {
                     this.scheduleRepoCardAvatarLoad(cardEl, prioritizeAvatarLoad);
                 });
+                this.applyRepoMasonryLayout(repositories.slice(0, firstScreenIndex));
             }
 
             if (firstScreenIndex < firstScreenCount) {
@@ -2303,6 +2879,7 @@ export class GithubStarsView extends ItemView {
             if (renderVersion === this.repoRenderVersion) {
                 this.recordPerformanceDuration('render', performance.now() - renderStartAt);
                 this.requestPerformancePanelRefresh();
+                this.requestLoadMoreRepositoriesIfNeeded();
             }
             return;
         }
@@ -2319,7 +2896,7 @@ export class GithubStarsView extends ItemView {
             const frameFragment = document.createDocumentFragment();
             const frameCardQueue: Array<{ cardEl: HTMLElement; prioritizeAvatarLoad: boolean }> = [];
             while (renderedIndex < totalCount) {
-                if (renderVersion !== this.repoRenderVersion || !this.repoContainer) {
+                if (renderVersion !== this.repoRenderVersion || !this.repoListEl) {
                     return;
                 }
                 const cardEl = this.renderOrReuseRepositoryCard(repositories[renderedIndex], false);
@@ -2339,11 +2916,12 @@ export class GithubStarsView extends ItemView {
                 }
             }
 
-            if (this.repoContainer && frameCardQueue.length > 0) {
-                this.repoContainer.appendChild(frameFragment);
+            if (this.repoListEl && frameCardQueue.length > 0) {
+                this.repoListEl.appendChild(frameFragment);
                 frameCardQueue.forEach(({ cardEl, prioritizeAvatarLoad }) => {
                     this.scheduleRepoCardAvatarLoad(cardEl, prioritizeAvatarLoad);
                 });
+                this.applyRepoMasonryLayout(repositories.slice(0, renderedIndex));
             }
 
             if (renderedIndex < totalCount) {
@@ -2354,6 +2932,7 @@ export class GithubStarsView extends ItemView {
         if (renderVersion === this.repoRenderVersion) {
             this.recordPerformanceDuration('render', performance.now() - renderStartAt);
             this.requestPerformancePanelRefresh();
+            this.requestLoadMoreRepositoriesIfNeeded();
         }
     }
 
@@ -2390,25 +2969,23 @@ export class GithubStarsView extends ItemView {
                 const avatarImg = avatarWrapper.createEl('img', {
                     cls: 'github-stars-repo-avatar',
                     attr: {
-                        'data-avatar-src': optimizedAvatarUrl,
+                        src: optimizedAvatarUrl,
                         alt: `${repo.owner.login} avatar`,
                         loading: prioritizeAvatarLoad ? 'eager' : 'lazy',
-                        decoding: 'async',
-                        fetchpriority: prioritizeAvatarLoad ? 'high' : 'low'
+                        decoding: 'async'
                     }
                 });
-                avatarImg.addClass('is-deferred');
 
                 avatarImg.addEventListener('load', () => {
                     avatarImg.dataset.avatarLoaded = '1';
                     avatarImg.addClass('is-loaded');
-                    avatarFallback.addClass('hidden');
+                    avatarFallback.addClass('display-none');
                 });
 
                 avatarImg.addEventListener('error', () => {
                     avatarImg.dataset.avatarLoaded = '1';
                     avatarImg.addClass('display-none');
-                    avatarFallback.removeClass('hidden');
+                    avatarFallback.removeClass('display-none');
                 });
             }
         }
@@ -2467,6 +3044,7 @@ export class GithubStarsView extends ItemView {
             }
         }
 
+        const secondaryContentEl = repoEl.createDiv('github-stars-repo-secondary');
         const footerEl = repoEl.createEl('div', { cls: 'github-stars-repo-footer' });
         const infoRow = footerEl.createEl('div', { cls: 'github-stars-repo-info' });
         if (repo.language) {
@@ -2495,18 +3073,18 @@ export class GithubStarsView extends ItemView {
         editButton.setAttribute('data-repo-action', 'edit-repo');
         editButton.setAttribute('data-repo-id', String(repo.id));
 
-        this.scheduleRepoSecondaryContentMount(repoEl, repo);
+        this.scheduleRepoSecondaryContentMount(repoEl, secondaryContentEl, repo);
         return repoEl;
     }
 
     /**
      * 按需挂载次要内容（笔记/关联笔记），降低首轮渲染压强
      */
-    private mountRepoSecondaryContent(repoEl: HTMLElement, repo: RenderRepository): void {
+    private mountRepoSecondaryContent(repoEl: HTMLElement, containerEl: HTMLElement, repo: RenderRepository): void {
         if (repoEl.dataset.secondaryMounted === '1') return;
 
         if (repo.notes) {
-            const notesContainer = repoEl.createEl('div', { cls: 'github-stars-repo-notes' });
+            const notesContainer = containerEl.createEl('div', { cls: 'github-stars-repo-notes' });
             notesContainer.createEl('span', {
                 cls: 'github-stars-repo-notes-icon',
                 text: '📝'
@@ -2517,7 +3095,7 @@ export class GithubStarsView extends ItemView {
         }
 
         if (repo.linked_note) {
-            const linkedNoteEl = repoEl.createEl('div', { cls: 'github-stars-repo-linked-note' });
+            const linkedNoteEl = containerEl.createEl('div', { cls: 'github-stars-repo-linked-note' });
             setIcon(linkedNoteEl, 'link');
             const link = linkedNoteEl.createEl('a', {
                 text: repo.linked_note,
@@ -2531,12 +3109,20 @@ export class GithubStarsView extends ItemView {
 
         repoEl.dataset.secondaryMounted = '1';
         delete repoEl.dataset.secondaryPending;
+        if (repoEl.isConnected) {
+            this.requestRepoMasonryLayout();
+            this.requestLoadMoreRepositoriesIfNeeded();
+        }
     }
 
     /**
      * 将次要内容延后到空闲时段挂载，减少主渲染路径开销
      */
-    private scheduleRepoSecondaryContentMount(repoEl: HTMLElement, repo: RenderRepository): void {
+    private scheduleRepoSecondaryContentMount(
+        repoEl: HTMLElement,
+        containerEl: HTMLElement,
+        repo: RenderRepository
+    ): void {
         if (!repo.notes && !repo.linked_note) {
             repoEl.dataset.secondaryMounted = '1';
             delete repoEl.dataset.secondaryPending;
@@ -2552,7 +3138,7 @@ export class GithubStarsView extends ItemView {
                 delete repoEl.dataset.secondaryPending;
                 return;
             }
-            this.mountRepoSecondaryContent(repoEl, repo);
+            this.mountRepoSecondaryContent(repoEl, containerEl, repo);
         };
 
         const requestIdle = (window as Window & {
@@ -3272,11 +3858,15 @@ export class GithubStarsView extends ItemView {
         if (this.repoContainer) {
             this.repoContainer.removeEventListener('click', this.handleRepoContainerClick);
             this.repoContainer.removeEventListener('change', this.handleRepoContainerChange);
+            this.repoContainer.removeEventListener('scroll', this.handleRepoContainerScroll);
         }
         if (this.repoRenderFrameId !== null) {
             window.cancelAnimationFrame(this.repoRenderFrameId);
             this.repoRenderFrameId = null;
         }
+        this.cancelPendingRepoLoadMore();
+        this.cancelPendingRepoWindowRender();
+        this.cancelPendingRepoMasonryLayout();
         if (this.tagsFilterFrameId !== null) {
             window.cancelAnimationFrame(this.tagsFilterFrameId);
             this.tagsFilterFrameId = null;
@@ -3291,6 +3881,14 @@ export class GithubStarsView extends ItemView {
         this.removePerformancePanel();
         this.resetRepoAvatarObserver();
         this.repoAvatarObserver = null;
+        if (this.repoContainerResizeObserver) {
+            this.repoContainerResizeObserver.disconnect();
+            this.repoContainerResizeObserver = null;
+        }
+        this.resetRepoCardResizeObserver();
+        this.repoCardResizeObserver = null;
+        this.resetRepoRenderWindowState(true);
+        this.repoListEl = null;
         this.clearRepoCardCache();
         this.syncedQueryDataSignatureById.clear();
         this.syncedQueryDataVersion = -1;

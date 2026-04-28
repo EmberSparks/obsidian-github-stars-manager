@@ -2,6 +2,8 @@ import { Octokit } from '@octokit/rest';
 import { Notice } from 'obsidian';
 import { GithubRepository, GithubAccount } from './types';
 import { t } from './i18n';
+import { classifyGithubError, summarizeGithubErrorKinds } from './githubErrorUtils';
+import { deduplicateRepositoriesById } from './userEnhancementCleanup';
 
 // 添加GitHub API响应类型
 interface StarredRepoItem extends Partial<GithubRepository> {
@@ -219,7 +221,8 @@ export class GithubService {
                 
                 return { repos, accountId, error: null };
             } catch (error) {
-                const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+                const errorInfo = classifyGithubError(error);
+                const errorMsg = errorInfo.message;
                 errors[accountId] = errorMsg;
                 console.error(`Account ${account.username} sync failed:`, error);
                 return { repos: [], accountId, error: errorMsg };
@@ -237,7 +240,7 @@ export class GithubService {
         });
         
         // 去重处理（基于仓库ID，保留最新的starred_at时间）
-        const uniqueRepos = this.deduplicateRepositories(allRepositories);
+        const uniqueRepos = deduplicateRepositoriesById(allRepositories);
         
         // 显示同步结果通知
         const successCount = Object.keys(accountSyncTimes).length;
@@ -250,7 +253,10 @@ export class GithubService {
             // 显示详细的错误信息
             const failedAccounts = Object.keys(errors).map(accountId => {
                 const account = this.accounts.find(acc => acc.id === accountId);
-                return account ? `${account.username}` : accountId;
+                const errorInfo = classifyGithubError(errors[accountId]);
+                return account
+                    ? `${account.username}（${this.getErrorReasonLabel(errorInfo.kind)}）`
+                    : `${accountId}（${this.getErrorReasonLabel(errorInfo.kind)}）`;
             }).join(', ');
 
             if (successCount > 0) {
@@ -260,7 +266,13 @@ export class GithubService {
                     failed: failedAccounts
                 }), 8000);
             } else {
-                new Notice(t('sync.failed', { failed: failedAccounts }), 8000);
+                const failureReason = this.getFailureReasonText(
+                    summarizeGithubErrorKinds(Object.values(errors))
+                );
+                new Notice(t('sync.failed', {
+                    failed: failedAccounts,
+                    reason: failureReason
+                }), 8000);
             }
 
             // 在控制台输出详细错误
@@ -273,29 +285,31 @@ export class GithubService {
             errors
         };
     }
-    
-    /**
-     * 去重仓库（基于仓库ID）
-     */
-    private deduplicateRepositories(repositories: GithubRepository[]): GithubRepository[] {
-        const repoMap = new Map<number, GithubRepository>();
-        
-        repositories.forEach(repo => {
-            const existing = repoMap.get(repo.id);
-            if (!existing) {
-                repoMap.set(repo.id, repo);
-            } else {
-                // 如果仓库已存在，保留最新的starred_at时间
-                const existingTime = existing.starred_at ? new Date(existing.starred_at).getTime() : 0;
-                const currentTime = repo.starred_at ? new Date(repo.starred_at).getTime() : 0;
-                
-                if (currentTime > existingTime) {
-                    repoMap.set(repo.id, repo);
-                }
-            }
-        });
-        
-        return Array.from(repoMap.values());
+
+    private getErrorReasonLabel(kind: ReturnType<typeof classifyGithubError>['kind']): string {
+        switch (kind) {
+            case 'network':
+                return t('sync.failedReasonNetworkLabel');
+            case 'auth':
+                return t('sync.failedReasonAuthLabel');
+            case 'rate_limit':
+                return t('sync.failedReasonRateLimitLabel');
+            default:
+                return t('sync.failedReasonUnknownLabel');
+        }
+    }
+
+    private getFailureReasonText(kind: ReturnType<typeof summarizeGithubErrorKinds>): string {
+        switch (kind) {
+            case 'network':
+                return t('sync.reasonNetwork');
+            case 'auth':
+                return t('sync.reasonAuth');
+            case 'rate_limit':
+                return t('sync.reasonRateLimit');
+            default:
+                return t('sync.reasonUnknown');
+        }
     }
     
     /**

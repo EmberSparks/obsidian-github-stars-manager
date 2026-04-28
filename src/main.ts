@@ -22,6 +22,7 @@ import {
     removeEnhancementsByRepoIds,
     syncEnhancementSnapshotsWithRepositories
 } from './userEnhancementCleanup';
+import { classifyGithubError } from './githubErrorUtils';
 
 // GitHub星标图标 (不变)
 const GITHUB_STAR_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-star"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>`;
@@ -385,7 +386,15 @@ export default class GithubStarsPlugin extends Plugin {
             await this._handleSyncSuccess(syncResult);
         } catch (error) {
             console.error('同步GitHub星标失败:', error);
-            new Notice(t('plugin.syncFailed'));
+            const errorKind = classifyGithubError(error).kind;
+            const noticeKey = errorKind === 'network'
+                ? 'settings.syncFailedNoticeNetwork'
+                : errorKind === 'auth'
+                    ? 'settings.syncFailedNoticeAuth'
+                    : errorKind === 'rate_limit'
+                        ? 'settings.syncFailedNoticeRateLimit'
+                        : 'plugin.syncFailed';
+            new Notice(t(noticeKey));
         }
     }
 
