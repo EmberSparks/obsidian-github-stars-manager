@@ -116,6 +116,8 @@ export class GithubStarsView extends ItemView {
     repoContainer: HTMLElement;
     repoListEl: HTMLElement | null = null;
     isReopeningView: boolean = false;
+    lastStableRepoContainerClientWidth: number = 0;
+    lastStableRepoContainerClientHeight: number = 0;
     filterByTags: Map<string, boolean> = new Map();
     tagsContainer: HTMLElement;
     currentFilter: string = '';
@@ -1256,15 +1258,92 @@ export class GithubStarsView extends ItemView {
         });
     }
 
+    private getStableRepoContainerMetrics(options?: {
+        allowFallback?: boolean;
+        persistCurrent?: boolean;
+    }): { clientWidth: number; clientHeight: number } | null {
+        const allowFallback = options?.allowFallback ?? true;
+        const persistCurrent = options?.persistCurrent ?? true;
+        const clientWidth = this.repoContainer?.clientWidth || 0;
+        const clientHeight = this.repoContainer?.clientHeight || 0;
+        const hasUsableWidth = clientWidth > REPO_GRID_HORIZONTAL_PADDING;
+        const fallbackHeight = this.lastStableRepoContainerClientHeight > 0
+            ? this.lastStableRepoContainerClientHeight
+            : 0;
+
+        if (hasUsableWidth) {
+            if (persistCurrent) {
+                this.lastStableRepoContainerClientWidth = clientWidth;
+                if (clientHeight > 0) {
+                    this.lastStableRepoContainerClientHeight = clientHeight;
+                }
+            }
+            return {
+                clientWidth,
+                clientHeight: clientHeight > 0 ? clientHeight : (allowFallback ? fallbackHeight : clientHeight)
+            };
+        }
+
+        if (allowFallback && this.lastStableRepoContainerClientWidth > REPO_GRID_HORIZONTAL_PADDING) {
+            return {
+                clientWidth: this.lastStableRepoContainerClientWidth,
+                clientHeight: clientHeight > 0 ? clientHeight : fallbackHeight
+            };
+        }
+
+        return null;
+    }
+
+    private getStableRepoContainerContentWidth(options?: {
+        allowFallback?: boolean;
+        persistCurrent?: boolean;
+    }): number | null {
+        const metrics = this.getStableRepoContainerMetrics(options);
+        if (!metrics) {
+            return null;
+        }
+        return Math.max(
+            REPO_GRID_COLUMN_WIDTH,
+            metrics.clientWidth - REPO_GRID_HORIZONTAL_PADDING
+        );
+    }
+
     private ensureRepoContainerResizeObserver(): void {
         if (this.repoContainerResizeObserver || !this.repoContainer || typeof ResizeObserver !== 'function') {
             return;
         }
 
         this.repoContainerResizeObserver = new ResizeObserver(() => {
-            this.requestTagsFilterUpdate();
-            this.requestRepoMasonryLayout();
-            this.requestLoadMoreRepositoriesIfNeeded();
+            const metrics = this.getStableRepoContainerMetrics({
+                allowFallback: false,
+                persistCurrent: false
+            });
+            if (!metrics) {
+                return;
+            }
+
+            const widthChanged = Math.abs(metrics.clientWidth - this.lastStableRepoContainerClientWidth) >= 1;
+            const heightChanged = metrics.clientHeight > 0 &&
+                Math.abs(metrics.clientHeight - this.lastStableRepoContainerClientHeight) >= 1;
+            if (!widthChanged && !heightChanged) {
+                return;
+            }
+
+            if (widthChanged) {
+                this.lastStableRepoContainerClientWidth = metrics.clientWidth;
+            }
+            if (metrics.clientHeight > 0) {
+                this.lastStableRepoContainerClientHeight = metrics.clientHeight;
+            }
+
+            if (widthChanged) {
+                this.requestTagsFilterUpdate();
+                this.invalidateRepoMasonryState();
+                this.requestRepoMasonryLayout();
+            }
+            if (widthChanged || heightChanged) {
+                this.requestLoadMoreRepositoriesIfNeeded();
+            }
         });
         this.repoContainerResizeObserver.observe(this.repoContainer);
     }
@@ -1355,10 +1434,10 @@ export class GithubStarsView extends ItemView {
             return;
         }
 
-        const contentWidth = Math.max(
-            REPO_GRID_COLUMN_WIDTH,
-            this.repoContainer.clientWidth - REPO_GRID_HORIZONTAL_PADDING
-        );
+        const contentWidth = this.getStableRepoContainerContentWidth();
+        if (!contentWidth) {
+            return;
+        }
         const cards = repositories
             .map((repository) => this.repoCardElementCache.get(repository.id) || null)
             .filter((cardEl): cardEl is HTMLElement => Boolean(cardEl && this.repoListEl?.contains(cardEl)));
@@ -1598,19 +1677,18 @@ export class GithubStarsView extends ItemView {
     private getAdaptiveFirstScreenCount(totalCount: number, batchSize: number): number {
         const mode = this.getRepoRenderPerformanceMode();
         const fallbackMinimum = mode === 'visual' ? 32 : 24;
-        if (!this.repoContainer) {
+        const containerWidth = this.getStableRepoContainerContentWidth();
+        if (!this.repoContainer || !containerWidth) {
             return Math.min(totalCount, Math.max(batchSize, fallbackMinimum));
         }
-
-        const containerWidth = Math.max(
-            REPO_GRID_COLUMN_WIDTH,
-            this.repoContainer.clientWidth - REPO_GRID_HORIZONTAL_PADDING
-        );
         const columnCount = Math.max(
             1,
             Math.floor((containerWidth + REPO_GRID_COLUMN_GAP) / (REPO_GRID_COLUMN_WIDTH + REPO_GRID_COLUMN_GAP))
         );
-        const viewportHeight = Math.max(this.repoContainer.clientHeight, 560);
+        const viewportHeight = Math.max(
+            this.getStableRepoContainerMetrics()?.clientHeight || this.repoContainer.clientHeight,
+            560
+        );
         const estimatedCardHeight = mode === 'visual'
             ? REPO_ESTIMATED_CARD_HEIGHT_VISUAL
             : REPO_ESTIMATED_CARD_HEIGHT_BALANCED;
@@ -1623,14 +1701,10 @@ export class GithubStarsView extends ItemView {
 
     private getRepoIncrementCount(totalCount: number): number {
         const batchSize = this.getRepoRenderBatchSize(totalCount);
-        if (!this.repoContainer) {
+        const containerWidth = this.getStableRepoContainerContentWidth();
+        if (!this.repoContainer || !containerWidth) {
             return Math.max(batchSize, 12);
         }
-
-        const containerWidth = Math.max(
-            REPO_GRID_COLUMN_WIDTH,
-            this.repoContainer.clientWidth - REPO_GRID_HORIZONTAL_PADDING
-        );
         return calculateRepoIncrementCount({
             containerWidth,
             columnWidth: REPO_GRID_COLUMN_WIDTH,
@@ -1689,10 +1763,7 @@ export class GithubStarsView extends ItemView {
     }
 
     private getRepoMasonryBaseState(repositories: RenderRepository[]): RepoMasonryBaseState {
-        const contentWidth = Math.max(
-            REPO_GRID_COLUMN_WIDTH,
-            (this.repoContainer?.clientWidth || 0) - REPO_GRID_HORIZONTAL_PADDING
-        );
+        const contentWidth = this.getStableRepoContainerContentWidth() || REPO_GRID_COLUMN_WIDTH;
         const roundedContentWidth = Math.round(contentWidth * 100) / 100;
         const cacheKey = [
             roundedContentWidth,
@@ -3584,7 +3655,7 @@ export class GithubStarsView extends ItemView {
         });
         const totalStarsNumber = totalStarsEl.createEl('span', {
             cls: 'total-stars-number',
-            text: `${this.getVisibleRepoCount()}`
+            text: `${this.getVisibleRepoCount()}/${this.getAccountScopedRepoCount()}`
         });
 
         // 保存引用以便更新
@@ -3938,13 +4009,18 @@ export class GithubStarsView extends ItemView {
         return this.getFilteredRepositories().length;
     }
 
+    private getAccountScopedRepoCount(): number {
+        return this.githubRepositories.filter((repo) => this.isRepoVisibleByAccount(repo)).length;
+    }
+
     /**
      * 更新star总数显示
      */
     updateTotalStarsCount(visibleRepoCount?: number) {
         if (this.totalStarsNumberEl) {
-            const count = typeof visibleRepoCount === 'number' ? visibleRepoCount : this.getVisibleRepoCount();
-            this.totalStarsNumberEl.textContent = `${count}`;
+            const visibleCount = typeof visibleRepoCount === 'number' ? visibleRepoCount : this.getVisibleRepoCount();
+            const totalCount = this.getAccountScopedRepoCount();
+            this.totalStarsNumberEl.textContent = `${visibleCount}/${totalCount}`;
         }
         this.updateInvalidDataButtonState();
     }
@@ -3986,6 +4062,8 @@ export class GithubStarsView extends ItemView {
         this.resetRepoRenderWindowState(true);
         this.repoListEl = null;
         this.isReopeningView = false;
+        this.lastStableRepoContainerClientWidth = 0;
+        this.lastStableRepoContainerClientHeight = 0;
         this.clearRepoCardCache();
         this.syncedQueryDataSignatureById.clear();
         this.syncedQueryDataVersion = -1;
