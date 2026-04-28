@@ -5,6 +5,7 @@ import { EmojiUtils } from './emojiUtils';
 import { t } from './i18n';
 import { TagChipsInput } from './components/TagChipsInput';
 import { buildEnhancementRepoSnapshot } from './userEnhancementCleanup';
+import { shouldCaptureTextareaWheel } from './textareaWheelScroll';
 
 /**
  * 编辑仓库信息的模态框
@@ -69,6 +70,20 @@ export class EditRepoModal extends Modal {
                 notesTextareaEl.addEventListener('input', () => {
                     this.resizeNotesTextarea(notesTextareaEl);
                 });
+                notesTextareaEl.addEventListener('wheel', (event) => {
+                    if (!shouldCaptureTextareaWheel({
+                        scrollTop: notesTextareaEl.scrollTop,
+                        clientHeight: notesTextareaEl.clientHeight,
+                        scrollHeight: notesTextareaEl.scrollHeight,
+                        deltaY: event.deltaY
+                    })) {
+                        return;
+                    }
+
+                    event.preventDefault();
+                    event.stopPropagation();
+                    notesTextareaEl.scrollTop += event.deltaY;
+                }, { passive: false });
                 window.setTimeout(() => {
                     this.resizeNotesTextarea(notesTextareaEl);
                 }, 0);
