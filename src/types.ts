@@ -77,11 +77,17 @@ export interface UserEnhancementRepoSnapshot {
     account_id?: string;
 }
 
+export interface RepoProjectLink {
+    label: string;
+    url: string;
+}
+
 // 新增：用户为仓库添加的增强信息接口
 export interface UserRepoEnhancements {
     notes: string;
     tags: string[];
     linked_note?: string;
+    project_links?: RepoProjectLink[];
     repoSnapshot?: UserEnhancementRepoSnapshot;
 }
 
@@ -90,6 +96,7 @@ export interface InvalidUserEnhancementRecord {
     tags: string[];
     notes: string;
     linked_note?: string;
+    project_links?: RepoProjectLink[];
     repoSnapshot?: UserEnhancementRepoSnapshot;
 }
 

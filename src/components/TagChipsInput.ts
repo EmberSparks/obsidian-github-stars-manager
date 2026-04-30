@@ -301,10 +301,6 @@ export class TagChipsInput {
         // 创建容器（如果不存在）
         if (!this.availableTagsContainer) {
             this.availableTagsContainer = this.container.createDiv('available-tags-container');
-            this.availableTagsContainer.createSpan({
-                text: 'Available tags:',
-                cls: 'available-tags-label'
-            });
         }
 
         // 清空现有按钮

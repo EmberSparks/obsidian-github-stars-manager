@@ -1,11 +1,12 @@
 import { ItemView, WorkspaceLeaf, setIcon, Notice } from 'obsidian';
 import GithubStarsPlugin from './main';
-import { GithubRepository, UserRepoEnhancements, GithubAccount, RepoRenderPerformanceMode } from './types';
+import { GithubRepository, UserRepoEnhancements, GithubAccount, RepoRenderPerformanceMode, RepoProjectLink } from './types';
 import { EditRepoModal, InvalidEnhancementRecordsModal } from './modal';
 import { EmojiUtils } from './emojiUtils';
 import { t } from './i18n';
 import { RepoQueryEngine, RepoQueryDataItem, RepoQueryDataPatch, RepoQueryInput } from './repoQueryEngine';
 import { getTagDisplayCount } from './tagAssociation';
+import { normalizeProjectLinks } from './projectLinks';
 import {
     buildRepoRenderQueryKey as buildRepoRenderWindowKey,
     getNextRepoVisibleLimit,
@@ -44,7 +45,7 @@ const REPO_RENDER_BUDGET_CHECK_INTERVAL = 4;
 const PERF_DURATION_SAMPLE_WINDOW_SIZE = 120;
 const PERF_LONG_TASK_THRESHOLD_MS = 50;
 const PERF_LONG_TASK_WINDOW_MS = 30_000;
-const REPO_CARD_RENDER_SCHEMA_VERSION = '20260428-tag-row-and-edit-button-v1';
+const REPO_CARD_RENDER_SCHEMA_VERSION = '20260430-tag-row-links-v1';
 const REPO_GRID_COLUMN_WIDTH = 280;
 const REPO_GRID_COLUMN_GAP = 16;
 const REPO_GRID_HORIZONTAL_PADDING = 32;
@@ -73,6 +74,7 @@ type RenderRepository = GithubRepository & {
     notes?: string;
     tags?: string[];
     linked_note?: string;
+    project_links?: RepoProjectLink[];
 };
 
 type PerfDurationMetricKey = 'query' | 'render' | 'interaction' | 'firstScreen';
@@ -760,8 +762,12 @@ export class GithubStarsView extends ItemView {
      */
     private buildRepoCardSignature(repo: RenderRepository): string {
         const tags = Array.isArray(repo.tags) ? repo.tags : [];
+        const projectLinks = normalizeProjectLinks(repo.project_links);
         const tagColorSignature = tags
             .map((tag) => `${tag}:${this.getTagColor(tag)}`)
+            .join('\u0001');
+        const projectLinkSignature = projectLinks
+            .map((link) => `${link.label}:${link.url}`)
             .join('\u0001');
 
         return [
@@ -777,6 +783,7 @@ export class GithubStarsView extends ItemView {
             repo.notes || '',
             repo.linked_note || '',
             tags.join('\u0001'),
+            projectLinkSignature,
             tagColorSignature,
             repo.owner?.login || '',
             repo.owner?.avatar_url || '',
@@ -1592,6 +1599,21 @@ export class GithubStarsView extends ItemView {
             this.app.workspace.openLinkText(linkedNotePath, '', false).catch((err) =>
                 console.error('Failed to open linked note:', err)
             );
+            return;
+        }
+
+        if (action === 'open-project-link') {
+            event.preventDefault();
+            let projectLinkUrl = (actionEl.dataset.projectLinkUrl || '').trim();
+            if (!projectLinkUrl) {
+                const repoId = this.resolveRepoIdFromActionElement(actionEl);
+                if (repoId !== null) {
+                    const repo = this.combinedRepositoriesById.get(repoId);
+                    projectLinkUrl = normalizeProjectLinks(repo?.project_links)[0]?.url || '';
+                }
+            }
+            if (!projectLinkUrl) return;
+            window.open(projectLinkUrl, '_blank');
         }
     };
 
@@ -1751,6 +1773,9 @@ export class GithubStarsView extends ItemView {
         }
         if (Array.isArray(repo.tags) && repo.tags.length > 0) {
             estimatedHeight += repo.tags.length > 3 ? 20 : 10;
+        }
+        if (normalizeProjectLinks(repo.project_links).length > 0) {
+            estimatedHeight += 24;
         }
         if (repo.notes) {
             estimatedHeight += 92;
@@ -2626,7 +2651,12 @@ export class GithubStarsView extends ItemView {
 
     private rebuildCombinedRepositoriesCache(): void {
         this.combinedRepositoriesCache = this.githubRepositories.map((githubRepo) => {
-            const enhancement = this.userEnhancements[githubRepo.id] || { notes: '', tags: [], linked_note: undefined };
+            const enhancement = this.userEnhancements[githubRepo.id] || {
+                notes: '',
+                tags: [],
+                linked_note: undefined,
+                project_links: []
+            };
             return { ...githubRepo, ...enhancement };
         });
         this.combinedRepositoriesById = new Map(
@@ -3164,16 +3194,32 @@ export class GithubStarsView extends ItemView {
         linkEl.setAttribute('role', 'link');
         linkEl.setAttribute('tabindex', '0');
 
-        if (Array.isArray(repo.tags) && repo.tags.length > 0) {
+        const projectLinks = normalizeProjectLinks(repo.project_links);
+        if ((Array.isArray(repo.tags) && repo.tags.length > 0) || projectLinks.length > 0) {
             const titleTagsEl = titleGroupEl.createEl('div', { cls: 'github-stars-repo-title-tags' });
-            repo.tags.forEach((tag) => {
-                const tagEl = titleTagsEl.createEl('span', {
-                    cls: 'github-stars-repo-tag',
-                    text: tag
+            if (Array.isArray(repo.tags)) {
+                repo.tags.forEach((tag) => {
+                    const tagEl = titleTagsEl.createEl('span', {
+                        cls: 'github-stars-repo-tag',
+                        text: tag
+                    });
+                    this.applyTagColorStyle(tagEl, tag);
+                    tagEl.setAttribute('data-repo-action', 'toggle-tag-filter');
+                    tagEl.setAttribute('data-tag-name', tag);
                 });
-                this.applyTagColorStyle(tagEl, tag);
-                tagEl.setAttribute('data-repo-action', 'toggle-tag-filter');
-                tagEl.setAttribute('data-tag-name', tag);
+            }
+
+            projectLinks.forEach((projectLink) => {
+                const linkChipEl = titleTagsEl.createEl('a', {
+                    cls: 'github-stars-repo-project-link',
+                    text: `${t('view.projectLinkPrefix')} ${projectLink.label}`,
+                    href: '#'
+                });
+                linkChipEl.setAttribute('data-repo-action', 'open-project-link');
+                linkChipEl.setAttribute('data-project-link-url', projectLink.url);
+                linkChipEl.setAttribute('data-repo-id', String(repo.id));
+                linkChipEl.setAttribute('aria-label', `${projectLink.label}: ${projectLink.url}`);
+                linkChipEl.setAttribute('title', `${projectLink.label}: ${projectLink.url}`);
             });
         }
 

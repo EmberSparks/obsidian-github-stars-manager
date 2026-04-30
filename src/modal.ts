@@ -1,11 +1,12 @@
 import { App, Modal, Setting, Notice, TFile } from 'obsidian';
-import { GithubRepository, InvalidUserEnhancementRecord, UserRepoEnhancements } from './types';
+import { GithubRepository, InvalidUserEnhancementRecord, RepoProjectLink, UserRepoEnhancements } from './types';
 import GithubStarsPlugin from './main';
 import { EmojiUtils } from './emojiUtils';
 import { t } from './i18n';
 import { TagChipsInput } from './components/TagChipsInput';
 import { buildEnhancementRepoSnapshot } from './userEnhancementCleanup';
 import { shouldCaptureTextareaWheel } from './textareaWheelScroll';
+import { appendProjectLink, normalizeProjectLinks, replaceProjectLink } from './projectLinks';
 
 /**
  * 编辑仓库信息的模态框
@@ -16,9 +17,14 @@ export class EditRepoModal extends Modal {
     tags: string;
     notes: string;
     linkedNote: string;
+    projectLinks: RepoProjectLink[];
+    projectLinkLabelDraft: string;
+    projectLinkUrlDraft: string;
+    editingProjectLinkIndex: number | null;
     linkedNoteInputEl?: HTMLInputElement;
     tagChipsContainer?: HTMLElement;
     tagChipsInput?: TagChipsInput;
+    projectLinksListEl?: HTMLElement;
 
     constructor(app: App, plugin: GithubStarsPlugin, githubRepo: GithubRepository) {
         super(app);
@@ -29,6 +35,10 @@ export class EditRepoModal extends Modal {
         this.tags = existingEnhancement?.tags?.join(', ') || '';
         this.notes = existingEnhancement?.notes || '';
         this.linkedNote = existingEnhancement?.linked_note || '';
+        this.projectLinks = normalizeProjectLinks(existingEnhancement?.project_links || []);
+        this.projectLinkLabelDraft = '';
+        this.projectLinkUrlDraft = '';
+        this.editingProjectLinkIndex = null;
     }
 
     onOpen() {
@@ -49,9 +59,13 @@ export class EditRepoModal extends Modal {
             EmojiUtils.setEmojiText(descEl, this.githubRepo.description);
         }
 
-        new Setting(contentEl)
-            .setName(t('modal.tags'))
-            .setDesc(t('modal.tagsDesc'));
+        const tagsSetting = new Setting(contentEl)
+            .setName(t('modal.tags'));
+        tagsSetting.settingEl.addClass('edit-repo-tags-setting');
+        tagsSetting.nameEl.createSpan({
+            cls: 'edit-repo-tags-inline-desc',
+            text: t('modal.tagsDesc')
+        });
 
         this.tagChipsContainer = contentEl.createDiv('tag-chips-input-wrapper');
         this.renderTagChipsInput();
@@ -67,28 +81,42 @@ export class EditRepoModal extends Modal {
                     .onChange(value => {
                         this.notes = value;
                     });
-                notesTextareaEl.addEventListener('input', () => {
-                    this.resizeNotesTextarea(notesTextareaEl);
-                });
-                notesTextareaEl.addEventListener('wheel', (event) => {
-                    if (!shouldCaptureTextareaWheel({
-                        scrollTop: notesTextareaEl.scrollTop,
-                        clientHeight: notesTextareaEl.clientHeight,
-                        scrollHeight: notesTextareaEl.scrollHeight,
-                        deltaY: event.deltaY
-                    })) {
-                        return;
-                    }
-
-                    event.preventDefault();
-                    event.stopPropagation();
-                    notesTextareaEl.scrollTop += event.deltaY;
-                }, { passive: false });
-                window.setTimeout(() => {
-                    this.resizeNotesTextarea(notesTextareaEl);
-                }, 0);
+                this.attachAutoResizeTextareaBehavior(notesTextareaEl);
             });
         notesSetting.settingEl.addClass('edit-repo-notes-setting');
+
+        const projectLinksSetting = new Setting(contentEl)
+            .setName(t('modal.projectLinks'))
+            .addText(text => {
+                text.setPlaceholder(t('modal.projectLinkNamePlaceholder'))
+                    .setValue(this.projectLinkLabelDraft)
+                    .onChange(value => {
+                        this.projectLinkLabelDraft = value;
+                    });
+                text.inputEl.addClass('edit-repo-project-link-name-input');
+            })
+            .addText(text => {
+                text.setPlaceholder(t('modal.projectLinkUrlPlaceholder'))
+                    .setValue(this.projectLinkUrlDraft)
+                    .onChange(value => {
+                        this.projectLinkUrlDraft = value;
+                    });
+                text.inputEl.addClass('edit-repo-project-link-url-input');
+            })
+            .addButton(button => {
+                button.setButtonText(
+                    this.editingProjectLinkIndex === null
+                        ? t('modal.addProjectLink')
+                        : t('modal.saveProjectLink')
+                )
+                    .setCta()
+                    .onClick(() => {
+                        this.handleSubmitProjectLink();
+                    });
+            });
+        projectLinksSetting.settingEl.addClass('edit-repo-project-links-setting');
+        this.projectLinksListEl = contentEl.createDiv('edit-repo-project-links-list');
+        this.renderProjectLinksList();
 
         new Setting(contentEl)
             .setName(t('modal.linkedNote'))
@@ -176,6 +204,148 @@ export class EditRepoModal extends Modal {
     }
 
     /**
+     * 渲染已添加链接列表
+     */
+    private renderProjectLinksList(): void {
+        if (!this.projectLinksListEl) return;
+
+        this.projectLinksListEl.empty();
+        if (this.projectLinks.length === 0) {
+            return;
+        }
+
+        this.projectLinks.forEach((projectLink, index) => {
+            const itemEl = this.projectLinksListEl!.createDiv('edit-repo-project-link-item');
+            itemEl.createEl('div', {
+                cls: 'edit-repo-project-link-title',
+                text: projectLink.label
+            });
+            const actionsEl = itemEl.createDiv('edit-repo-project-link-actions');
+
+            const editBtn = actionsEl.createEl('button', {
+                cls: 'edit-repo-project-link-edit',
+                text: t('common.edit')
+            });
+            editBtn.type = 'button';
+            editBtn.addEventListener('click', () => {
+                this.projectLinkLabelDraft = projectLink.label === projectLink.url ? '' : projectLink.label;
+                this.projectLinkUrlDraft = projectLink.url;
+                this.editingProjectLinkIndex = index;
+                this.updateProjectLinkInputs();
+            });
+
+            const removeBtn = actionsEl.createEl('button', {
+                cls: 'edit-repo-project-link-delete',
+                text: t('common.delete')
+            });
+            removeBtn.type = 'button';
+            removeBtn.addEventListener('click', () => {
+                this.projectLinks.splice(index, 1);
+                if (this.editingProjectLinkIndex === index) {
+                    this.resetProjectLinkDrafts();
+                } else if (
+                    this.editingProjectLinkIndex !== null &&
+                    this.editingProjectLinkIndex > index
+                ) {
+                    this.editingProjectLinkIndex -= 1;
+                }
+                this.renderProjectLinksList();
+            });
+        });
+    }
+
+    /**
+     * 同步链接输入框与按钮文本
+     */
+    private updateProjectLinkInputs(): void {
+        const labelInput = this.contentEl.querySelector<HTMLInputElement>('.edit-repo-project-link-name-input');
+        const urlInput = this.contentEl.querySelector<HTMLInputElement>('.edit-repo-project-link-url-input');
+        const submitButton = this.contentEl.querySelector<HTMLButtonElement>('.edit-repo-project-links-setting .mod-cta');
+
+        if (labelInput) {
+            labelInput.value = this.projectLinkLabelDraft;
+        }
+        if (urlInput) {
+            urlInput.value = this.projectLinkUrlDraft;
+        }
+        if (submitButton) {
+            submitButton.textContent = this.editingProjectLinkIndex === null
+                ? t('modal.addProjectLink')
+                : t('modal.saveProjectLink');
+        }
+    }
+
+    /**
+     * 重置链接草稿
+     */
+    private resetProjectLinkDrafts(): void {
+        this.projectLinkLabelDraft = '';
+        this.projectLinkUrlDraft = '';
+        this.editingProjectLinkIndex = null;
+        this.updateProjectLinkInputs();
+    }
+
+    /**
+     * 添加或保存单条链接
+     */
+    private handleSubmitProjectLink(): void {
+        const result = this.editingProjectLinkIndex === null
+            ? appendProjectLink(
+                this.projectLinks,
+                this.projectLinkLabelDraft,
+                this.projectLinkUrlDraft
+            )
+            : replaceProjectLink(
+                this.projectLinks,
+                this.editingProjectLinkIndex,
+                this.projectLinkLabelDraft,
+                this.projectLinkUrlDraft
+            );
+
+        if (result.error === 'missing_url') {
+            new Notice(t('modal.projectLinkUrlRequired'));
+            return;
+        }
+        if (result.error === 'duplicate') {
+            new Notice(t('modal.projectLinkDuplicate'));
+            return;
+        }
+
+        this.projectLinks = result.links;
+        this.resetProjectLinkDrafts();
+        this.renderProjectLinksList();
+
+        const labelInput = this.contentEl.querySelector<HTMLInputElement>('.edit-repo-project-link-name-input');
+        labelInput?.focus();
+    }
+
+    /**
+     * 让多行输入框复用笔记区域的自动高度和滚轮行为
+     */
+    private attachAutoResizeTextareaBehavior(textareaEl: HTMLTextAreaElement): void {
+        textareaEl.addEventListener('input', () => {
+            this.resizeNotesTextarea(textareaEl);
+        });
+        textareaEl.addEventListener('wheel', (event) => {
+            if (!shouldCaptureTextareaWheel({
+                scrollTop: textareaEl.scrollTop,
+                clientHeight: textareaEl.clientHeight,
+                scrollHeight: textareaEl.scrollHeight,
+                deltaY: event.deltaY
+            })) {
+                return;
+            }
+
+            event.preventDefault();
+            event.stopPropagation();
+            textareaEl.scrollTop += event.deltaY;
+        }, { passive: false });
+        window.setTimeout(() => {
+            this.resizeNotesTextarea(textareaEl);
+        }, 0);
+    }
+
+    /**
      * 打开笔记浏览器
      */
     openNoteBrowser() {
@@ -204,6 +374,7 @@ export class EditRepoModal extends Modal {
                 .map(tag => tag.trim())
                 .filter(tag => tag.length > 0),
             linked_note: this.linkedNote.trim() || undefined,
+            project_links: this.projectLinks,
             repoSnapshot: buildEnhancementRepoSnapshot(this.githubRepo, new Date().toISOString())
         };
 
