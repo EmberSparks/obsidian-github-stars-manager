@@ -45,7 +45,7 @@ const REPO_RENDER_BUDGET_CHECK_INTERVAL = 4;
 const PERF_DURATION_SAMPLE_WINDOW_SIZE = 120;
 const PERF_LONG_TASK_THRESHOLD_MS = 50;
 const PERF_LONG_TASK_WINDOW_MS = 30_000;
-const REPO_CARD_RENDER_SCHEMA_VERSION = '20260430-tag-row-links-v1';
+const REPO_CARD_RENDER_SCHEMA_VERSION = '20260502-tag-link-rows-v4';
 const REPO_GRID_COLUMN_WIDTH = 280;
 const REPO_GRID_COLUMN_GAP = 16;
 const REPO_GRID_HORIZONTAL_PADDING = 32;
@@ -3194,26 +3194,35 @@ export class GithubStarsView extends ItemView {
         linkEl.setAttribute('role', 'link');
         linkEl.setAttribute('tabindex', '0');
 
+        const tags = Array.isArray(repo.tags) ? repo.tags : [];
         const projectLinks = normalizeProjectLinks(repo.project_links);
-        if ((Array.isArray(repo.tags) && repo.tags.length > 0) || projectLinks.length > 0) {
+        if (tags.length > 0) {
             const titleTagsEl = titleGroupEl.createEl('div', { cls: 'github-stars-repo-title-tags' });
-            if (Array.isArray(repo.tags)) {
-                repo.tags.forEach((tag) => {
-                    const tagEl = titleTagsEl.createEl('span', {
-                        cls: 'github-stars-repo-tag',
-                        text: tag
-                    });
-                    this.applyTagColorStyle(tagEl, tag);
-                    tagEl.setAttribute('data-repo-action', 'toggle-tag-filter');
-                    tagEl.setAttribute('data-tag-name', tag);
+            tags.forEach((tag) => {
+                const tagEl = titleTagsEl.createEl('span', {
+                    cls: 'github-stars-repo-tag',
+                    text: tag
                 });
-            }
+                this.applyTagColorStyle(tagEl, tag);
+                tagEl.setAttribute('data-repo-action', 'toggle-tag-filter');
+                tagEl.setAttribute('data-tag-name', tag);
+            });
+        }
 
+        if (projectLinks.length > 0) {
+            const projectLinksEl = titleGroupEl.createEl('div', { cls: 'github-stars-repo-project-links' });
             projectLinks.forEach((projectLink) => {
-                const linkChipEl = titleTagsEl.createEl('a', {
+                const linkChipEl = projectLinksEl.createEl('a', {
                     cls: 'github-stars-repo-project-link',
-                    text: `${t('view.projectLinkPrefix')} ${projectLink.label}`,
                     href: '#'
+                });
+                linkChipEl.createEl('span', {
+                    cls: 'github-stars-repo-project-link-prefix',
+                    text: t('view.projectLinkPrefix')
+                });
+                linkChipEl.createEl('span', {
+                    cls: 'github-stars-repo-project-link-label',
+                    text: projectLink.label
                 });
                 linkChipEl.setAttribute('data-repo-action', 'open-project-link');
                 linkChipEl.setAttribute('data-project-link-url', projectLink.url);
@@ -3298,13 +3307,8 @@ export class GithubStarsView extends ItemView {
 
         if (repo.notes) {
             const notesContainer = containerEl.createEl('div', { cls: 'github-stars-repo-notes' });
-            notesContainer.createEl('span', {
-                cls: 'github-stars-repo-notes-icon',
-                text: '📝'
-            });
-
             const contentEl = notesContainer.createEl('div', { cls: 'github-stars-repo-notes-content' });
-            EmojiUtils.setEmojiText(contentEl, repo.notes);
+            contentEl.textContent = repo.notes;
         }
 
         if (repo.linked_note) {

@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>笔记卡片配色方案 Demo</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --page-bg: #f4f7fb;
+      --panel-bg: rgba(255, 255, 255, 0.88);
+      --panel-border: rgba(148, 163, 184, 0.18);
+      --card-bg: #ffffff;
+      --card-border: #dbe4ef;
+      --text-strong: #1e293b;
+      --text-normal: #334155;
+      --text-muted: #64748b;
+      --title-blue: #0b84d8;
+      --tag-bg: #eff6ff;
+      --tag-border: #bfdbfe;
+      --tag-text: #1d4ed8;
+      --link-bg: #f8fafc;
+      --link-border: #dbe4ef;
+      --link-text: #475569;
+      --shadow-soft: 0 10px 28px rgba(15, 23, 42, 0.08);
+      --shadow-card: 0 6px 18px rgba(15, 23, 42, 0.06);
+      --radius-panel: 24px;
+      --radius-card: 22px;
+      --radius-note: 14px;
+      --font: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 32px;
+      font-family: var(--font);
+      color: var(--text-normal);
+      background:
+        radial-gradient(circle at top left, rgba(96, 165, 250, 0.18), transparent 30%),
+        radial-gradient(circle at top right, rgba(147, 197, 253, 0.18), transparent 32%),
+        linear-gradient(180deg, #f8fbff 0%, var(--page-bg) 100%);
+    }
+
+    .page {
+      max-width: 1480px;
+      margin: 0 auto;
+    }
+
+    .hero {
+      padding: 22px 26px;
+      border: 1px solid var(--panel-border);
+      border-radius: var(--radius-panel);
+      background: var(--panel-bg);
+      backdrop-filter: blur(18px);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .hero h1 {
+      margin: 0;
+      font-size: 30px;
+      color: var(--text-strong);
+      letter-spacing: -0.02em;
+    }
+
+    .hero p {
+      margin: 10px 0 0;
+      line-height: 1.65;
+      color: var(--text-muted);
+      max-width: 980px;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .legend-chip {
+      padding: 7px 12px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid #d9e5f3;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 22px;
+      margin-top: 24px;
+    }
+
+    .scheme {
+      border-radius: var(--radius-panel);
+      background: rgba(255, 255, 255, 0.86);
+      border: 1px solid var(--panel-border);
+      box-shadow: var(--shadow-soft);
+      overflow: hidden;
+    }
+
+    .scheme-head {
+      padding: 18px 20px 14px;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(248, 250, 252, 0.72));
+    }
+
+    .scheme-kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--scheme-accent);
+      background: var(--scheme-pill-bg);
+    }
+
+    .scheme h2 {
+      margin: 12px 0 4px;
+      font-size: 22px;
+      color: var(--text-strong);
+    }
+
+    .scheme p {
+      margin: 0;
+      line-height: 1.6;
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+
+    .scheme-body {
+      padding: 18px;
+    }
+
+    .repo-card {
+      padding: 18px;
+      border-radius: var(--radius-card);
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      box-shadow: var(--shadow-card);
+    }
+
+    .repo-title {
+      margin: 0;
+      font-size: 22px;
+      line-height: 1.2;
+      color: var(--title-blue);
+      font-weight: 700;
+    }
+
+    .repo-subtitle {
+      margin-top: 10px;
+      color: var(--text-muted);
+      font-size: 14px;
+      line-height: 1.65;
+    }
+
+    .chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .tag-chip,
+    .link-chip {
+      display: inline-block;
+      max-width: 100%;
+      min-width: 0;
+      padding: 4px 9px;
+      border-radius: 10px;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .tag-chip {
+      background: var(--tag-bg);
+      border: 1px solid var(--tag-border);
+      color: var(--tag-text);
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .link-chip {
+      background: var(--link-bg);
+      border: 1px solid var(--link-border);
+      color: var(--link-text);
+      word-break: break-all;
+      white-space: normal;
+    }
+
+    .note-card {
+      margin-top: 16px;
+      padding: 14px 15px;
+      border-radius: var(--radius-note);
+      border: 1px solid var(--note-border);
+      border-left: 4px solid var(--note-accent);
+      background: var(--note-bg);
+      color: var(--text-normal);
+      line-height: 1.68;
+      white-space: pre-wrap;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
+    }
+
+    .meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 16px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .pick-hint {
+      margin-top: 14px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: rgba(241, 245, 249, 0.72);
+      border: 1px dashed rgba(148, 163, 184, 0.36);
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--text-muted);
+    }
+
+    .scheme-current {
+      --scheme-accent: #475569;
+      --scheme-pill-bg: rgba(226, 232, 240, 0.9);
+      --note-bg: linear-gradient(135deg, #f1f5f9 0%, #e8eef5 100%);
+      --note-border: #d8e1ec;
+      --note-accent: #94a3b8;
+    }
+
+    .scheme-sky {
+      --scheme-accent: #0b84d8;
+      --scheme-pill-bg: rgba(224, 242, 254, 0.95);
+      --note-bg: linear-gradient(135deg, #f6fbff 0%, #eef6ff 100%);
+      --note-border: #d7e7f7;
+      --note-accent: #4ea1f3;
+    }
+
+    .scheme-paper {
+      --scheme-accent: #b7791f;
+      --scheme-pill-bg: rgba(254, 243, 199, 0.92);
+      --note-bg: linear-gradient(135deg, #fffaf0 0%, #fff3dd 100%);
+      --note-border: #f1dfb3;
+      --note-accent: #e7b95a;
+    }
+
+    .scheme-mint {
+      --scheme-accent: #0f766e;
+      --scheme-pill-bg: rgba(204, 251, 241, 0.92);
+      --note-bg: linear-gradient(135deg, #f2fffb 0%, #e7faf3 100%);
+      --note-border: #cbeee1;
+      --note-accent: #3eb98f;
+    }
+
+    .scheme-ink {
+      --scheme-accent: #7c3aed;
+      --scheme-pill-bg: rgba(237, 233, 254, 0.92);
+      --note-bg: linear-gradient(135deg, #faf7ff 0%, #f1ecff 100%);
+      --note-border: #ddd3fb;
+      --note-accent: #9a7bf5;
+    }
+
+    @media (max-width: 900px) {
+      body {
+        padding: 18px;
+      }
+
+      .hero h1 {
+        font-size: 26px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <section class="hero">
+      <h1>笔记卡片填充色 Demo</h1>
+      <p>这个页面只对比“仓库卡片里的笔记块”视觉处理，其他元素保持尽量一致。每个方案都用了同一份标题、标签、长链接和多行笔记内容，方便你直接判断哪种底色最顺眼、最不抢戏，也最适合和当前插件整体风格放在一起。</p>
+      <div class="legend">
+        <span class="legend-chip">同一内容</span>
+        <span class="legend-chip">长链接换行已纳入观察</span>
+        <span class="legend-chip">笔记区不带 emoji 前缀</span>
+        <span class="legend-chip">建议优先看“卡片整体平衡感”</span>
+      </div>
+    </section>
+
+    <section class="grid">
+      <article class="scheme scheme-current">
+        <div class="scheme-head">
+          <span class="scheme-kicker">方案 A · 当前中性灰</span>
+          <h2>稳，但偏淡</h2>
+          <p>最不出错，识别感也最低，笔记像“附属说明”，不太像真正需要被看见的内容。</p>
+        </div>
+        <div class="scheme-body">
+          <div class="repo-card">
+            <h3 class="repo-title">cloudclaw</h3>
+            <div class="repo-subtitle">一个用于聚合多模型调用能力的工具集，接口设计和路由层都比较轻。</div>
+            <div class="chip-row">
+              <span class="tag-chip">tooling</span>
+              <span class="tag-chip">agent</span>
+              <span class="link-chip">↗ https://www.bilibili.com/video/BV1ekwfz2EhS</span>
+            </div>
+            <div class="note-card">这个仓库我主要关注：
+1. 多模型路由策略
+2. 限流和缓存是否做得足够轻量
+3. 后面可以参考它的错误处理和重试机制</div>
+            <div class="meta-row">
+              <span>TypeScript</span>
+              <span>⭐ 2.8k</span>
+              <span>更新于 3 天前</span>
+            </div>
+          </div>
+          <div class="pick-hint">适合：你想让笔记更“退后”，只作为补充信息存在。</div>
+        </div>
+      </article>
+
+      <article class="scheme scheme-sky">
+        <div class="scheme-head">
+          <span class="scheme-kicker">方案 B · 浅蓝推荐</span>
+          <h2>清爽，和当前按钮体系一致</h2>
+          <p>比白底更有识别度，但不会太跳；和现有蓝色标题、编辑按钮、链接色天然同一套语言。</p>
+        </div>
+        <div class="scheme-body">
+          <div class="repo-card">
+            <h3 class="repo-title">cloudclaw</h3>
+            <div class="repo-subtitle">一个用于聚合多模型调用能力的工具集，接口设计和路由层都比较轻。</div>
+            <div class="chip-row">
+              <span class="tag-chip">tooling</span>
+              <span class="tag-chip">agent</span>
+              <span class="link-chip">↗ https://www.bilibili.com/video/BV1ekwfz2EhS</span>
+            </div>
+            <div class="note-card">这个仓库我主要关注：
+1. 多模型路由策略
+2. 限流和缓存是否做得足够轻量
+3. 后面可以参考它的错误处理和重试机制</div>
+            <div class="meta-row">
+              <span>TypeScript</span>
+              <span>⭐ 2.8k</span>
+              <span>更新于 3 天前</span>
+            </div>
+          </div>
+          <div class="pick-hint">推荐理由：强调“这是笔记”，但不至于压过仓库标题和标签。</div>
+        </div>
+      </article>
+
+      <article class="scheme scheme-paper">
+        <div class="scheme-head">
+          <span class="scheme-kicker">方案 C · 便签米黄</span>
+          <h2>最像“注释/批注”</h2>
+          <p>存在感最强，容易让人立刻把它理解成个人备注区，但也更容易成为视觉主角。</p>
+        </div>
+        <div class="scheme-body">
+          <div class="repo-card">
+            <h3 class="repo-title">cloudclaw</h3>
+            <div class="repo-subtitle">一个用于聚合多模型调用能力的工具集，接口设计和路由层都比较轻。</div>
+            <div class="chip-row">
+              <span class="tag-chip">tooling</span>
+              <span class="tag-chip">agent</span>
+              <span class="link-chip">↗ https://www.bilibili.com/video/BV1ekwfz2EhS</span>
+            </div>
+            <div class="note-card">这个仓库我主要关注：
+1. 多模型路由策略
+2. 限流和缓存是否做得足够轻量
+3. 后面可以参考它的错误处理和重试机制</div>
+            <div class="meta-row">
+              <span>TypeScript</span>
+              <span>⭐ 2.8k</span>
+              <span>更新于 3 天前</span>
+            </div>
+          </div>
+          <div class="pick-hint">适合：你希望笔记块像“我的个人判断”或“重点摘录”。</div>
+        </div>
+      </article>
+
+      <article class="scheme scheme-mint">
+        <div class="scheme-head">
+          <span class="scheme-kicker">方案 D · 薄荷浅绿</span>
+          <h2>信息感更轻，呼吸感更强</h2>
+          <p>比蓝色更柔和，也比米黄更克制，适合想让笔记看起来“整理过、很干净”的感觉。</p>
+        </div>
+        <div class="scheme-body">
+          <div class="repo-card">
+            <h3 class="repo-title">cloudclaw</h3>
+            <div class="repo-subtitle">一个用于聚合多模型调用能力的工具集，接口设计和路由层都比较轻。</div>
+            <div class="chip-row">
+              <span class="tag-chip">tooling</span>
+              <span class="tag-chip">agent</span>
+              <span class="link-chip">↗ https://www.bilibili.com/video/BV1ekwfz2EhS</span>
+            </div>
+            <div class="note-card">这个仓库我主要关注：
+1. 多模型路由策略
+2. 限流和缓存是否做得足够轻量
+3. 后面可以参考它的错误处理和重试机制</div>
+            <div class="meta-row">
+              <span>TypeScript</span>
+              <span>⭐ 2.8k</span>
+              <span>更新于 3 天前</span>
+            </div>
+          </div>
+          <div class="pick-hint">适合：你希望整体看起来更轻盈，不那么“工具化”。</div>
+        </div>
+      </article>
+
+      <article class="scheme scheme-ink">
+        <div class="scheme-head">
+          <span class="scheme-kicker">方案 E · 低饱和淡紫</span>
+          <h2>更有设计感，但风险略高</h2>
+          <p>有一点点编辑器/知识库产品的气质，适合偏精致风格，但如果主题太多会稍显跳脱。</p>
+        </div>
+        <div class="scheme-body">
+          <div class="repo-card">
+            <h3 class="repo-title">cloudclaw</h3>
+            <div class="repo-subtitle">一个用于聚合多模型调用能力的工具集，接口设计和路由层都比较轻。</div>
+            <div class="chip-row">
+              <span class="tag-chip">tooling</span>
+              <span class="tag-chip">agent</span>
+              <span class="link-chip">↗ https://www.bilibili.com/video/BV1ekwfz2EhS</span>
+            </div>
+            <div class="note-card">这个仓库我主要关注：
+1. 多模型路由策略
+2. 限流和缓存是否做得足够轻量
+3. 后面可以参考它的错误处理和重试机制</div>
+            <div class="meta-row">
+              <span>TypeScript</span>
+              <span>⭐ 2.8k</span>
+              <span>更新于 3 天前</span>
+            </div>
+          </div>
+          <div class="pick-hint">适合：你想要比常规蓝绿更“有一点性格”的方案。</div>
+        </div>
+      </article>
+    </section>
+  </div>
+</body>
+</html>
