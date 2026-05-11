@@ -27,6 +27,9 @@ import { classifyGithubError } from './githubErrorUtils';
 // GitHub星标图标 (不变)
 const GITHUB_STAR_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-star"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>`;
 
+const EXTERNAL_LINK_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none"><path d="M10.5 1.5h4v4a.75.75 0 0 1-1.5 0V3.81l-5.22 5.22a.75.75 0 0 1-1.06-1.06l5.22-5.22H10.5a.75.75 0 0 1 0-1.5ZM2.5 3.5A2 2 0 0 1 4.5 1.5H7a.75.75 0 0 1 0 1.5H4.5a.5.5 0 0 0-.5.5v8a.5.5 0 0 0 .5.5h8a.5.5 0 0 0 .5-.5V9a.75.75 0 0 1 1.5 0v2.5a2 2 0 0 1-2 2h-8a2 2 0 0 1-2-2v-8Z" fill="currentColor"/></svg>`;
+const GITHUB_STARS_EXTERNAL_LINK_ICON_ID = 'github-stars-external-link';
+
 // 默认插件数据 (更新结构)
 const DEFAULT_PLUGIN_DATA: PluginData = {
     githubRepositories: [], // 重命名
@@ -65,6 +68,7 @@ export default class GithubStarsPlugin extends Plugin {
 
     async onload() {
         addIcon('github-star', GITHUB_STAR_ICON);
+        addIcon(GITHUB_STARS_EXTERNAL_LINK_ICON_ID, EXTERNAL_LINK_ICON);
 
         // 加载合并后的数据
         await this.loadCombinedData();

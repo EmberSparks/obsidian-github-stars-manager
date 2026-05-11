@@ -28,6 +28,7 @@ import {
 } from './repoMasonryWindow';
 
 export const VIEW_TYPE_STARS = 'github-stars-view';
+const GITHUB_STARS_EXTERNAL_LINK_ICON_ID = 'github-stars-external-link';
 
 const TAG_COLOR_PALETTE = [
     '#b7dbff', '#c3e4ff', '#c8f0ff', '#c6f4f0', '#c9f7e6', '#d8f7cf',
@@ -3216,10 +3217,10 @@ export class GithubStarsView extends ItemView {
                     cls: 'github-stars-repo-project-link',
                     href: '#'
                 });
-                linkChipEl.createEl('span', {
-                    cls: 'github-stars-repo-project-link-prefix',
-                    text: t('view.projectLinkPrefix')
+                const prefixEl = linkChipEl.createEl('span', {
+                    cls: 'github-stars-repo-project-link-prefix'
                 });
+                setIcon(prefixEl, GITHUB_STARS_EXTERNAL_LINK_ICON_ID);
                 linkChipEl.createEl('span', {
                     cls: 'github-stars-repo-project-link-label',
                     text: projectLink.label
@@ -3313,7 +3314,7 @@ export class GithubStarsView extends ItemView {
 
         if (repo.linked_note) {
             const linkedNoteEl = containerEl.createEl('div', { cls: 'github-stars-repo-linked-note' });
-            setIcon(linkedNoteEl, 'link');
+            setIcon(linkedNoteEl, GITHUB_STARS_EXTERNAL_LINK_ICON_ID);
             const link = linkedNoteEl.createEl('a', {
                 text: repo.linked_note,
                 href: '#',

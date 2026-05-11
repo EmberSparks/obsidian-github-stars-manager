@@ -101,7 +101,6 @@ export const zh: TranslationKeys = {
         perfResetDone: '已清空性能统计',
         editRepo: '编辑',
         cannotEditRepo: '无法编辑此仓库信息',
-        projectLinkPrefix: '↗',
         sortBy: {
             starred: '最近添加',
             stars: 'Star数量',

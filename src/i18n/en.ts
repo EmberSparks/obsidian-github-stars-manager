@@ -99,7 +99,6 @@ export const en = {
         perfResetDone: 'Performance stats reset',
         editRepo: 'Edit',
         cannotEditRepo: 'Cannot edit this repository information',
-        projectLinkPrefix: '↗',
         sortBy: {
             starred: 'Recently starred',
             stars: 'Stars count',
