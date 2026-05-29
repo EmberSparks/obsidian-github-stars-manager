@@ -21,3 +21,24 @@ test('仓库卡片不应直接请求 external-link 作为自定义图标', () =>
         '仓库卡片应使用插件私有图标 ID，避免重复渲染'
     );
 });
+
+test('项目链接前缀图标不应带背景色或阴影容器', () => {
+    const stylesSource = readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
+    const projectLinkPrefixBlockMatch = stylesSource.match(
+        /\.github-stars-repo-project-link-prefix\s*\{[\s\S]*?\n\}/
+    );
+
+    assert.ok(projectLinkPrefixBlockMatch, '应存在 github-stars-repo-project-link-prefix 样式块');
+
+    const projectLinkPrefixBlock = projectLinkPrefixBlockMatch[0];
+    assert.doesNotMatch(
+        projectLinkPrefixBlock,
+        /\bbackground\s*:/,
+        '项目链接前缀图标不应再带背景色'
+    );
+    assert.doesNotMatch(
+        projectLinkPrefixBlock,
+        /\bbox-shadow\s*:/,
+        '项目链接前缀图标不应再带阴影'
+    );
+});
